@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(helmet()); // Sets secure HTTP headers (HSTS, XSS protection, hides X-Powered-By, etc.)
-app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(cors({ origin: ['ss-new-backendfromr-4832fsvr4-sport-smack.vercel.app', 'http://localhost:3000'], credentials: true }));
 app.use(express.json());
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
