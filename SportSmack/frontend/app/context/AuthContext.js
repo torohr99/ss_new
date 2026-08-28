@@ -53,7 +53,8 @@ export const AuthProvider = ({ children }) => {
       
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`https://onrender.com`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      const res = await fetch(baseUrl + '/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -76,7 +77,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async ({ email, password }) => {
-    const res = await fetch('https://onrender.com', {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(baseUrl + '/api/auth/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +102,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async ({ username, email, password }) => {
-    const res = await fetch(`https://onrender.com`, {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    const res = await fetch(baseUrl + 'api/auth/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
