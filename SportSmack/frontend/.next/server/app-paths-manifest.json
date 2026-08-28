@@ -1,0 +1,10 @@
+{
+  "/page": "app/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/game/[league]/[id]/page": "app/game/[league]/[id]/page.js",
+  "/hubs/page": "app/hubs/page.js",
+  "/scores/page": "app/scores/page.js",
+  "/fantasy/page": "app/fantasy/page.js",
+  "/fantasy/league/[id]/page": "app/fantasy/league/[id]/page.js",
+  "/fantasy/draft/[id]/page": "app/fantasy/draft/[id]/page.js"
+}

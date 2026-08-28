@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+C:/Users/tor99/.gemini/antigravity/scratch/SportSmack/frontend/node_modules/@next/swc-win32-x64-msvc filter=lfs diff=lfs merge=lfs -text
+C:/Users/tor99/.gemini/antigravity/scratch/SportSmack/frontend/node_modules/@next/swc-win32-x64-msvc filter=lfs diff=lfs merge=lfs -text
+*.node filter=lfs diff=lfs merge=lfs -text
