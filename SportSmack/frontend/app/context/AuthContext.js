@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async ({ email, password }) => {
-    const res = await fetch(`https://onrender.com', {
+    const res = await fetch('https://onrender.com', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
