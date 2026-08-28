@@ -15,6 +15,7 @@ const server = http.createServer(app);
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
+  'https://ss-new-backendfromr-pl6vf0k56-sport-smack.vercel.app',
   'https://ss-new-backendfromr.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
