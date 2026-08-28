@@ -14,6 +14,8 @@ const server = http.createServer(app);
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
+  'http://localhost:5173',
+  'https://ss-new-backendfromr.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
@@ -41,6 +43,7 @@ app.use(cors({
   },
   credentials: true
 }));
+app.options('*', cors());
 app.use(express.json());
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
