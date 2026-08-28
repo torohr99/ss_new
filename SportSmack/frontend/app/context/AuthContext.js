@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async ({ username, email, password }) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(baseUrl + 'api/auth/register', {
+    const res = await fetch(baseUrl + '/api/auth/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
