@@ -11,6 +11,14 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+// 1. Allows your backend to read incoming account data text (email, password)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// 2. Logs every request that hits your server to the Render console
+app.use((req, res, next) => {
+  console.log(`>>> Incoming Request: ${req.method} ${req.url} from origin: ${req.headers.origin}`);
+  next();
+});
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
