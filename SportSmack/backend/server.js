@@ -11,6 +11,10 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+
+// FIX 1: Tell Express to trust Render's proxy headers so express-rate-limit stops crashing
+app.set('trust proxy', 1);
+
 // 1. Allows your backend to read incoming account data text (email, password)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -23,19 +27,29 @@ app.use((req, res, next) => {
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://ss-new-backendfromr-pl6vf0k56-sport-smack.vercel.app',
   'https://ss-new-backendfromr.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
+// FIX 2 & 3: Reusable origin verifier for both Express and Socket.io that handles Vercel Wildcards
+const verifyOrigin = (origin, callback) => {
+  // Allow requests with no origin (like mobile apps, postman, curl)
+  if (!origin) return callback(null, true);
+  
+  // Check exact matches
+  if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+  
+  // Wildcard check for any Vercel deployment under this project name
+  const isVercelPreview = /^https:\/\/ss-new-backendfromr.*\.vercel\.app$/.test(origin);
+  if (isVercelPreview) return callback(null, true);
+  
+  console.error(`Blocked CORS Origin: ${origin}`);
+  return callback(null, false);
+};
+
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl)
-      if (!origin) return callback(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS: Origin ${origin} not allowed`));
-    },
+    origin: verifyOrigin,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -45,14 +59,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-
-    console.error(`Blocked CORS Origin: ${origin}`);
-
-    return callback(null, false);
-  },
+  origin: verifyOrigin,
   credentials: true
 }));
 app.options('*', cors());
