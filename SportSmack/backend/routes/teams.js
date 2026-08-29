@@ -24,7 +24,7 @@ router.get('/', authMiddleware, async (req, res) => {
         { sport: 'baseball', league: 'mlb', label: 'MLB' },
         { sport: 'football', league: 'nfl', label: 'NFL' },
         { sport: 'basketball', league: 'wnba', label: 'WNBA' },
-        { sport: 'soccer', league: 'eng.1', label: 'Premier League' } // eng.1 is the code for EPL
+        { sport: 'football', league: 'eng.1', label: 'Premier League' } // eng.1 is the code for EPL
       ];
 
       let allTeamsToInsert = [];
