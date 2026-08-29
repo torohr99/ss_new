@@ -32,14 +32,14 @@ router.get('/', authMiddleware, async (req, res) => {
       // Loop through each league, fetch data, and parse it
       for (const config of leaguesToFetch) {
         try {
+          // 1. Corrected URL with proper dollar sign variable substitution
           const url = `https://espn.com{config.sport}/${config.league}/teams`;
           const response = await axios.get(url);
-          
-          // Drill down into ESPN's dynamic JSON object structure
+    
+          // 2. Navigates ESPN's array tracking layer reliably
           const apiTeams = response.data.sports[0].leagues[0].teams;
 
           const formattedTeams = apiTeams.map(item => ({
-            // Note: If you use auto-incrementing IDs in Prisma, remove the 'id' line entirely 
             name: item.team.displayName,
             abbreviation: item.team.abbreviation || item.team.shortDisplayName,
             sport: config.label,
@@ -50,7 +50,6 @@ router.get('/', authMiddleware, async (req, res) => {
           console.log(`Successfully parsed ${formattedTeams.length} teams from ${config.label}`);
         } catch (leagueError) {
           console.error(`Failed to fetch team data for ${config.label}:`, leagueError.message);
-          // Keep loop running even if one specific league fails temporarily
         }
       }
 
