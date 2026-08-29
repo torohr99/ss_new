@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "Backend for SportSmack",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "dev": "npx kill-port 5000 && nodemon server.js",
-    "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate && npx prisma db push",
-    "render-build": "cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma deploy"
+  "scripts": { 
+    "start": "node server.js", 
+    "dev": "npx kill-port 5000 && nodemon server.js", 
+    "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate && npx prisma db push", 
+    "render-build": "cp prisma/schema.postgres.prisma prisma/schema.prisma && npm install" 
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
