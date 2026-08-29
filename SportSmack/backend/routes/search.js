@@ -30,7 +30,7 @@ router.get('/', authMiddleware, async (req, res) => {
           { sport: { contains: searchQuery, mode: 'insensitive' } }
         ]
       },
-      select: { id: true, name: true, logoUrl: true, sport: true },
+      select: { id: true, name: true, city: true, logo_url: true, sport: true }, // Changed logoUrl to logo_url and added city
       take: 5
     });
 
@@ -45,8 +45,8 @@ router.get('/', authMiddleware, async (req, res) => {
     const formattedTeams = teams.map(t => ({
       id: t.id,
       type: 'team',
-      displayName: t.name, // Uses the full ESPN name (e.g. "Los Angeles Lakers")
-      avatar: t.logoUrl,    // Fixed from logo_url to camelCase logoUrl
+      displayName: t.city ? `${t.city} ${t.name}` : t.name, // Gracefully handles full team display names
+      avatar: t.logo_url, // Changed logoUrl to logo_url
       sport: t.sport
     }));
 
