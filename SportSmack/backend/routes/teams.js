@@ -33,7 +33,7 @@ router.get('/', authMiddleware, async (req, res) => {
       for (const config of leaguesToFetch) {
         try {
           // 1. Corrected URL with proper dollar sign variable substitution
-          const url = `https://espn.com/${config.sport}/${config.league}/scoreboard`;
+          const url = `https://site.api.espn.com/${config.sport}/${config.league}/teams?limit=100`;
           const response = await axios.get(url);
     
           // 2. Navigates ESPN's array tracking layer reliably
