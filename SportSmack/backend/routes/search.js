@@ -27,7 +27,6 @@ router.get('/', authMiddleware, async (req, res) => {
       where: {
         OR: [
           { name: { contains: searchQuery, mode: 'insensitive' } },
-          { abbreviation: { contains: searchQuery, mode: 'insensitive' } },
           { sport: { contains: searchQuery, mode: 'insensitive' } }
         ]
       },
