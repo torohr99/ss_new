@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
 const sportsApi = require('../services/sportsApi');
+const axios = require('axios');
 
 const prisma = new PrismaClient();
 
@@ -10,15 +11,66 @@ const prisma = new PrismaClient();
 // @desc    Get all teams ordered alphabetically by city
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const teams = await prisma.team.findMany({
-      orderBy: {
-        city: 'asc'
+    // 1. Check if teams already exist in your PostgreSQL database
+    let teams = await prisma.team.findMany();
+
+    // 2. If the database is empty, fetch and sync real teams from all 5 leagues
+    if (teams.length === 0) {
+      console.log("Database empty. Synchronizing real teams from all major leagues...");
+
+      // Define the target paths for all 5 leagues on ESPN's API architecture
+      const leaguesToFetch = [
+        { sport: 'basketball', league: 'nba', label: 'NBA' },
+        { sport: 'baseball', league: 'mlb', label: 'MLB' },
+        { sport: 'football', league: 'nfl', label: 'NFL' },
+        { sport: 'basketball', league: 'wnba', label: 'WNBA' },
+        { sport: 'soccer', league: 'eng.1', label: 'Premier League' } // eng.1 is the code for EPL
+      ];
+
+      let allTeamsToInsert = [];
+
+      // Loop through each league, fetch data, and parse it
+      for (const config of leaguesToFetch) {
+        try {
+          const url = `https://espn.com{config.sport}/${config.league}/teams`;
+          const response = await axios.get(url);
+          
+          // Drill down into ESPN's dynamic JSON object structure
+          const apiTeams = response.data.sports[0].leagues[0].teams;
+
+          const formattedTeams = apiTeams.map(item => ({
+            // Note: If you use auto-incrementing IDs in Prisma, remove the 'id' line entirely
+            id: parseInt(item.team.id), 
+            name: item.team.displayName,
+            abbreviation: item.team.abbreviation || item.team.shortDisplayName,
+            sport: config.label,
+            logoUrl: item.team.logos?.[0]?.href || 'https://espncdn.com'
+          }));
+
+          allTeamsToInsert = [...allTeamsToInsert, ...formattedTeams];
+          console.log(`Successfully parsed ${formattedTeams.length} teams from ${config.label}`);
+        } catch (leagueError) {
+          console.error(`Failed to fetch team data for ${config.label}:`, leagueError.message);
+          // Keep loop running even if one specific league fails temporarily
+        }
       }
-    });
-    res.json(teams);
+
+      // 3. Batch insert all collected teams into your Render Postgres database
+      if (allTeamsToInsert.length > 0) {
+        await prisma.team.createMany({
+          data: allTeamsToInsert,
+          skipDuplicates: true // Prevents collision errors if IDs overlap across sports
+        });
+      }
+
+      // 4. Query the database again now that it contains all the real API listings
+      teams = await prisma.team.findMany();
+    }
+
+    return res.json(teams);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error fetching teams' });
+    console.error("Global team synchronization failed:", error);
+    return res.status(500).json({ error: "Could not initialize multi-league team records" });
   }
 });
 
