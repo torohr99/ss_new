@@ -144,9 +144,9 @@ router.post('/login', async (req, res) => {
 
     if (user && (await bcrypt.compare(password, user.password_hash))) {
       
-      if (!user.isVerified) {
-        return res.status(403).json({ message: 'Account not verified. Please verify your email first.', unverified: true, userId: user.id });
-      }
+      //if (!user.isVerified) {
+        //return res.status(403).json({ message: 'Account not verified. Please verify your email first.', unverified: true, userId: user.id });
+      //}
 
       // Create token
       const token = generateToken(user.id, user.username);
