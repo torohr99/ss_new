@@ -39,8 +39,7 @@ router.get('/', authMiddleware, async (req, res) => {
           const apiTeams = response.data.sports[0].leagues[0].teams;
 
           const formattedTeams = apiTeams.map(item => ({
-            // Note: If you use auto-incrementing IDs in Prisma, remove the 'id' line entirely
-            id: parseInt(item.team.id), 
+            // Note: If you use auto-incrementing IDs in Prisma, remove the 'id' line entirely 
             name: item.team.displayName,
             abbreviation: item.team.abbreviation || item.team.shortDisplayName,
             sport: config.label,
