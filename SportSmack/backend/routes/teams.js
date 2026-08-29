@@ -33,17 +33,18 @@ router.get('/', authMiddleware, async (req, res) => {
       for (const config of leaguesToFetch) {
         try {
           // 1. Corrected URL with proper dollar sign variable substitution
-          const url = `https://espn.com/${config.sport}/${config.league}/teams`;
+          const url = `https://espn.com/${config.sport}/${config.league}/scoreboard`;
           const response = await axios.get(url);
     
           // 2. Navigates ESPN's array tracking layer reliably
           const apiTeams = response.data.sports[0].leagues[0].teams;
 
           const formattedTeams = apiTeams.map(item => ({
-            name: item.team.displayName,
+            name: item.team.name, // The pure team name (e.g., "Lakers")
+            city: item.team.location || "", // The city name (e.g., "Los Angeles")
             abbreviation: item.team.abbreviation || item.team.shortDisplayName,
             sport: config.label,
-            logoUrl: item.team.logos?.[0]?.href || 'https://espncdn.com'
+            logo_url: item.team.logos?.[0]?.href || 'https://espncdn.com' // Changed to snake_case logo_url
           }));
 
           allTeamsToInsert = [...allTeamsToInsert, ...formattedTeams];
