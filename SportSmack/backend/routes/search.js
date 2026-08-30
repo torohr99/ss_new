@@ -27,7 +27,8 @@ router.get('/', authMiddleware, async (req, res) => {
       where: {
         OR: [
           { name: { contains: searchQuery, mode: 'insensitive' } },
-          { sport: { contains: searchQuery, mode: 'insensitive' } }
+          { sport: { contains: searchQuery, mode: 'insensitive' } },
+          { city: { contains: searchQuery, mode: 'insensitive' } }
         ]
       },
       select: { id: true, name: true, city: true, logo_url: true, sport: true }, // Changed logoUrl to logo_url and added city
