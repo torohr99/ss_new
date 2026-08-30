@@ -80,10 +80,13 @@ model Team {
   id       Int    @id @default(autoincrement())
   city     String
   name     String
+  abbreviation String
   logo_url String
   sport    String
 
   users UserTeam[]
+
+  @@unique([sport, abbreviation])
 }
 
 model UserTeam {
