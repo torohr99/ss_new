@@ -32,7 +32,7 @@ router.get('/', authMiddleware, async (req, res) => {
           { abbreviation: { contains: searchQuery, mode: 'insensitive' } }
         ]
       },
-      select: { id: true, name: true, city: true, logo_url: true, sport: true }, // Changed logoUrl to logo_url and added city
+      select: { id: true, name: true, city: true, abbreviation: true, logo_url: true, sport: true }, // Changed logoUrl to logo_url and added city
       take: 5
     });
 
@@ -49,7 +49,8 @@ router.get('/', authMiddleware, async (req, res) => {
       type: 'team',
       displayName: t.city ? `${t.city} ${t.name}` : t.name, // Gracefully handles full team display names
       avatar: t.logo_url, // Changed logoUrl to logo_url
-      sport: t.sport
+      sport: t.sport,
+      abbreviation: t.abbreviation
     }));
 
     const combinedResults = [...formattedUsers, ...formattedTeams];
