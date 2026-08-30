@@ -12,7 +12,12 @@ const prisma = new PrismaClient();
 router.get('/', authMiddleware, async (req, res) => {
   try {
     // 1. Check if teams already exist in your PostgreSQL database
-    let teams = await prisma.team.findMany();
+    let teams = await prisma.team.findMany({
+      orderBy: [
+        { city: 'asc' },
+        { name: 'asc' }
+      ]
+    });
 
     // 2. If the database is empty, fetch and sync real teams from all 5 leagues
     if (teams.length === 0) {
@@ -60,14 +65,25 @@ router.get('/', authMiddleware, async (req, res) => {
 
       // 3. Batch insert all collected teams into your Render Postgres database
       if (allTeamsToInsert.length > 0) {
+        console.log(
+          `Attempting to insert ${allTeamsToInsert.length} teams into the database...`
+        );
+
         await prisma.team.createMany({
           data: allTeamsToInsert,
-          skipDuplicates: true // Prevents collision errors if IDs overlap across sports
+          skipDuplicates: true
         });
+
+        console.log('Team database synchronization completed successfully.');
       }
 
       // 4. Query the database again now that it contains all the real API listings
-      teams = await prisma.team.findMany();
+      teams = await prisma.team.findMany({
+        orderBy: [
+          { city: 'asc' },
+          { name: 'asc' }
+        ]
+      });
     }
 
     return res.json(teams);
