@@ -24,7 +24,7 @@ router.get('/', authMiddleware, async (req, res) => {
         { sport: 'baseball', league: 'mlb', label: 'MLB' },
         { sport: 'football', league: 'nfl', label: 'NFL' },
         { sport: 'basketball', league: 'wnba', label: 'WNBA' },
-        { sport: 'football', league: 'eng.1', label: 'Premier League' } // eng.1 is the code for EPL
+        { sport: 'soccer', league: 'eng.1', label: 'Premier League' } // eng.1 is the code for EPL
       ];
 
       let allTeamsToInsert = [];
@@ -33,7 +33,7 @@ router.get('/', authMiddleware, async (req, res) => {
       for (const config of leaguesToFetch) {
         try {
           // 1. Corrected URL with proper dollar sign variable substitution
-          const url = `https://site.api.espn.com/${config.sport}/${config.league}/teams?limit=100`;
+          const url = `https://corsproxy.io?` + encodeURIComponent(`https://site.api.espn.com/${config.sport}/${config.league}/teams?limit=100`);
           const response = await axios.get(url, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
