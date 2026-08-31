@@ -599,8 +599,6 @@ router.put('/me/notifications/read', async (req, res) => {
   }
 });
 
-module.exports = router;
-
 // @route   GET /api/users/me/teams/details
 // @desc    Get detailed schedule and stats for all followed teams (for the sidebar)
 router.get('/me/teams/details', authMiddleware, async (req, res) => {
@@ -688,3 +686,5 @@ router.get('/me/teams/details', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Server error fetching team details' });
   }
 });
+
+module.exports = router;
