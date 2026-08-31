@@ -96,7 +96,7 @@ async function generateWithGemini(gameState) {
   }
 
   const model =
-    process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -137,19 +137,13 @@ async function generateWithGemini(gameState) {
   );
 }
 
-async function getPregameAnalysis(
-  gameState,
-  league,
-  gameId
-) {
-  const cached =
-    getCachedAnalysis(league, gameId);
+async function getPregameAnalysis(gameState, league, gameId) {
+  const cached = getCachedAnalysis(league, gameId);
 
   if (cached) {
     console.log(
       `Using cached AI analysis for ${league}/${gameId}`
     );
-
     return cached;
   }
 
@@ -157,23 +151,33 @@ async function getPregameAnalysis(
     `Generating new AI analysis for ${league}/${gameId}`
   );
 
-  const analysis =
-    await generateWithGemini(gameState);
+  try {
+    const analysis = await generateWithGemini(gameState);
 
-  const result = {
-    success: true,
-    league,
-    gameId,
-    analysis
-  };
+    const result = {
+      success: true,
+      league,
+      gameId,
+      analysis
+    };
 
-  setCachedAnalysis(
-    league,
-    gameId,
-    result
-  );
+    setCachedAnalysis(league, gameId, result);
 
-  return result;
+    return result;
+  } catch (error) {
+    console.error(
+      `AI analysis generation failed for ${league}/${gameId}:`,
+      error.message
+    );
+
+    return {
+      success: false,
+      league,
+      gameId,
+      analysis: null,
+      error: 'AI analysis temporarily unavailable'
+    };
+  }
 }
 
 module.exports = {
