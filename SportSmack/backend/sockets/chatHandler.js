@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const gameAI = require('../services/gameAI');
 const sportsApi = require('../services/sportsApi');
 const gamePolls = require('../services/gamePolls');
 
@@ -189,6 +190,30 @@ module.exports = function(io) {
           
           const isNeutral = !followResult.follows;
           const followsGameTeam = supportsHome || supportsAway;
+
+          // Get centralized AI analysis for this game
+          let aiAnalysis = null;
+          
+          try {
+            const gameState =
+              sportsApi.buildSportSpecificState
+                ? sportsApi.buildSportSpecificState(
+                    gameSummary,
+                    league
+                  )
+                : gameSummary;
+          
+            aiAnalysis = await gameAI.getPregameAnalysis(
+              gameState,
+              league,
+              gameId
+            );
+          } catch (error) {
+            console.error(
+              `Could not obtain shared AI analysis for ${league}/${gameId}:`,
+              error.message
+            );
+          }
 
           // Save competitors array so send_message can use it
           socket.gameContext = {
@@ -413,7 +438,8 @@ module.exports = function(io) {
           success: true,
           readOnly,
           readOnlyReason,
-          messages: messages.reverse()
+          messages: messages.reverse(),
+          aiAnalysis
         });
 
       } catch (err) {
