@@ -171,7 +171,7 @@ async function generateGamePoll(
   }
 
   const cacheKey =
-    `${String(league).toLowerCase()}:${gameId}`;
+  `${String(league).toLowerCase()}:${gameId}:${gameState.status}:${gameState.statusDetail}:${gameState.homeTeam.score}:${gameState.awayTeam.score}`;
 
   const cached =
     pollCache.get(cacheKey);
