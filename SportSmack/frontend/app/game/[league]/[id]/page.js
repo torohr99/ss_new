@@ -5,7 +5,10 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import { useAuth } from '../../../context/AuthContext';
 import MemeEditor from '../../../../components/MemeEditor';
-import { LiveStats } from '../../../../components/gamecast';
+import {
+    LiveStats,
+    PregameAnalysis
+} from '../../../../components/gamecast';
 
 // Per-image component with loading skeleton and error fallback
 function MemeCandidate({ src, index, onSelect }) {
@@ -79,7 +82,12 @@ export default function GameHubPage({ params }) {
   
   // Game & Stats Data
   const [gameData, setGameData] = useState(null);
+
   const [stats, setStats] = useState(null);
+  
+  const [pregameAnalysis, setPregameAnalysis] = useState(null);
+  const [pregameAnalysisLoading, setPregameAnalysisLoading] = useState(false);
+  const [pregameAnalysisError, setPregameAnalysisError] = useState(false);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -95,6 +103,44 @@ export default function GameHubPage({ params }) {
     };
     fetchGameSummary();
   }, [league, gameId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchPregameAnalysis = async () => {
+        setPregameAnalysisLoading(true);
+        setPregameAnalysisError(false);
+
+        try {
+            const res = await axios.get(
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/gamecast/${league}/${gameId}/pregame-analysis`
+            );
+
+            if (!cancelled) {
+                setPregameAnalysis(res.data);
+            }
+        } catch (err) {
+            console.error(
+                'Failed to fetch pre-game AI analysis',
+                err
+            );
+
+            if (!cancelled) {
+                setPregameAnalysisError(true);
+            }
+        } finally {
+            if (!cancelled) {
+                setPregameAnalysisLoading(false);
+            }
+        }
+    };
+
+    fetchPregameAnalysis();
+
+    return () => {
+        cancelled = true;
+    };
+}, [league, gameId]);
 
   // Fetch stats when modal is opened, and interval it
   useEffect(() => {
@@ -239,6 +285,30 @@ export default function GameHubPage({ params }) {
           Live Stats
         </button>
       </div>
+
+      {pregameAnalysis?.status === 'pre' && (
+          <PregameAnalysis
+              data={pregameAnalysis}
+              loading={pregameAnalysisLoading}
+              error={pregameAnalysisError}
+          />
+      )}
+      
+      {pregameAnalysisLoading && !pregameAnalysis && (
+          <PregameAnalysis
+              data={null}
+              loading={true}
+              error={false}
+          />
+      )}
+      
+      {pregameAnalysisError && !pregameAnalysis && (
+          <PregameAnalysis
+              data={null}
+              loading={false}
+              error={true}
+          />
+      )}
 
       {/* CHAT INTERFACE */}
       <div style={{ background: 'var(--glass-bg)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--glass-border)', minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
