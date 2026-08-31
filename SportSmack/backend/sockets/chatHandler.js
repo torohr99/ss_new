@@ -4,6 +4,75 @@ const sportsApi = require('../services/sportsApi');
 
 const prisma = new PrismaClient();
 
+async function userFollowsGameTeam(userId, competitors) {
+  if (!Array.isArray(competitors) || competitors.length === 0) {
+    return {
+      follows: false,
+      teamId: null,
+      team: null
+    };
+  }
+
+  const userTeams = await prisma.userTeam.findMany({
+    where: {
+      user_id: userId
+    },
+    include: {
+      team: true
+    }
+  });
+
+  for (const competitor of competitors) {
+    const espnTeamName = (
+      competitor.team?.displayName ||
+      competitor.team?.name ||
+      competitor.team?.shortDisplayName ||
+      ''
+    ).toLowerCase();
+
+    const espnShortName = (
+      competitor.team?.name ||
+      competitor.team?.shortDisplayName ||
+      ''
+    ).toLowerCase();
+
+    for (const ut of userTeams) {
+      const dbTeamName = (ut.team.name || '').toLowerCase();
+      const dbCityName = (ut.team.city || '').toLowerCase();
+      const dbAbbreviation = (ut.team.abbreviation || '').toLowerCase();
+
+      const nameMatch =
+        (dbTeamName && espnTeamName.includes(dbTeamName)) ||
+        (dbTeamName && espnShortName.includes(dbTeamName));
+
+      const cityMatch =
+        dbCityName &&
+        espnTeamName.includes(dbCityName);
+
+      const abbreviationMatch =
+        dbAbbreviation &&
+        espnShortName.includes(dbAbbreviation);
+
+      if (nameMatch || cityMatch || abbreviationMatch) {
+        return {
+          follows: true,
+          teamId: ut.team.id,
+          team: ut.team,
+          competitorId: String(
+            competitor.id || competitor.team?.id || ''
+          )
+        };
+      }
+    }
+  }
+
+  return {
+    follows: false,
+    teamId: null,
+    team: null
+  };
+}
+
 // Helper to parse cookies from handshake
 function parseCookies(cookieHeader) {
   const list = {};
@@ -54,7 +123,16 @@ module.exports = function(io) {
     console.log(`User connected to chat: ${socket.user.username}`);
 
     socket.on('join_game', async (data, callback) => {
-      const { league, gameId } = data;
+      const league = String(data.league || '').trim();
+      const gameId = String(data.gameId || '').trim();
+
+      if (!league || !gameId) {
+        return callback({
+          success: false,
+          message: 'League and gameId are required'
+        });
+    }
+
       const room = `game_${league}_${gameId}`;
       socket.join(room);
 
@@ -73,41 +151,36 @@ module.exports = function(io) {
           const state = comp.status.type.state; // 'pre', 'in', 'post'
           
           // Map user's followed teams to this game to see if they belong
-          const espnIdsFollowed = new Set();
-          for (const ut of socket.user.teams) {
-            let mapping = null;
-            if (ut.team.sport.toLowerCase() === 'college') {
-              mapping = sportsApi.LEAGUE_MAP[league]; // Map the college to the current game's league
-            } else {
-              for (const key of Object.keys(sportsApi.LEAGUE_MAP)) {
-                if (sportsApi.LEAGUE_MAP[key].sport === ut.team.sport.toLowerCase()) {
-                  mapping = sportsApi.LEAGUE_MAP[key];
-                  break;
-                }
-              }
-            }
-
-            if (mapping) {
-              const details = await sportsApi.getTeamDetails(mapping.sport, mapping.league, ut.team.name);
-              if (details) espnIdsFollowed.add(String(details.espnId));
-            }
-          }
-
-          const homeTeamId = String(comp.competitors.find(c => c.homeAway === 'home').id);
-          const awayTeamId = String(comp.competitors.find(c => c.homeAway === 'away').id);
+          const followResult = await userFollowsGameTeam(
+            socket.user.id,
+            comp.competitors
+          );
           
-          const supportsHome = espnIdsFollowed.has(homeTeamId);
-          const supportsAway = espnIdsFollowed.has(awayTeamId);
-          const isNeutral = !supportsHome && !supportsAway;
+          const supportsHome = followResult.team
+            ? String(comp.competitors.find(c =>
+                c.homeAway === 'home'
+              )?.team?.id || '') === followResult.competitorId
+            : false;
+          
+          const supportsAway = followResult.team
+            ? String(comp.competitors.find(c =>
+                c.homeAway === 'away'
+              )?.team?.id || '') === followResult.competitorId
+            : false;
+          
+          const isNeutral = !followResult.follows;
+          const followsGameTeam = supportsHome || supportsAway;
 
           // Save competitors array so send_message can use it
-          socket.gameContext = { 
-            league, 
-            gameId, 
-            supportsHome, 
-            supportsAway, 
+          socket.gameContext = {
+            league,
+            gameId,
+            supportsHome,
+            supportsAway,
             isNeutral,
-            competitors: comp.competitors
+            followsGameTeam,
+            competitors: comp.competitors,
+            readOnly: false
           };
 
           if (state === 'post') {
@@ -215,6 +288,7 @@ module.exports = function(io) {
               data: {
                 gameId: String(gameId),
                 league,
+                type: 'poll',
                 content: `[POLL_JSON]${JSON.stringify(pollData)}`,
                 userId: systemUser.id
               },
@@ -240,10 +314,33 @@ module.exports = function(io) {
     });
 
     socket.on('send_message', async (data, callback) => {
-      const { league, gameId, content } = data;
+      const league = String(data.league || '').trim();
+      const gameId = String(data.gameId || '').trim();
+      const content = String(data.content || '').trim();
       
-      if (!socket.gameContext || socket.gameContext.gameId !== gameId) {
-        return callback({ success: false, message: 'Not joined to this game' });
+      if (
+        !socket.gameContext ||
+        socket.gameContext.gameId !== gameId ||
+        socket.gameContext.league !== league
+      ) {
+        return callback({
+          success: false,
+          message: 'Not joined to this game'
+        });
+      }
+      
+      if (!socket.gameContext.followsGameTeam) {
+        return callback({
+          success: false,
+          message: 'You must follow one of the teams in this game to chat.'
+        });
+      }
+      
+      if (!content) {
+        return callback({
+          success: false,
+          message: 'Message cannot be empty.'
+        });
       }
 
       // Re-verify read only (simplified for speed, relying on join validation for simplicity, 
@@ -253,32 +350,63 @@ module.exports = function(io) {
 
       try {
         // Find user's favorite team that matches this game
-        let userTeamBadge = { abbreviation: 'Neutral', color: '#666' };
+        let userTeamBadge = {
+          abbreviation: 'Neutral',
+          color: '#666'
+        };
+        
         let teamId = null;
-        if (socket.gameContext && socket.gameContext.competitors) {
-          const userTeams = await prisma.userTeam.findMany({
-            where: { user_id: socket.user.id },
-            include: { team: true }
+        const followResult = await userFollowsGameTeam(
+          socket.user.id,
+          socket.gameContext.competitors
+        );
+        
+        if (!followResult.follows) {
+          return callback({
+            success: false,
+            message: 'You must follow one of the teams in this game to chat.'
           });
-          // Match by name instead of espn_id (Team model has no espn_id field)
-          const gameCompetitors = socket.gameContext.competitors.map(c => ({
-            espnId: String(c.team.id),
-            displayName: (c.team.displayName || '').toLowerCase(),
-            shortName: (c.team.name || '').toLowerCase(),
-            color: c.team.color || '888888'
-          }));
-          for (const ut of userTeams) {
-            const dbTeamName = ut.team.name.toLowerCase();
-            const dbCityName = (ut.team.city || '').toLowerCase();
-            for (const comp of gameCompetitors) {
-              if (comp.displayName.includes(dbTeamName) || 
-                  comp.shortName.includes(dbTeamName) ||
-                  (dbCityName && comp.displayName.includes(dbCityName))) {
-                userTeamBadge = { abbreviation: ut.team.name, color: `#${comp.color}` };
-                break;
-              }
-            }
-            if (userTeamBadge.abbreviation !== 'Neutral') break;
+        }
+        
+        teamId = followResult.teamId;
+        
+        if (followResult.team) {
+          const matchedCompetitor =
+            socket.gameContext.competitors.find(c => {
+              const displayName = (
+                c.team?.displayName ||
+                ''
+              ).toLowerCase();
+        
+              const shortName = (
+                c.team?.name ||
+                c.team?.shortDisplayName ||
+                ''
+              ).toLowerCase();
+        
+              const teamName = (
+                followResult.team.name ||
+                ''
+              ).toLowerCase();
+        
+              const teamCity = (
+                followResult.team.city ||
+                ''
+              ).toLowerCase();
+        
+              return (
+                (teamName && displayName.includes(teamName)) ||
+                (teamName && shortName.includes(teamName)) ||
+                (teamCity && displayName.includes(teamCity))
+              );
+            });
+        
+          if (matchedCompetitor) {
+            userTeamBadge = {
+              abbreviation: followResult.team.abbreviation ||
+                followResult.team.name,
+              color: `#${matchedCompetitor.team.color || '888888'}`
+            };
           }
         }
 
@@ -329,6 +457,7 @@ module.exports = function(io) {
           data: {
             gameId: String(gameId),
             league,
+            type: 'poll',
             content: `[POLL_JSON]${JSON.stringify(pollData)}`,
             userId: socket.user.id
           },
