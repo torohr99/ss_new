@@ -357,16 +357,16 @@ async function generatePregameAnalysis(league, gameId) {
         };
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-        throw new Error('OPENAI_API_KEY is not configured.');
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured.');
     }
 
     const prompt = buildAnalysisPrompt(context);
 
     const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
+        'https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}',
         {
-            model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
             temperature: 0.2,
             response_format: {
                 type: 'json_object'
@@ -385,7 +385,7 @@ async function generatePregameAnalysis(league, gameId) {
         },
         {
             headers: {
-                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
                 'Content-Type': 'application/json'
             },
             timeout: 30000
