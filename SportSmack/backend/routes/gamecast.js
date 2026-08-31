@@ -1,44 +1,84 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const gameAI = require('../services/gameAI')
 const sportsApi = require('../services/sportsApi');
 const gameAnalysis = require('../services/gameAnalysis');
 
 // @route GET /api/gamecast/:league/:gameId/pregame-analysis
 // @desc Generate matchup-specific AI pre-game analysis
 
-router.get('/:league/:gameId/pregame-analysis', async (req, res) => {
+router.get(
+  '/:league/:gameId/pregame-analysis',
+  async (req, res) => {
+    const { league, gameId } = req.params;
+
     try {
-        const { league, gameId } = req.params;
+      const leagueKey =
+        String(league).toLowerCase();
 
-        if (!league || !gameId) {
-            return res.status(400).json({
-                message: 'League and gameId are required.'
-            });
-        }
+      const mapping =
+        sportsApi.LEAGUE_MAP?.[leagueKey];
 
-        const result = await gameAnalysis.generatePregameAnalysis(
-            league,
-            gameId
+      if (!mapping) {
+        return res.status(400).json({
+          success: false,
+          message: `Unsupported league: ${league}`
+        });
+      }
+
+      const summary =
+        await sportsApi.getGameSummary(
+          mapping.sport,
+          league,
+          gameId
         );
 
-        res.json(result);
+      if (!summary) {
+        return res.status(404).json({
+          success: false,
+          message: 'Game data unavailable'
+        });
+      }
+
+      /*
+       * IMPORTANT:
+       * Use the centralized live-game builder.
+       */
+      const gameState =
+        sportsApi.buildLiveGameState
+          ? sportsApi.buildLiveGameState(
+              summary,
+              league,
+              gameId
+            )
+          : summary;
+
+      const result =
+        await gameAI.getPregameAnalysis(
+          gameState,
+          league,
+          gameId
+        );
+
+      res.json(result);
 
     } catch (error) {
-        console.error(
-            'Error generating pre-game AI analysis:',
-            error.message
-        );
+      console.error(
+        'AI analysis error:',
+        error.response?.data ||
+        error.message
+      );
 
-        res.status(500).json({
-            message: 'Unable to generate pre-game analysis.',
-            error:
-                process.env.NODE_ENV === 'development'
-                    ? error.message
-                    : undefined
-        });
+      res.status(503).json({
+        success: false,
+        code: 'AI_ANALYSIS_UNAVAILABLE',
+        message:
+          'AI analysis is temporarily unavailable.'
+      });
     }
-});
+  }
+);
 
 // Helper to get raw ESPN summary
 async function getGameSummary(league, gameId) {
