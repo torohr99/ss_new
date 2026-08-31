@@ -1,8 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
-const gameAI = require('../services/gameAI');
 const sportsApi = require('../services/sportsApi');
-const gamePolls = require('../services/gamePolls');
+const gameAI = require('../services/gameAI');
 
 const prisma = new PrismaClient();
 
@@ -97,8 +96,10 @@ module.exports = function(io) {
       if (!token && socket.handshake.auth && socket.handshake.auth.token) {
         token = socket.handshake.auth.token;
       }
-      console.log('Handshake auth:', socket.handshake.auth, 'Token:', !!token);
-
+      console.log(
+        'Socket handshake received. Token present:',
+        !!token
+      );
       if (!token) {
         return next(new Error('Authentication error'));
       }
@@ -127,6 +128,10 @@ module.exports = function(io) {
     socket.on('join_game', async (data, callback) => {
       const league = String(data.league || '').trim();
       const gameId = String(data.gameId || '').trim();
+    
+      // AI analysis is optional; a failure must NEVER
+      // prevent a user from entering the chatroom.
+      let aiAnalysis = null;
 
       if (!league || !gameId) {
         return callback({
@@ -149,11 +154,12 @@ module.exports = function(io) {
             });
         }
         
-        const gameSummary = await sportsApi.getGameSummary(
+        const gameSummary =
+          await sportsApi.getGameSummary(
             leagueMapping.sport,
             league,
             gameId
-        );
+          );
         
         let readOnly = false;
         let readOnlyReason = '';
@@ -190,31 +196,24 @@ module.exports = function(io) {
           
           const isNeutral = !followResult.follows;
           const followsGameTeam = supportsHome || supportsAway;
-
-          // Get centralized AI analysis for this game
-          let aiAnalysis = null;
-          
+          // Get centralized AI analysis for this game.
+          // AI failure must NEVER prevent joining the chatroom.
           try {
-            const gameState =
-              sportsApi.buildSportSpecificState
-                ? sportsApi.buildSportSpecificState(
-                    summary,
-                    league
-                  )
-                : summary;
-                      
-            aiAnalysis = await gameAI.getPregameAnalysis(
-              gameState,
-              league,
-              gameId
-            );
+            if (gameSummary) {
+              aiAnalysis = await gameAI.getPregameAnalysis(
+                gameSummary,
+                league,
+                gameId
+              );
+            }
           } catch (error) {
             console.error(
               `Could not obtain shared AI analysis for ${league}/${gameId}:`,
               error.message
             );
+          
+            aiAnalysis = null;
           }
-
           // Save competitors array so send_message can use it
           socket.gameContext = {
             league,
@@ -304,134 +303,6 @@ module.exports = function(io) {
                 : { abbreviation: 'Neutral', color: '#666' }
             };
           });
-        }
-
-        // Auto-generate the live prompt poll if it doesn't exist
-        const hasPoll = messages.some(m => m.content.startsWith('[POLL_JSON]'));
-        if (!hasPoll) {
-          // Determine the poll question based on league
-          // Generate a matchup-specific AI poll for this game.
-          let generatedPoll = null;
-          
-          try {
-            const leagueKey = String(league).toLowerCase();
-          
-            const leagueMapping =
-              sportsApi.LEAGUE_MAP?.[leagueKey];
-          
-            if (!leagueMapping) {
-              throw new Error(
-                `Unsupported league for poll generation: ${league}`
-              );
-            }
-          
-            const gameSummary =
-              await sportsApi.getGameSummary(
-                leagueMapping.sport,
-                league,
-                gameId
-              );
-          
-            if (!gameSummary) {
-              throw new Error(
-                'Game summary unavailable for poll generation'
-              );
-            }
-          
-            generatedPoll =
-              await gamePolls.generateGamePoll(
-                gameSummary,
-                league,
-                gameId
-              );
-          
-          } catch (pollError) {
-            console.error(
-              `AI poll generation failed for ${league}/${gameId}:`,
-              pollError.message
-            );
-          
-            // Safe fallback. This prevents joining the chatroom
-            // from failing if the AI service is unavailable.
-            generatedPoll = {
-              question: 'Who has the advantage in this matchup?',
-              options: [
-                'Home team',
-                'Away team'
-              ],
-              reason:
-                'AI-generated matchup context is temporarily unavailable.'
-            };
-          }
-          
-          const pollData = {
-            isPoll: true,
-          
-            question: generatedPoll.question,
-          
-            options: Array.isArray(generatedPoll.options)
-              ? generatedPoll.options
-              : ['Home team', 'Away team'],
-          
-            reason:
-              generatedPoll.reason || '',
-          
-            votes: {},
-          
-            votedUsers: [],
-          
-            createdAt: Date.now(),
-          
-            expiresAt:
-              Date.now() + (10 * 60 * 1000)
-          };
-          
-          pollData.options.forEach(option => {
-            pollData.votes[option] = 0;
-          });
-          
-          const pollMsg = await prisma.gameMessage.create({
-            data: {
-              gameId: String(gameId),
-              league,
-              type: 'poll',
-              content:
-                `[POLL_JSON]${JSON.stringify(pollData)}`,
-              userId: systemUser.id
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true
-                }
-              }
-            }
-          });
-          
-          messages.unshift(pollMsg);
-          
-          // Broadcast to users currently in the room.
-          io.to(room).emit('new_message', pollMsg);
-          pollOptions.forEach(opt => pollData.votes[opt] = 0);
-
-          // Find a system user or use the joining user to post it
-          const systemUser = await prisma.user.findFirst(); // Any user, ideally admin
-          if (systemUser) {
-            const pollMsg = await prisma.gameMessage.create({
-              data: {
-                gameId: String(gameId),
-                league,
-                type: 'poll',
-                content: `[POLL_JSON]${JSON.stringify(pollData)}`,
-                userId: systemUser.id
-              },
-              include: { user: { select: { id: true, username: true } } }
-            });
-            messages.unshift(pollMsg); // Insert at beginning of fetched list
-            // Also broadcast so anyone currently in gets it
-            io.to(room).emit('new_message', pollMsg);
-          }
         }
 
         callback({
