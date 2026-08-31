@@ -2,6 +2,43 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const sportsApi = require('../services/sportsApi');
+const gameAnalysis = require('../services/gameAnalysis');
+
+// @route GET /api/gamecast/:league/:gameId/pregame-analysis
+// @desc Generate matchup-specific AI pre-game analysis
+
+router.get('/:league/:gameId/pregame-analysis', async (req, res) => {
+    try {
+        const { league, gameId } = req.params;
+
+        if (!league || !gameId) {
+            return res.status(400).json({
+                message: 'League and gameId are required.'
+            });
+        }
+
+        const result = await gameAnalysis.generatePregameAnalysis(
+            league,
+            gameId
+        );
+
+        res.json(result);
+
+    } catch (error) {
+        console.error(
+            'Error generating pre-game AI analysis:',
+            error.message
+        );
+
+        res.status(500).json({
+            message: 'Unable to generate pre-game analysis.',
+            error:
+                process.env.NODE_ENV === 'development'
+                    ? error.message
+                    : undefined
+        });
+    }
+});
 
 // Helper to get raw ESPN summary
 async function getGameSummary(league, gameId) {
@@ -29,13 +66,13 @@ router.get('/:league/:gameId/timeline', async (req, res) => {
     let timeline = [];
 
     if (status === 'pre') {
-      timeline.push({
-        id: 'pre-1',
-        time: 'Pre-Game',
-        title: 'Matchup Overview',
-        text: `Welcome to the matchup! The current line is ${summary.pickcenter ? summary.pickcenter[0]?.details : 'unavailable'}. Based on recent team form and historical performance, the predictive models give the ${comp.competitors.find(c=>c.homeAway==='home').team.displayName} a ${summary.predictor?.homeTeam?.gameProjection ?? 50}% chance of winning tonight.`,
-        type: 'analysis'
-      });
+        timeline.push({
+            id: 'pre-1',
+            time: 'Pre-Game',
+            title: 'Game Preview',
+            text: 'AI pre-game analysis is available above.',
+            type: 'analysis'
+        });
     } else {
       // Process live or completed plays
       const plays = summary.plays || [];
