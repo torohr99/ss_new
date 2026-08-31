@@ -46,11 +46,10 @@ router.get(
        * Use the centralized live-game builder.
        */
       const gameState =
-        sportsApi.buildLiveGameState
-          ? sportsApi.buildLiveGameState(
+        sportsApi.buildSportSpecificState
+          ? sportsApi.buildSportSpecificState(
               summary,
-              league,
-              gameId
+              league
             )
           : summary;
 
