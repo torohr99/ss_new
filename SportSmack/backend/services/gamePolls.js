@@ -2,312 +2,260 @@
 
 const axios = require('axios');
 
-const OPENAI_API_URL =
-    'https://api.openai.com/v1/chat/completions';
+const GEMINI_MODEL =
+  process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 const pollCache = new Map();
 
 const POLL_CACHE_TTL =
-    5 * 60 * 1000; // 5 minutes
+  5 * 60 * 1000;
 
 function getTeamName(competitor) {
-    return (
-        competitor?.team?.displayName ||
-        competitor?.team?.name ||
-        'Unknown Team'
-    );
+  return (
+    competitor?.team?.displayName ||
+    competitor?.team?.name ||
+    'Unknown Team'
+  );
 }
 
 function buildGameState(summary, league) {
-    const competition =
-        summary?.header?.competitions?.[0];
+  const competition =
+    summary?.header?.competitions?.[0];
 
-    if (!competition) {
-        return null;
-    }
+  if (!competition) {
+    return null;
+  }
 
-    const competitors =
-        competition.competitors || [];
+  const competitors =
+    competition.competitors || [];
 
-    const home =
-        competitors.find(
-            c => c.homeAway === 'home'
-        );
+  const home =
+    competitors.find(
+      c => c.homeAway === 'home'
+    );
 
-    const away =
-        competitors.find(
-            c => c.homeAway === 'away'
-        );
+  const away =
+    competitors.find(
+      c => c.homeAway === 'away'
+    );
 
-    return {
-        league,
+  return {
+    league,
 
-        status:
-            competition.status?.type?.state ||
-            'unknown',
+    status:
+      competition.status?.type?.state ||
+      'unknown',
 
-        statusDetail:
-            competition.status?.type?.detail ||
-            '',
+    statusDetail:
+      competition.status?.type?.detail ||
+      '',
 
-        homeTeam: {
-            name: getTeamName(home),
-            abbreviation:
-                home?.team?.abbreviation || '',
-            score:
-                home?.score ?? null,
-            record:
-                home?.records?.[0]?.summary || null
-        },
+    homeTeam: {
+      name: getTeamName(home),
+      abbreviation:
+        home?.team?.abbreviation || '',
+      score:
+        home?.score ?? null,
+      record:
+        home?.records?.[0]?.summary || null
+    },
 
-        awayTeam: {
-            name: getTeamName(away),
-            abbreviation:
-                away?.team?.abbreviation || '',
-            score:
-                away?.score ?? null,
-            record:
-                away?.records?.[0]?.summary || null
-        },
+    awayTeam: {
+      name: getTeamName(away),
+      abbreviation:
+        away?.team?.abbreviation || '',
+      score:
+        away?.score ?? null,
+      record:
+        away?.records?.[0]?.summary || null
+    },
 
-        situation:
-            summary?.situation || null,
+    situation:
+      summary?.situation || null,
 
-        plays:
-            Array.isArray(summary?.plays)
-                ? summary.plays.slice(-15)
-                : [],
+    plays:
+      Array.isArray(summary?.plays)
+        ? summary.plays.slice(-15)
+        : [],
 
-        leaders:
-            summary?.leaders || null,
-
-        broadcasts:
-            competition.broadcasts || []
-    };
+    leaders:
+      summary?.leaders || null
+  };
 }
 
-function buildPollPrompt(gameState) {
-    const isPreGame =
-        gameState.status === 'pre';
+function buildPrompt(gameState) {
+  return `
+You generate interactive polls for SportSmack.
 
-    return `
-You create interactive polls for the SportSmack sports social network.
+Create ONE poll for THIS EXACT GAME.
 
-Generate ONE poll for THIS EXACT GAME.
-
-LEAGUE:
-${gameState.league}
-
-GAME STATE:
+GAME:
 ${JSON.stringify(gameState, null, 2)}
 
-This must be a matchup-specific poll.
+The poll must be specific to this matchup.
 
-${isPreGame
-    ? `
-The game has not started.
+If the game has NOT started:
+- Ask about a meaningful matchup, player, strategy,
+  or outcome.
+- Do not use a generic "Who will win?" question
+  unless no better information exists.
 
-Create a poll based on the actual matchup, teams, players, records,
-odds, or other information supplied in the game data.
+If the game IS LIVE:
+- Use the current score.
+- Use the inning/quarter/period.
+- Use recent plays.
+- Use player/game situation information.
+- Ask something fans could realistically debate RIGHT NOW.
 
-Do NOT ask a generic "Who will win?" question unless there is genuinely
-no other useful information available.
-`
-    : `
-The game is currently in progress.
-
-Create a poll based on what is ACTUALLY happening right now.
-
-If the supplied data contains a recent play, score, inning, quarter,
-period, possession, timeout situation, player statistic, etc., use it.
-
-The poll should feel like something fans would naturally debate RIGHT NOW.
-`
-}
-
-SPORT-SPECIFIC RULES:
-
-NFL:
-- Drives
-- Fourth downs
-- Play calling
-- Touchdowns/field goals
-- Quarterback decisions
-- Matchups
-- Defensive strategy
-
-NBA:
-- Player matchups
-- Next possession
-- Three-point attempts
-- Foul/timeout decisions
-- Defensive assignments
-- Scoring runs
-- Clutch situations
+SPORT-SPECIFIC GUIDANCE:
 
 MLB:
-- Next at-bat
-- Pitching changes
-- Batter/pitcher matchups
-- Stolen bases
-- Bullpen decisions
-- Inning strategy
-- Hit/run expectations
+Focus on pitcher/batter matchups, next at-bat,
+runs, bullpen decisions, inning strategy, steals,
+hits, strikeouts, etc.
+
+NFL:
+Focus on drives, fourth downs, play calling,
+QB decisions, touchdowns, field goals, defensive
+matchups, etc.
+
+NBA:
+Focus on possessions, player matchups, three-point
+attempts, fouls, defensive assignments, scoring runs,
+timeouts, etc.
 
 NHL:
-- Power plays
-- Goalie decisions
-- Next goal
-- Shot volume
-- Defensive matchups
-- Empty-net situations
+Focus on power plays, goalie decisions, shots,
+scoring chances, empty-net situations, etc.
 
 NCAAF:
-- Fourth downs
-- Drives
-- Rivalry/matchup factors
-- Quarterback decisions
-- Scoring drives
+Focus on drives, fourth downs, QB decisions,
+scoring, matchups and game situation.
 
 NCAAB:
-- Possessions
-- Three-point shooting
-- Foul trouble
-- Defensive matchups
-- Next scoring run
+Focus on possessions, shooting, foul trouble,
+defensive matchups and scoring runs.
 
-IMPORTANT:
-- Never invent a player.
-- Never invent a statistic.
-- Never claim something happened unless it appears in the supplied data.
-- Don't use stale generic questions when current game data is available.
-- Don't ask the same type of poll repeatedly.
-- Make the question specific enough that fans of THIS game would recognize it.
+Never invent:
+- players
+- statistics
+- injuries
+- plays
+- scores
+- game events
 
-Return ONLY valid JSON:
+Only use supplied information.
+
+Return ONLY JSON:
 
 {
-  "question": "specific poll question",
-  "options": [
-    "Option 1",
-    "Option 2"
-  ],
-  "reason": "one sentence explaining why this poll is relevant right now"
+  "question": "specific question",
+  "options": ["Option 1", "Option 2"],
+  "reason": "why this poll is relevant"
 }
 `;
 }
 
-async function generateGamePoll(summary, league, gameId) {
-    const gameState =
-        buildGameState(summary, league);
+async function generateGamePoll(
+  summary,
+  league,
+  gameId
+) {
+  const gameState =
+    buildGameState(summary, league);
 
-    if (!gameState) {
-        throw new Error(
-            'Game state unavailable'
-        );
-    }
+  if (!gameState) {
+    throw new Error(
+      'Game state unavailable'
+    );
+  }
 
-    const cacheKey =
-        `${String(league).toLowerCase()}:${gameId}`;
+  const cacheKey =
+    `${String(league).toLowerCase()}:${gameId}`;
 
-    const cached =
-        pollCache.get(cacheKey);
+  const cached =
+    pollCache.get(cacheKey);
 
-    if (
-        cached &&
-        Date.now() - cached.timestamp <
-            POLL_CACHE_TTL
-    ) {
-        return cached.data;
-    }
+  if (
+    cached &&
+    Date.now() - cached.timestamp <
+      POLL_CACHE_TTL
+  ) {
+    return cached.data;
+  }
 
-    if (!process.env.OPENAI_API_KEY) {
-        throw new Error(
-            'OPENAI_API_KEY is not configured'
-        );
-    }
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error(
+      'GEMINI_API_KEY is not configured'
+    );
+  }
 
-    const response =
-        await axios.post(
-            OPENAI_API_URL,
-            {
-                model:
-                    process.env.OPENAI_MODEL ||
-                    'gpt-4o-mini',
+  const response =
+    await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: buildPrompt(gameState)
+              }
+            ]
+          }
+        ],
 
-                messages: [
-                    {
-                        role: 'system',
-                        content:
-                            'You generate accurate, game-specific sports polls using only supplied information.'
-                    },
-                    {
-                        role: 'user',
-                        content:
-                            buildPollPrompt(gameState)
-                    }
-                ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 300,
+          responseMimeType:
+            'application/json'
+        }
+      },
+      {
+        timeout: 20000
+      }
+    );
 
-                temperature: 0.7,
-                max_tokens: 250
-            },
-            {
-                headers: {
-                    Authorization:
-                        `Bearer ${process.env.OPENAI_API_KEY}`,
+  const raw =
+    response.data?.candidates?.[0]
+      ?.content?.parts?.[0]?.text;
 
-                    'Content-Type':
-                        'application/json'
-                },
+  if (!raw) {
+    throw new Error(
+      'Gemini returned an empty response'
+    );
+  }
 
-                timeout: 20000
-            }
-        );
+  const poll =
+    JSON.parse(raw);
 
-    const raw =
-        response.data?.choices?.[0]?.message?.content;
+  if (
+    !poll.question ||
+    !Array.isArray(poll.options) ||
+    poll.options.length < 2
+  ) {
+    throw new Error(
+      'Invalid poll format'
+    );
+  }
 
-    if (!raw) {
-        throw new Error(
-            'Empty poll response'
-        );
-    }
+  const result = {
+    question: poll.question,
+    options: poll.options,
+    reason: poll.reason || '',
+    gameId,
+    league
+  };
 
-    const cleaned =
-        raw
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/\s*```$/i, '')
-            .trim();
+  pollCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data: result
+  });
 
-    const poll =
-        JSON.parse(cleaned);
-
-    if (
-        !poll.question ||
-        !Array.isArray(poll.options) ||
-        poll.options.length < 2
-    ) {
-        throw new Error(
-            'Invalid poll format'
-        );
-    }
-
-    const result = {
-        ...poll,
-        gameId,
-        league
-    };
-
-    pollCache.set(cacheKey, {
-        timestamp: Date.now(),
-        data: result
-    });
-
-    return result;
+  return result;
 }
 
 module.exports = {
-    generateGamePoll,
-    buildGameState
+  generateGamePoll,
+  buildGameState
 };
