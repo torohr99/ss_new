@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const sportsApi = require('../services/sportsApi');
+const gamePolls = require('../services/gamePolls');
 
 const prisma = new PrismaClient();
 
@@ -284,19 +285,109 @@ module.exports = function(io) {
         const hasPoll = messages.some(m => m.content.startsWith('[POLL_JSON]'));
         if (!hasPoll) {
           // Determine the poll question based on league
-          const pollQuestion = (league.includes('nfl') || league.includes('ncaaf')) ? 'Should the coach go for it on 4th down?' :
-                               (league.includes('nba') || league.includes('ncaam') || league.includes('ncaaw')) ? 'Should they foul to stop the clock?' :
-                               (league.includes('mlb') || league.includes('ncaab')) ? 'Should they pull the pitcher?' :
-                               'Who is the MVP of this game?';
-          const pollOptions = (league.includes('mlb') || league.includes('ncaab')) ? ['PULL HIM', 'LEAVE HIM'] : ['YES', 'NO'];
-
+          // Generate a matchup-specific AI poll for this game.
+          let generatedPoll = null;
+          
+          try {
+            const leagueKey = String(league).toLowerCase();
+          
+            const leagueMapping =
+              sportsApi.LEAGUE_MAP?.[leagueKey];
+          
+            if (!leagueMapping) {
+              throw new Error(
+                `Unsupported league for poll generation: ${league}`
+              );
+            }
+          
+            const gameSummary =
+              await sportsApi.getGameSummary(
+                leagueMapping.sport,
+                league,
+                gameId
+              );
+          
+            if (!gameSummary) {
+              throw new Error(
+                'Game summary unavailable for poll generation'
+              );
+            }
+          
+            generatedPoll =
+              await gamePolls.generateGamePoll(
+                gameSummary,
+                league,
+                gameId
+              );
+          
+          } catch (pollError) {
+            console.error(
+              `AI poll generation failed for ${league}/${gameId}:`,
+              pollError.message
+            );
+          
+            // Safe fallback. This prevents joining the chatroom
+            // from failing if the AI service is unavailable.
+            generatedPoll = {
+              question: 'Who has the advantage in this matchup?',
+              options: [
+                'Home team',
+                'Away team'
+              ],
+              reason:
+                'AI-generated matchup context is temporarily unavailable.'
+            };
+          }
+          
           const pollData = {
             isPoll: true,
-            question: pollQuestion,
-            options: pollOptions,
+          
+            question: generatedPoll.question,
+          
+            options: Array.isArray(generatedPoll.options)
+              ? generatedPoll.options
+              : ['Home team', 'Away team'],
+          
+            reason:
+              generatedPoll.reason || '',
+          
             votes: {},
-            votedUsers: []
+          
+            votedUsers: [],
+          
+            createdAt: Date.now(),
+          
+            expiresAt:
+              Date.now() + (10 * 60 * 1000)
           };
+          
+          pollData.options.forEach(option => {
+            pollData.votes[option] = 0;
+          });
+          
+          const pollMsg = await prisma.gameMessage.create({
+            data: {
+              gameId: String(gameId),
+              league,
+              type: 'poll',
+              content:
+                `[POLL_JSON]${JSON.stringify(pollData)}`,
+              userId: systemUser.id
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true
+                }
+              }
+            }
+          });
+          
+          messages.unshift(pollMsg);
+          
+          // Broadcast to users currently in the room.
+          io.to(room).emit('new_message', pollMsg);
           pollOptions.forEach(opt => pollData.votes[opt] = 0);
 
           // Find a system user or use the joining user to post it
