@@ -10,6 +10,63 @@ import {
     PregameAnalysis
 } from '../../../../components/gamecast';
 
+function normalizeChatMessage(message) {
+    if (!message) return null;
+
+    const normalized = {
+        ...message
+    };
+
+    // Poll data is stored inside content as:
+    // [POLL_JSON]{...}
+    if (
+        message.type === 'poll' &&
+        typeof message.content === 'string' &&
+        message.content.startsWith('[POLL_JSON]')
+    ) {
+        try {
+            const pollData = JSON.parse(
+                message.content.substring('[POLL_JSON]'.length)
+            );
+
+            normalized.poll_question =
+                pollData.question || 'Poll';
+
+            normalized.poll_options =
+                Array.isArray(pollData.options)
+                    ? pollData.options
+                    : [];
+
+            normalized.poll_results =
+                pollData.votes || {};
+
+        } catch (error) {
+            console.error(
+                'Failed to parse poll data:',
+                error
+            );
+
+            normalized.poll_question = 'Poll';
+            normalized.poll_options = [];
+            normalized.poll_results = {};
+        }
+    }
+
+    // Always guarantee arrays/objects expected by the UI.
+    if (!Array.isArray(normalized.poll_options)) {
+        normalized.poll_options = [];
+    }
+
+    if (
+        !normalized.poll_results ||
+        typeof normalized.poll_results !== 'object'
+    ) {
+        normalized.poll_results = {};
+    }
+
+    return normalized;
+}
+
 // Per-image component with loading skeleton and error fallback
 function MemeCandidate({ src, index, onSelect }) {
   const [loaded, setLoaded] = useState(false);
@@ -181,7 +238,13 @@ export default function GameHubPage({ params }) {
           setConnected(true);
           socket.emit('join_game', { league, gameId }, (response) => {
             if (response.success) {
-              setMessages(response.messages || []);
+              setMessages(
+                  Array.isArray(response.messages)
+                      ? response.messages
+                          .map(normalizeChatMessage)
+                          .filter(Boolean)
+                      : []
+              );
               setReadOnly(response.readOnly);
               setReadOnlyReason(response.readOnlyReason);
             } else {
@@ -192,15 +255,47 @@ export default function GameHubPage({ params }) {
         });
 
         socket.on('new_message', (msg) => {
-          setMessages((prev) => {
-            const exists = prev.find(m => m.id === msg.id);
-            if (exists) return prev.map(m => m.id === msg.id ? msg : m);
-            return [...prev, msg];
-          });
+
+            const normalizedMessage = normalizeChatMessage(msg);
+        
+            if (!normalizedMessage) return;
+        
+            setMessages((prev) => {
+        
+                const exists = prev.find(
+                    m => m.id === normalizedMessage.id
+                );
+        
+                if (exists) {
+                    return prev.map(
+                        m =>
+                            m.id === normalizedMessage.id
+                                ? normalizedMessage
+                                : m
+                    );
+                }
+        
+                return [...prev, normalizedMessage];
+        
+            });
+        
         });
 
         socket.on('poll_updated', (updatedMsg) => {
-          setMessages((prev) => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+
+            const normalizedMessage =
+                normalizeChatMessage(updatedMsg);
+        
+            if (!normalizedMessage) return;
+        
+            setMessages((prev) =>
+                prev.map(m =>
+                    m.id === normalizedMessage.id
+                        ? normalizedMessage
+                        : m
+                )
+            );
+        
         });
 
         socket.on('connect_error', () => {
@@ -337,14 +432,14 @@ export default function GameHubPage({ params }) {
                 <div>
                   <strong>{msg.poll_question}</strong>
                   <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {msg.poll_options.map((opt, i) => (
+                    {(Array.isArray(msg.poll_options) ? msg.poll_options : []).map((opt, i) => (
                       <button key={i} onClick={() => handleVotePoll(msg.id, opt)} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
                         {opt}
                       </button>
                     ))}
                   </div>
                   <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                    {msg.poll_options.map(o => {
+                    {(Array.isArray(msg.poll_options) ? msg.poll_options : []).map(o => {
                       const votes = (msg.poll_results || {})[o] || 0;
                       const totalVotes = Object.values(msg.poll_results || {}).reduce((a,b)=>a+b, 0) || 1;
                       const percent = Math.round((votes/totalVotes)*100);
