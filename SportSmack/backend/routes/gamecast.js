@@ -60,8 +60,15 @@ router.get('/:league/:gameId/timeline', async (req, res) => {
       return res.status(404).json({ message: 'Game data not found' });
     }
 
-    const comp = summary.header.competitions[0];
-    const status = comp.status.type.state; // 'pre', 'in', 'post'
+    const comp = summary.header?.competitions?.[0];
+
+    if (!comp) {
+        return res.status(404).json({
+            message: 'Game data not available yet.'
+        });
+    }
+    
+    const status = comp.status?.type?.state || 'unknown';
 
     let timeline = [];
 
