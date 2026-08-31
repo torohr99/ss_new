@@ -446,6 +446,255 @@ async function getGameSummary(sport, league, gameId) {
   }
 }
 
+function buildLiveGameState(
+  summary,
+  league,
+  gameId
+) {
+  const competition =
+    summary?.header?.competitions?.[0];
+
+  if (!competition) {
+    return null;
+  }
+
+  const competitors =
+    competition.competitors || [];
+
+  const home =
+    competitors.find(
+      c => c.homeAway === 'home'
+    );
+
+  const away =
+    competitors.find(
+      c => c.homeAway === 'away'
+    );
+
+  const cleanTeam = team => ({
+    id: team?.team?.id || null,
+
+    name:
+      team?.team?.displayName ||
+      team?.team?.name ||
+      null,
+
+    abbreviation:
+      team?.team?.abbreviation ||
+      null,
+
+    score:
+      team?.score ?? null,
+
+    record:
+      team?.records?.[0]?.summary ||
+      null,
+
+    winner:
+      team?.winner ?? null
+  });
+
+  return {
+    league,
+    gameId,
+
+    status: {
+      state:
+        competition.status?.type?.state ||
+        null,
+
+      description:
+        competition.status?.type?.description ||
+        null,
+
+      detail:
+        competition.status?.type?.detail ||
+        null,
+
+      period:
+        competition.status?.period ??
+        null,
+
+      clock:
+        competition.status?.displayClock ||
+        null
+    },
+
+    teams: {
+      home: cleanTeam(home),
+      away: cleanTeam(away)
+    },
+
+    venue: {
+      name:
+        competition.venue?.fullName ||
+        null,
+
+      city:
+        competition.venue?.address?.city ||
+        null
+    },
+
+    situation:
+      summary.situation ||
+      null,
+
+    leaders:
+      summary.leaders ||
+      null,
+
+    plays:
+      Array.isArray(summary.plays)
+        ? summary.plays.slice(-20)
+        : [],
+
+    broadcasts:
+      competition.broadcasts ||
+      [],
+
+    odds:
+      competition.odds?.[0] ||
+      null
+  };
+}
+
+function buildSportSpecificState(
+  summary,
+  league
+) {
+  const state =
+    buildLiveGameState(
+      summary,
+      league,
+      summary?.header?.id
+    );
+
+  if (!state) return null;
+
+  const leagueKey =
+    String(league).toLowerCase();
+
+  const situation =
+    summary?.situation || {};
+
+  if (
+    leagueKey === 'mlb' ||
+    leagueKey === 'baseball'
+  ) {
+    state.sportSituation = {
+      inning:
+        situation.inning ??
+        situation.currentInning ??
+        null,
+
+      halfInning:
+        situation.halfInning ||
+        situation.inningHalf ||
+        null,
+
+      outs:
+        situation.outs ??
+        null,
+
+      balls:
+        situation.balls ??
+        null,
+
+      strikes:
+        situation.strikes ??
+        null,
+
+      batter:
+        situation.batter ||
+        null,
+
+      pitcher:
+        situation.pitcher ||
+        null,
+
+      onFirst:
+        situation.onFirst ??
+        false,
+
+      onSecond:
+        situation.onSecond ??
+        false,
+
+      onThird:
+        situation.onThird ??
+        false
+    };
+  }
+
+  if (
+    leagueKey === 'nfl' ||
+    leagueKey === 'ncaaf'
+  ) {
+    state.sportSituation = {
+      down:
+        situation.down ??
+        null,
+
+      distance:
+        situation.distance ??
+        null,
+
+      yardLine:
+        situation.yardLine ??
+        null,
+
+      possession:
+        situation.possession ||
+        null,
+
+      possessionText:
+        situation.possessionText ||
+        null,
+
+      redZone:
+        situation.redZone ??
+        null
+    };
+  }
+
+  if (
+    leagueKey === 'nba' ||
+    leagueKey === 'ncaab'
+  ) {
+    state.sportSituation = {
+      possession:
+        situation.possession ||
+        null,
+
+      possessionText:
+        situation.possessionText ||
+        null,
+
+      shotClock:
+        situation.shotClock ??
+        null
+    };
+  }
+
+  if (leagueKey === 'nhl') {
+    state.sportSituation = {
+      period:
+        situation.period ??
+        null,
+
+      powerPlay:
+        situation.powerPlay ??
+        null,
+
+      possession:
+        situation.possession ||
+        null
+    };
+  }
+
+  return state;
+}
+
 module.exports = {
   getScoreboard,
   getStandings,
@@ -456,5 +705,7 @@ module.exports = {
   getTeamNews,
   getTeamSocialFeeds,
   getGameSummary,
-  LEAGUE_MAP
+  LEAGUE_MAP,
+  buildLiveGameState,
+  buildSportSpecificState
 };
