@@ -35,23 +35,37 @@ export default function RightSidebar() {
 
   const handleFetchAnalysis = async (leagueKey, gameId) => {
     setAnalysisLoading(true);
+    setActiveAnalysis(null);
+
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/sports/${leagueKey}/game/${gameId}/analysis`, {
-        credentials: 'include'
-      });
-      if (res.ok) {
+        const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/gamecast/${leagueKey}/${gameId}/pregame-analysis`,
+            {
+                credentials: 'include'
+            }
+        );
+
         const data = await res.json();
-        setActiveAnalysis(data.analysis);
-      } else {
-        setActiveAnalysis("Analysis unavailable at this time.");
-      }
+
+        if (!res.ok) {
+            throw new Error(
+                data.message || 'Unable to generate analysis'
+            );
+        }
+
+        setActiveAnalysis(data);
+
     } catch (err) {
-      console.error('Failed to fetch analysis', err);
-      setActiveAnalysis("Analysis unavailable at this time.");
+        console.error('Failed to fetch AI pre-game analysis:', err);
+
+        setActiveAnalysis({
+            error: 'AI analysis is unavailable at this time.'
+        });
+
     } finally {
-      setAnalysisLoading(false);
+        setAnalysisLoading(false);
     }
-  };
+};
 
   if (!user) return null;
 
@@ -165,14 +179,132 @@ export default function RightSidebar() {
               🤖 AI Pre-Game Analysis
             </h2>
             {analysisLoading ? (
-              <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-secondary)' }}>
-                <p>Generating deep analysis...</p>
+
+              <div
+                  style={{
+                      textAlign: 'center',
+                      padding: '2rem 0',
+                      color: 'var(--text-secondary)'
+                  }}
+              >
+                  <p>Generating matchup-specific AI analysis...</p>
               </div>
-            ) : (
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: 'var(--text-primary)' }}>
-                {activeAnalysis}
+          
+          ) : activeAnalysis?.error ? (
+          
+              <div
+                  style={{
+                      padding: '1rem',
+                      color: 'var(--text-secondary)'
+                  }}
+              >
+                  {activeAnalysis.error}
               </div>
-            )}
+          
+          ) : activeAnalysis ? (
+          
+              <div
+                  style={{
+                      lineHeight: '1.6',
+                      color: 'var(--text-primary)'
+                  }}
+              >
+          
+                  {activeAnalysis.analysis?.headline && (
+                      <h3 style={{ marginTop: 0 }}>
+                          {activeAnalysis.analysis.headline}
+                      </h3>
+                  )}
+          
+                  {activeAnalysis.analysis?.summary && (
+                      <p>
+                          {activeAnalysis.analysis.summary}
+                      </p>
+                  )}
+          
+                  {activeAnalysis.analysis?.keyMatchup && (
+                      <div style={{ marginTop: '1.25rem' }}>
+                          <h4>Key Matchup</h4>
+          
+                          <strong>
+                              {activeAnalysis.analysis.keyMatchup.title}
+                          </strong>
+          
+                          <p>
+                              {activeAnalysis.analysis.keyMatchup.analysis}
+                          </p>
+          
+                          {activeAnalysis.analysis.keyMatchup.evidence?.length > 0 && (
+                              <ul>
+                                  {activeAnalysis.analysis.keyMatchup.evidence.map(
+                                      (item, index) => (
+                                          <li key={index}>{item}</li>
+                                      )
+                                  )}
+                              </ul>
+                          )}
+                      </div>
+                  )}
+          
+                  {activeAnalysis.analysis?.mostImportantFactor && (
+                      <div style={{ marginTop: '1.25rem' }}>
+                          <h4>Most Important Factor</h4>
+                          <p>
+                              {activeAnalysis.analysis.mostImportantFactor}
+                          </p>
+                      </div>
+                  )}
+          
+                  {activeAnalysis.analysis?.prediction && (
+                      <div
+                          style={{
+                              marginTop: '1.25rem',
+                              padding: '1rem',
+                              background: 'rgba(255,255,255,0.05)',
+                              borderRadius: '8px'
+                          }}
+                      >
+                          <h4 style={{ marginTop: 0 }}>
+                              AI Prediction
+                          </h4>
+          
+                          <div style={{ fontSize: '1.1rem', fontWeight: '700' }}>
+                              {activeAnalysis.analysis.prediction.winner}
+                          </div>
+          
+                          <div
+                              style={{
+                                  fontSize: '0.85rem',
+                                  opacity: 0.75,
+                                  marginTop: '0.25rem'
+                              }}
+                          >
+                              {activeAnalysis.analysis.prediction.confidence}% confidence
+                          </div>
+          
+                          <p>
+                              {activeAnalysis.analysis.prediction.reason}
+                          </p>
+                      </div>
+                  )}
+          
+                  {activeAnalysis.analysis?.watchFor?.length > 0 && (
+                      <div style={{ marginTop: '1.25rem' }}>
+                          <h4>What to Watch For</h4>
+          
+                          <ul>
+                              {activeAnalysis.analysis.watchFor.map(
+                                  (item, index) => (
+                                      <li key={index}>{item}</li>
+                                  )
+                              )}
+                          </ul>
+                      </div>
+                  )}
+          
+              </div>
+          
+          ) : null}
           </div>
         </div>
       )}
