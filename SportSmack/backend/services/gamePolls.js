@@ -10,77 +10,14 @@ const pollCache = new Map();
 const POLL_CACHE_TTL =
   5 * 60 * 1000;
 
+const sportsApi = require('./sportsApi');
+
 function getTeamName(competitor) {
   return (
     competitor?.team?.displayName ||
     competitor?.team?.name ||
     'Unknown Team'
   );
-}
-
-function buildGameState(summary, league) {
-  const competition =
-    summary?.header?.competitions?.[0];
-
-  if (!competition) {
-    return null;
-  }
-
-  const competitors =
-    competition.competitors || [];
-
-  const home =
-    competitors.find(
-      c => c.homeAway === 'home'
-    );
-
-  const away =
-    competitors.find(
-      c => c.homeAway === 'away'
-    );
-
-  return {
-    league,
-
-    status:
-      competition.status?.type?.state ||
-      'unknown',
-
-    statusDetail:
-      competition.status?.type?.detail ||
-      '',
-
-    homeTeam: {
-      name: getTeamName(home),
-      abbreviation:
-        home?.team?.abbreviation || '',
-      score:
-        home?.score ?? null,
-      record:
-        home?.records?.[0]?.summary || null
-    },
-
-    awayTeam: {
-      name: getTeamName(away),
-      abbreviation:
-        away?.team?.abbreviation || '',
-      score:
-        away?.score ?? null,
-      record:
-        away?.records?.[0]?.summary || null
-    },
-
-    situation:
-      summary?.situation || null,
-
-    plays:
-      Array.isArray(summary?.plays)
-        ? summary.plays.slice(-15)
-        : [],
-
-    leaders:
-      summary?.leaders || null
-  };
 }
 
 function buildPrompt(gameState) {
@@ -161,8 +98,10 @@ async function generateGamePoll(
   league,
   gameId
 ) {
-  const gameState =
-    buildGameState(summary, league);
+  const gameState = sportsApi.buildSportSpecificState(
+  summary,
+  league
+);
 
   if (!gameState) {
     throw new Error(
