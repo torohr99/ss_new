@@ -311,13 +311,11 @@ router.post('/me/teams', async (req, res) => {
 
 // @route   GET /api/users/feed/news
 // @desc    Get news for all followed teams
-router.get('/feed/news', authMiddleware, async (req, res) => {
+router.get('/feed/news', async (req, res) => {
   try {
     const userTeams = await prisma.userTeam.findMany({
       where: { user_id: req.user.id },
-      include: {
-        team: true
-      }
+      include: { team: true }
     });
 
     if (!userTeams || userTeams.length === 0) {
@@ -326,165 +324,118 @@ router.get('/feed/news', authMiddleware, async (req, res) => {
 
     let allNews = [];
 
-for (const ut of userTeams) {
-  try {
-    const team = ut.team;
-    const sportKey = (team.sport || '').toLowerCase();
+    for (const ut of userTeams) {
+      try {
+        const team = ut.team;
+        const sportKey = (team.sport || '').toLowerCase();
 
-    let mapping = null;
-    let leagueKey = '';
-    let espnDetails = null;
+        let mapping = null;
+        let leagueKey = '';
+        let espnDetails = null;
 
-    // 1. If the stored sport is directly a LEAGUE_MAP key
-    if (sportsApi.LEAGUE_MAP[sportKey]) {
-      mapping = sportsApi.LEAGUE_MAP[sportKey];
-      leagueKey = sportKey;
+        if (sportsApi.LEAGUE_MAP[sportKey]) {
+          mapping = sportsApi.LEAGUE_MAP[sportKey];
+          leagueKey = sportKey;
 
-      espnDetails = await sportsApi.getTeamDetails(
-        mapping.sport,
-        mapping.league,
-        team.name,
-        team.city
-      );
-    }
-
-    // 2. Otherwise search all league mappings by sport
-    //    (needed for values such as NBA, MLB, NFL, WNBA)
-    if (!espnDetails) {
-      for (const key of Object.keys(sportsApi.LEAGUE_MAP)) {
-        const m = sportsApi.LEAGUE_MAP[key];
-
-        // Match common stored team sport labels to league mappings
-        const label = sportKey;
-
-        const matches =
-          (label === 'nba' && key === 'nba') ||
-          (label === 'mlb' && key === 'mlb') ||
-          (label === 'nfl' && key === 'nfl') ||
-          (label === 'wnba' && key === 'wnba') ||
-          (label === 'premier league' && (
-            key === 'eng.1' ||
-            key === 'epl' ||
-            key === 'premierleague'
-          )) ||
-          m.sport === label;
-
-        if (matches) {
-          const details = await sportsApi.getTeamDetails(
-            m.sport,
-            m.league,
+          espnDetails = await sportsApi.getTeamDetails(
+            mapping.sport,
+            mapping.league,
             team.name,
             team.city
           );
+        }
 
-          if (details) {
-            espnDetails = details;
-            mapping = m;
-            leagueKey = key;
-            break;
+        if (!espnDetails) {
+          for (const key of Object.keys(sportsApi.LEAGUE_MAP)) {
+            const m = sportsApi.LEAGUE_MAP[key];
+
+            const matches =
+              (sportKey === 'nba' && key === 'nba') ||
+              (sportKey === 'mlb' && key === 'mlb') ||
+              (sportKey === 'nfl' && key === 'nfl') ||
+              (sportKey === 'wnba' && key === 'wnba') ||
+              (sportKey === 'premier league' &&
+                (key === 'eng.1' ||
+                 key === 'epl' ||
+                 key === 'premierleague')) ||
+              m.sport === sportKey;
+
+            if (matches) {
+              const details = await sportsApi.getTeamDetails(
+                m.sport,
+                m.league,
+                team.name,
+                team.city
+              );
+
+              if (details) {
+                espnDetails = details;
+                mapping = m;
+                leagueKey = key;
+                break;
+              }
+            }
           }
         }
-      }
-    }
 
-    if (!espnDetails || !mapping) {
-      console.log(
-        `Could not resolve ESPN mapping for ${team.city} ${team.name} (${team.sport})`
-      );
-      continue;
-    }
+        if (!espnDetails || !mapping) {
+          console.log(
+            `Could not resolve ESPN mapping for ${team.city} ${team.name} (${team.sport})`
+          );
+          continue;
+        }
 
-    console.log(
-      `Fetching home feed news for ${team.city} ${team.name} via ${leagueKey}`
-    );
-
-    // Fetch specific team news from ESPN
-    const teamNewsRaw = await sportsApi.getTeamNews(
-      mapping.sport,
-      mapping.league,
-      espnDetails.espnId
-    );
-
-    const mappedNews = (teamNewsRaw || []).map(a => ({
-      id: `news_${a.id || Math.random().toString(36).slice(2)}`,
-      type: 'news',
-      teamId: team.id,
-      teamName: team.name,
-      teamCity: team.city,
-      headline: a.headline || '',
-      description: a.description || '',
-      published: a.published || new Date().toISOString(),
-      image: a.images?.[0]?.url || null,
-      link: a.links?.web?.href || '#'
-    }));
-
-    allNews.push(...mappedNews);
-
-    // Social feeds are optional; do not let them break the entire feed
-    try {
-      const socialFeeds = await sportsApi.getTeamSocialFeeds(team.name);
-
-      if (Array.isArray(socialFeeds)) {
-        allNews.push(
-          ...socialFeeds.map(item => ({
-            ...item,
-            teamId: team.id,
-            teamName: team.name,
-            teamCity: team.city
-          }))
+        const teamNewsRaw = await sportsApi.getTeamNews(
+          mapping.sport,
+          mapping.league,
+          espnDetails.espnId
         );
-      }
-    } catch (socialError) {
-      console.error(
-        `Social feed failed for ${team.name}:`,
-        socialError.message
-      );
-    }
 
-  } catch (teamError) {
-    console.error(
-      `Failed to load news for ${ut.team.name}:`,
-      teamError.message
-    );
-  }
-}
-
-      for (const key of Object.keys(sportsApi.LEAGUE_MAP)) {
-        const m = sportsApi.LEAGUE_MAP[key];
-        if (m.sport === ut.team.sport.toLowerCase()) {
-          const details = await sportsApi.getTeamDetails(m.sport, m.league, ut.team.name);
-          if (details) {
-            espnDetails = details;
-            mapping = m;
-            leagueKey = key;
-            break;
-          }
-        }
-      }
-
-      if (leagueKey && espnDetails) {
-        // Fetch specific team news from ESPN
-        const teamNewsRaw = await sportsApi.getTeamNews(mapping.sport, mapping.league, espnDetails.espnId);
-        const mappedNews = teamNewsRaw.map(a => ({
-          id: `news_${a.id || Math.random().toString()}`,
+        const mappedNews = (teamNewsRaw || []).map(a => ({
+          id: `news_${a.id || Math.random().toString(36).slice(2)}`,
           type: 'news',
-          headline: a.headline,
-          description: a.description,
-          published: a.published,
+          teamId: team.id,
+          teamName: team.name,
+          teamCity: team.city,
+          headline: a.headline || '',
+          description: a.description || '',
+          published: a.published || new Date().toISOString(),
           image: a.images?.[0]?.url || null,
           link: a.links?.web?.href || '#'
         }));
 
-        // Fetch simulated social media feeds (Twitter, etc)
-        const socialFeeds = await sportsApi.getTeamSocialFeeds(ut.team.name);
+        allNews.push(...mappedNews);
 
-        allNews = [...allNews, ...mappedNews, ...socialFeeds];
+        try {
+          const socialFeeds = await sportsApi.getTeamSocialFeeds(team.name);
+
+          if (Array.isArray(socialFeeds)) {
+            allNews.push(
+              ...socialFeeds.map(item => ({
+                ...item,
+                teamId: team.id,
+                teamName: team.name,
+                teamCity: team.city
+              }))
+            );
+          }
+        } catch (socialError) {
+          console.error(
+            `Social feed failed for ${team.name}:`,
+            socialError.message
+          );
+        }
+      } catch (teamError) {
+        console.error(
+          `Failed to load news for ${ut.team.name}:`,
+          teamError.message
+        );
       }
     }
 
-    // Deduplicate (some articles might apply to multiple followed teams)
     const uniqueNews = [];
     const seen = new Set();
+
     for (const item of allNews) {
       if (!seen.has(item.id)) {
         seen.add(item.id);
@@ -492,17 +443,18 @@ for (const ut of userTeams) {
       }
     }
 
-    // Sort descending by published date
     uniqueNews.sort((a, b) => {
       const dateA = new Date(a.published || 0).getTime();
       const dateB = new Date(b.published || 0).getTime();
       return dateB - dateA;
     });
 
-    res.json(uniqueNews.slice(0, 30)); // Limit to top 30
+    return res.json(uniqueNews.slice(0, 30));
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error fetching news feed' });
+    console.error('Server error fetching news feed:', error);
+    return res.status(500).json({
+      message: 'Server error fetching news feed'
+    });
   }
 });
 
