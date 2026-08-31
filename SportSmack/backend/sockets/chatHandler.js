@@ -138,15 +138,33 @@ module.exports = function(io) {
 
       try {
         // Fetch game state
-        const gameSummary = await sportsApi.getGameSummary(sportsApi.LEAGUE_MAP[league].sport, league, gameId);
+        const leagueMapping = sportsApi.LEAGUE_MAP[String(league).toLowerCase()];
+
+        if (!leagueMapping) {
+            return callback({
+                success: false,
+                message: `Unsupported league: ${league}`
+            });
+        }
+        
+        const gameSummary = await sportsApi.getGameSummary(
+            leagueMapping.sport,
+            league,
+            gameId
+        );
         
         let readOnly = false;
         let readOnlyReason = '';
         
-        if (!gameSummary || !gameSummary.header || !gameSummary.header.competitions) {
-          readOnly = true;
-          readOnlyReason = 'Game data unavailable';
-        } else {
+        if (
+              !gameSummary ||
+              !gameSummary.header ||
+              !Array.isArray(gameSummary.header.competitions) ||
+              gameSummary.header.competitions.length === 0
+          ) {
+              readOnly = true;
+              readOnlyReason = 'Game data unavailable';
+          } else {
           const comp = gameSummary.header.competitions[0];
           const state = comp.status.type.state; // 'pre', 'in', 'post'
           
