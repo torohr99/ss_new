@@ -198,11 +198,11 @@ module.exports = function(io) {
             const gameState =
               sportsApi.buildSportSpecificState
                 ? sportsApi.buildSportSpecificState(
-                    gameSummary,
+                    summary,
                     league
                   )
-                : gameSummary;
-          
+                : summary;
+                      
             aiAnalysis = await gameAI.getPregameAnalysis(
               gameState,
               league,
