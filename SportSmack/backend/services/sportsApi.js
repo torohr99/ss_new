@@ -327,6 +327,68 @@ async function getTeamSchedule(sport, league, espnId) {
   }
 }
 
+async function getRecentTeamGames(sport, league, espnId, count = 5) {
+    const cacheKey = `recentGames_${sport}_${league}_${espnId}_${count}`;
+    const cached = cache.get(cacheKey);
+
+    if (cached) return cached;
+
+    try {
+        const response = await axios.get(
+            `http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`
+        );
+
+        const events = response.data.events || [];
+
+        const completedGames = events
+            .filter(event => event.status?.type?.state === 'post')
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .slice(0, count);
+
+        const games = completedGames.map(game => {
+            const competition = game.competitions?.[0];
+
+            if (!competition) return null;
+
+            const home = competition.competitors?.find(
+                c => c.homeAway === 'home'
+            );
+
+            const away = competition.competitors?.find(
+                c => c.homeAway === 'away'
+            );
+
+            if (!home || !away) return null;
+
+            const teamIsHome = String(home.team?.id) === String(espnId);
+            const team = teamIsHome ? home : away;
+            const opponent = teamIsHome ? away : home;
+
+            return {
+                id: game.id,
+                date: game.date,
+                opponent: opponent.team?.displayName || 'Unknown',
+                opponentId: opponent.team?.id || null,
+                homeAway: teamIsHome ? 'home' : 'away',
+                teamScore: Number(team.score) || 0,
+                opponentScore: Number(opponent.score) || 0,
+                result: team.winner ? 'W' : opponent.winner ? 'L' : 'T'
+            };
+        }).filter(Boolean);
+
+        cache.set(cacheKey, games, 900);
+
+        return games;
+    } catch (error) {
+        console.error(
+            `ESPN API Error fetching recent games for ${espnId}:`,
+            error.message
+        );
+
+        return [];
+    }
+}
+
 async function getLeagueNews(sport, league) {
   const cacheKey = `news_${league}`;
   const cached = cache.get(cacheKey);
@@ -389,6 +451,7 @@ module.exports = {
   getStandings,
   getTeamDetails,
   getTeamSchedule,
+  getRecentTeamGames,
   getLeagueNews,
   getTeamNews,
   getTeamSocialFeeds,
