@@ -73,13 +73,28 @@ router.get('/:league/:gameId/timeline', async (req, res) => {
     let timeline = [];
 
     if (status === 'pre') {
+
+        const homeTeam =
+            comp.competitors?.find(
+                c => c.homeAway === 'home'
+            );
+    
+        const awayTeam =
+            comp.competitors?.find(
+                c => c.homeAway === 'away'
+            );
+    
         timeline.push({
             id: 'pre-1',
             time: 'Pre-Game',
-            title: 'Game Preview',
-            text: 'AI pre-game analysis is available above.',
+            title: 'AI Pre-Game Analysis',
+            text:
+                homeTeam && awayTeam
+                    ? `${awayTeam.team?.displayName || 'Away Team'} at ${homeTeam.team?.displayName || 'Home Team'}. Detailed AI matchup analysis is available above.`
+                    : 'Detailed AI matchup analysis is available above.',
             type: 'analysis'
         });
+    
     } else {
       // Process live or completed plays
       const plays = summary.plays || [];
