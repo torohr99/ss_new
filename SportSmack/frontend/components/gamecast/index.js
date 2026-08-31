@@ -181,3 +181,292 @@ export function DynamicPolls({ pollsData }) {
     </div>
   );
 }
+
+export function PregameAnalysis({ data, loading, error }) {
+    if (loading) {
+        return (
+            <div
+                className="gamecast-analysis"
+                style={{
+                    background: 'var(--glass-bg)',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    border: '1px solid var(--glass-border)',
+                    marginBottom: '1rem'
+                }}
+            >
+                <h3 style={{ marginTop: 0 }}>
+                    AI Pre-Game Analysis
+                </h3>
+
+                <p style={{ opacity: 0.75 }}>
+                    Analyzing this matchup...
+                </p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div
+                className="gamecast-analysis"
+                style={{
+                    background: 'var(--glass-bg)',
+                    padding: '1.5rem',
+                    borderRadius: '12px',
+                    border: '1px solid var(--glass-border)',
+                    marginBottom: '1rem'
+                }}
+            >
+                <h3 style={{ marginTop: 0 }}>
+                    AI Pre-Game Analysis
+                </h3>
+
+                <p style={{ opacity: 0.75 }}>
+                    Pre-game analysis is temporarily unavailable.
+                </p>
+            </div>
+        );
+    }
+
+    if (!data?.analysis) {
+        return null;
+    }
+
+    const analysis = data.analysis;
+
+    return (
+        <div
+            className="gamecast-analysis"
+            style={{
+                background: 'var(--glass-bg)',
+                padding: '1.5rem',
+                borderRadius: '12px',
+                border: '1px solid var(--glass-border)',
+                marginBottom: '1rem'
+            }}
+        >
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    alignItems: 'flex-start',
+                    marginBottom: '1rem'
+                }}
+            >
+                <div>
+                    <h3 style={{ margin: 0 }}>
+                        AI Pre-Game Analysis
+                    </h3>
+
+                    {analysis.headline && (
+                        <div
+                            style={{
+                                marginTop: '0.4rem',
+                                fontWeight: 'bold',
+                                color: 'var(--primary-color)'
+                            }}
+                        >
+                            {analysis.headline}
+                        </div>
+                    )}
+                </div>
+
+                {analysis.prediction?.winner && (
+                    <div
+                        style={{
+                            padding: '0.6rem 0.8rem',
+                            borderRadius: '8px',
+                            background: 'rgba(255,255,255,0.06)',
+                            textAlign: 'center',
+                            minWidth: '120px'
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: '0.7rem',
+                                opacity: 0.7,
+                                textTransform: 'uppercase'
+                            }}
+                        >
+                            AI Pick
+                        </div>
+
+                        <strong>
+                            {analysis.prediction.winner}
+                        </strong>
+
+                        {analysis.prediction.confidence !== undefined && (
+                            <div
+                                style={{
+                                    fontSize: '0.8rem',
+                                    opacity: 0.75
+                                }}
+                            >
+                                {analysis.prediction.confidence}% confidence
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {analysis.summary && (
+                <p
+                    style={{
+                        lineHeight: 1.55,
+                        marginTop: 0
+                    }}
+                >
+                    {analysis.summary}
+                </p>
+            )}
+
+            {analysis.keyMatchup && (
+                <div
+                    style={{
+                        marginTop: '1.2rem',
+                        padding: '1rem',
+                        background: 'rgba(255,255,255,0.04)',
+                        borderRadius: '8px'
+                    }}
+                >
+                    <h4 style={{ marginTop: 0 }}>
+                        Key Matchup
+                    </h4>
+
+                    <strong>
+                        {analysis.keyMatchup.title}
+                    </strong>
+
+                    <p style={{ lineHeight: 1.5 }}>
+                        {analysis.keyMatchup.analysis}
+                    </p>
+
+                    {analysis.keyMatchup.evidence?.length > 0 && (
+                        <ul
+                            style={{
+                                marginBottom: 0,
+                                paddingLeft: '1.2rem'
+                            }}
+                        >
+                            {analysis.keyMatchup.evidence.map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+                    )}
+                </div>
+            )}
+
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                        'repeat(auto-fit, minmax(220px, 1fr))',
+                    gap: '1rem',
+                    marginTop: '1rem'
+                }}
+            >
+                {analysis.homeTeam && (
+                    <div
+                        style={{
+                            padding: '1rem',
+                            background: 'rgba(255,255,255,0.04)',
+                            borderRadius: '8px'
+                        }}
+                    >
+                        <h4 style={{ marginTop: 0 }}>
+                            {analysis.homeTeam.name}
+                        </h4>
+
+                        <strong>Advantages</strong>
+
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.homeTeam.advantages || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+
+                        <strong>Concerns</strong>
+
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.homeTeam.concerns || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+                    </div>
+                )}
+
+                {analysis.awayTeam && (
+                    <div
+                        style={{
+                            padding: '1rem',
+                            background: 'rgba(255,255,255,0.04)',
+                            borderRadius: '8px'
+                        }}
+                    >
+                        <h4 style={{ marginTop: 0 }}>
+                            {analysis.awayTeam.name}
+                        </h4>
+
+                        <strong>Advantages</strong>
+
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.awayTeam.advantages || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+
+                        <strong>Concerns</strong>
+
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.awayTeam.concerns || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+                    </div>
+                )}
+            </div>
+
+            {analysis.mostImportantFactor && (
+                <div style={{ marginTop: '1rem' }}>
+                    <h4>Most Important Factor</h4>
+                    <p style={{ lineHeight: 1.5 }}>
+                        {analysis.mostImportantFactor}
+                    </p>
+                </div>
+            )}
+
+            {analysis.prediction?.reason && (
+                <div style={{ marginTop: '1rem' }}>
+                    <h4>Why the AI Picked Them</h4>
+                    <p style={{ lineHeight: 1.5 }}>
+                        {analysis.prediction.reason}
+                    </p>
+                </div>
+            )}
+
+            {analysis.watchFor?.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                    <h4>What to Watch For</h4>
+
+                    <ul style={{ paddingLeft: '1.2rem' }}>
+                        {analysis.watchFor.map((item, index) => (
+                            <li key={index}>{item}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+}
