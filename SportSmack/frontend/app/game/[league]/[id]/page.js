@@ -124,6 +124,7 @@ export default function GameHubPage({ params }) {
   const [readOnly, setReadOnly] = useState(false);
   const [readOnlyReason, setReadOnlyReason] = useState('Connecting to chat...');
   const [connected, setConnected] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
   
   const { user } = useAuth();
   
@@ -245,6 +246,9 @@ export default function GameHubPage({ params }) {
                           .filter(Boolean)
                       : []
               );
+              if (response.aiAnalysis) {
+                setAiAnalysis(response.aiAnalysis);
+              }
               setReadOnly(response.readOnly);
               setReadOnlyReason(response.readOnlyReason);
             } else {
