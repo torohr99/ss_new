@@ -195,6 +195,5 @@ async function generateGamePoll(
 }
 
 module.exports = {
-  generateGamePoll,
-  gameState
+  generateGamePoll
 };
