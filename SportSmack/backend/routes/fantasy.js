@@ -1093,4 +1093,74 @@ router.post(
   }
 );
 
+/* =========================================================
+   VALIDATE NUMBER OF STARTERS USED
+========================================================= */
+
+function validateCompleteStartingLineup(players) {
+  const starters =
+    players.filter(
+      p => p.status === 'STARTER'
+    );
+
+  const counts = {
+    QB: 0,
+    RB: 0,
+    WR: 0,
+    TE: 0,
+    K: 0,
+    DST: 0
+  };
+
+  for (const player of starters) {
+    const position =
+      normalizePosition(
+        player.player.position
+      );
+
+    if (counts[position] !== undefined) {
+      counts[position]++;
+    }
+  }
+
+  const flexUsed =
+    Math.max(0, counts.RB - 2) +
+    Math.max(0, counts.WR - 2) +
+    Math.max(0, counts.TE - 1);
+
+  if (counts.QB !== 1) {
+    return 'You must start exactly 1 QB.';
+  }
+
+  if (counts.RB < 2) {
+    return 'You must start at least 2 RBs.';
+  }
+
+  if (counts.WR < 2) {
+    return 'You must start at least 2 WRs.';
+  }
+
+  if (counts.TE < 1) {
+    return 'You must start at least 1 TE.';
+  }
+
+  if (counts.K !== 1) {
+    return 'You must start exactly 1 K.';
+  }
+
+  if (counts.DST !== 1) {
+    return 'You must start exactly 1 DST.';
+  }
+
+  if (flexUsed !== 1) {
+    return 'You must use exactly 1 FLEX.';
+  }
+
+  if (starters.length !== 9) {
+    return 'You must have exactly 9 starters.';
+  }
+
+  return null;
+}
+
 module.exports = router;
