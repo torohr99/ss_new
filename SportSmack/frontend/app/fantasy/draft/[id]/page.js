@@ -318,7 +318,14 @@ export default function DraftRoom({ params }) {
                             </div>
                             <div>
                               <div style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>{p.name}</div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bye {Math.floor(Math.random() * 8) + 5}</div>
+                              <div style={{
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)'
+                              }}>
+                                {p.byeWeek
+                                  ? `Bye Week ${p.byeWeek}`
+                                  : 'Bye Week —'}
+                              </div>
                             </div>
                           </td>
                           <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
@@ -328,7 +335,9 @@ export default function DraftRoom({ params }) {
                             {p.team}
                           </td>
                           <td style={{ padding: '0.8rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            {Math.floor(Math.random() * 100 + 150)} pts
+                            {p.projectedPoints != null
+                              ? `${Number(p.projectedPoints).toFixed(1)} pts`
+                              : '—'}
                           </td>
                           <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
                             <button 
