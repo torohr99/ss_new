@@ -446,17 +446,59 @@ async function getGameSummary(sport, league, gameId) {
   }
 }
 
+function normalizeGameSummary(summary, league, gameId) {
+  if (!summary) return null;
+
+  // Standard ESPN structure
+  if (summary.header?.competitions?.length) {
+    return summary;
+  }
+
+  // Some ESPN responses may expose the event/competition differently.
+  const event = summary.event || summary.game || null;
+
+  if (event?.competitions?.length) {
+    return {
+      ...summary,
+      header: {
+        ...(summary.header || {}),
+        id: event.id || gameId,
+        competitions: event.competitions
+      }
+    };
+  }
+
+  // If the response itself is an ESPN event object
+  if (summary.competitions?.length) {
+    return {
+      ...summary,
+      header: {
+        ...(summary.header || {}),
+        id: summary.id || gameId,
+        competitions: summary.competitions
+      }
+    };
+  }
+
+  return null;
+}
+
 function buildLiveGameState(
   summary,
   league,
   gameId
 ) {
+  const normalizedSummary =
+    normalizeGameSummary(summary, league, gameId);
+
   const competition =
-    summary?.header?.competitions?.[0];
+    normalizedSummary?.header?.competitions?.[0];
 
   if (!competition) {
     return null;
   }
+
+  summary = normalizedSummary;
 
   const competitors =
     competition.competitors || [];
@@ -560,13 +602,14 @@ function buildLiveGameState(
 
 function buildSportSpecificState(
   summary,
-  league
+  league,
+  gameId = null
 ) {
   const state =
     buildLiveGameState(
       summary,
       league,
-      summary?.header?.id
+      gameId || summary?.header?.id
     );
 
   if (!state) return null;
@@ -706,6 +749,7 @@ module.exports = {
   getTeamSocialFeeds,
   getGameSummary,
   LEAGUE_MAP,
+  normalizeGameSummary,
   buildLiveGameState,
   buildSportSpecificState
 };
