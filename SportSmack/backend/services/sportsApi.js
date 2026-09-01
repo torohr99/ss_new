@@ -738,6 +738,108 @@ function buildSportSpecificState(
   return state;
 }
 
+function buildMemeGameContext(summary, league, gameId) {
+  if (!summary) return null;
+
+  const competition = summary?.header?.competitions?.[0];
+  if (!competition) return null;
+
+  const competitors = competition.competitors || [];
+
+  const formatTeam = (competitor) => ({
+    id: competitor?.team?.id || null,
+    name:
+      competitor?.team?.displayName ||
+      competitor?.team?.name ||
+      null,
+    abbreviation: competitor?.team?.abbreviation || null,
+    score: competitor?.score ?? null,
+    homeAway: competitor?.homeAway || null,
+    winner: competitor?.winner ?? null,
+    logo:
+      competitor?.team?.logos?.[0]?.href ||
+      competitor?.team?.logo ||
+      null
+  });
+
+  const players = [];
+
+  // Extract players from ESPN leaders.
+  if (Array.isArray(summary.leaders)) {
+    for (const leaderGroup of summary.leaders) {
+      const team = leaderGroup?.team;
+
+      for (const category of leaderGroup?.leaders || []) {
+        for (const leader of category?.leaders || []) {
+          const athlete = leader?.athlete;
+
+          if (athlete?.id && athlete?.displayName) {
+            players.push({
+              id: athlete.id,
+              name: athlete.displayName,
+              teamId: team?.id || null,
+              teamName: team?.displayName || null,
+              image:
+                athlete?.headshot?.href ||
+                athlete?.image?.href ||
+                null
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Extract players from recent plays when available.
+  const recentPlays = Array.isArray(summary.plays)
+    ? summary.plays.slice(-20).map(play => ({
+        id: play?.id || null,
+        text: play?.text || play?.shortText || '',
+        type: play?.type?.text || null,
+        scoringPlay: !!play?.scoringPlay,
+        awayScore: play?.awayScore ?? null,
+        homeScore: play?.homeScore ?? null
+      }))
+    : [];
+
+  return {
+    league: String(league).toLowerCase(),
+    gameId: String(gameId),
+
+    status: {
+      state: competition?.status?.type?.state || null,
+      detail: competition?.status?.type?.detail || null,
+      description: competition?.status?.type?.description || null,
+      period: competition?.status?.period ?? null,
+      clock: competition?.status?.displayClock || null
+    },
+
+    teams: {
+      home:
+        formatTeam(
+          competitors.find(c => c.homeAway === 'home')
+        ),
+      away:
+        formatTeam(
+          competitors.find(c => c.homeAway === 'away')
+        )
+    },
+
+    situation: summary.situation || null,
+
+    players,
+
+    recentPlays,
+
+    venue: {
+      name:
+        competition?.venue?.fullName || null,
+      city:
+        competition?.venue?.address?.city || null
+    }
+  };
+}
+
 module.exports = {
   getScoreboard,
   getStandings,
@@ -751,5 +853,6 @@ module.exports = {
   LEAGUE_MAP,
   normalizeGameSummary,
   buildLiveGameState,
-  buildSportSpecificState
+  buildSportSpecificState,
+  buildMemeGameContext
 };
