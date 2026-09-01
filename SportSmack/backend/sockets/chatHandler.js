@@ -107,6 +107,11 @@ module.exports = function(io) {
         throw new Error('JWT_SECRET is not configured');
       }
 
+      if (!process.env.JWT_SECRET) {
+        console.error('JWT_SECRET is not configured');
+        return next(new Error('Server authentication configuration error'));
+      }
+      
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
