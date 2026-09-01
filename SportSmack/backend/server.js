@@ -8,6 +8,9 @@ const liveGameEngine = require('./services/liveGameEngine');
 const rateLimit = require('express-rate-limit');
 const xss = require('xss-clean');
 require('dotenv').config();
+const {
+  startFantasyScheduler
+} = require('./services/fantasyScheduler');
 
 const app = express();
 const server = http.createServer(app);
@@ -119,6 +122,8 @@ setupFantasySockets(io);
 
 // Initialize Live Game Engine for dynamic polls
 liveGameEngine.init(io);
+
+startFantasyScheduler();
 
 // Start server
 server.listen(PORT, '0.0.0.0', () => {
