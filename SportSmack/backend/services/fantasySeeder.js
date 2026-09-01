@@ -2,7 +2,14 @@ const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const VALID_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
+const VALID_POSITIONS = new Set([
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DST'
+]);
 
 async function seedFantasyPlayers() {
   try {
