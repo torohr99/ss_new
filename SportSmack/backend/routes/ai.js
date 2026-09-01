@@ -4,79 +4,173 @@ const authMiddleware = require('../middleware/auth');
 const entityDb = require('../services/entityDb');
 
 // Helper to build a detailed, interpretable meme prompt
-function buildMemePrompt(userInput, entityContext) {
-  const base = userInput.trim();
-  
-  // Detect tone/style signals in the prompt
-  const isReaction = /reaction|reacting|watching|when|face when|pov/i.test(base);
-  const isAction = /running|jumping|throwing|hitting|catching|celebrating|crying|angry|shocked/i.test(base);
-  
-  let styleGuide = 'photorealistic, highly detailed, meme-worthy composition, natural lighting';
-  
-  if (isReaction) {
-    styleGuide += ', extreme facial expression, close-up shot';
-  } else if (isAction) {
-    styleGuide += ', dynamic action shot, motion blur, sports photography';
-  }
-  
-  if (entityContext) {
-    const whoDesc = `${entityContext.name}${entityContext.team ? `, ${entityContext.team}` : ''}${entityContext.sport ? ` ${entityContext.sport} player` : ''}`;
-    return `${whoDesc} - ${base}, ${styleGuide}, sharp focus, cinematic quality, 4K resolution`;
-  }
-  
-  return `${base}, ${styleGuide}, sharp focus, cinematic quality, 4K resolution`;
+function buildMemePrompt(userInput, entityContext, gameContext) {
+  const base = String(userInput || '').trim();
+
+  const entityDescription = entityContext
+    ? [
+        `PRIMARY SPORTS ENTITY: ${entityContext.name || 'Unknown'}`,
+        entityContext.team ? `TEAM: ${entityContext.team}` : '',
+        entityContext.sport ? `SPORT: ${entityContext.sport}` : '',
+        entityContext.type ? `ENTITY TYPE: ${entityContext.type}` : ''
+      ].filter(Boolean).join('\n')
+    : 'PRIMARY SPORTS ENTITY: None identified';
+
+  const gameDescription = gameContext
+    ? [
+        `CURRENT GAME: ${gameContext.awayTeam || 'Away Team'} vs ${gameContext.homeTeam || 'Home Team'}`,
+        gameContext.score
+          ? `CURRENT SCORE: ${gameContext.score}`
+          : '',
+        gameContext.status
+          ? `GAME STATUS: ${gameContext.status}`
+          : '',
+        gameContext.situation
+          ? `CURRENT SITUATION: ${gameContext.situation}`
+          : ''
+      ].filter(Boolean).join('\n')
+    : 'CURRENT GAME: No game context supplied';
+
+  return `
+Create a sports meme image based on the user's exact idea below.
+
+USER'S MEME IDEA:
+"${base}"
+
+${entityDescription}
+
+${gameDescription}
+
+IMPORTANT ACCURACY RULES:
+- Preserve the exact athlete, team, sport, action, and situation requested by the user.
+- Do not substitute a different athlete or team.
+- If a real athlete is identified, make the person visually resemble that athlete.
+- If a team is identified, use that team's actual colors, uniform style, helmet/cap, and visual identity.
+- If the user describes a specific game situation, reproduce that situation rather than creating a generic sports scene.
+- Do not add unrelated players, teams, sports, equipment, or locations.
+- The image should communicate the joke visually even without text.
+- Leave appropriate negative space for meme text.
+- Do not render captions, speech bubbles, watermarks, logos, or written words inside the image.
+- Use realistic sports photography unless the user's request explicitly asks for another visual style.
+- Make the composition immediately understandable as a meme.
+
+VISUAL REQUIREMENTS:
+- Accurate anatomy
+- Correct sport-specific equipment
+- Correct number of players for the described scene
+- Correct team colors
+- Realistic stadium/environment when applicable
+- Strong facial expression when the joke depends on emotion
+- Dynamic action when the joke depends on action
+- Cinematic but believable lighting
+- High detail
+- 4:5 or 16:9 meme-friendly composition
+`.trim();
 }
 
 // @route   POST /api/ai/meme
 // @desc    Generate 3 meme image candidates from a user prompt
 router.post('/meme', authMiddleware, async (req, res) => {
   try {
-    const { prompt } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ message: 'Prompt is required' });
+    const {
+      prompt,
+      gameContext = null
+    } = req.body;
+
+    if (!prompt || !String(prompt).trim()) {
+      return res.status(400).json({
+        message: 'Prompt is required'
+      });
     }
 
-    // Analyze prompt to extract known sports entities (athletes, teams)
-    const entity = await entityDb.identifyEntity(prompt);
+    const cleanPrompt = String(prompt).trim();
 
-    const candidates = [];
-    let responseType = 'generic';
-    let sourceImage = null;
+    // Identify the athlete/team in the user's request.
+    const entity = await entityDb.identifyEntity(cleanPrompt);
 
-    const seed1 = Math.floor(Math.random() * 9000000) + 1000000;
-    const seed2 = Math.floor(Math.random() * 9000000) + 1000000;
-    const seed3 = Math.floor(Math.random() * 9000000) + 1000000;
-    
-    const basePrompt = buildMemePrompt(prompt, entity);
-    
-    // 3 stylistic variants so all candidates are always AI images (no broken entity photo candidate)
-    const prompt1 = `${basePrompt}, photorealistic photograph`;
-    const prompt2 = `${basePrompt}, dramatic angle, vivid colors, editorial photography`;
-    const prompt3 = `${basePrompt}, bold composition, high contrast, internet meme aesthetic, funny`;
+    const basePrompt = buildMemePrompt(
+      cleanPrompt,
+      entity,
+      gameContext
+    );
 
-    const makeUrl = (p, seed) => {
-      // model=flux gives the highest quality, most prompt-accurate results
-      return `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=800&height=500&nologo=true&seed=${seed}&model=flux`;
+    // Three genuinely different compositions.
+    const prompt1 = `
+${basePrompt}
+
+COMPOSITION:
+Classic sports meme photograph.
+The identified subject is the unmistakable focal point.
+Medium-wide shot with the relevant game environment visible.
+Funny but believable.
+`.trim();
+
+    const prompt2 = `
+${basePrompt}
+
+COMPOSITION:
+Close-up reaction meme.
+Prioritize the identified athlete's facial expression and the exact emotional reaction described by the user.
+Keep enough environmental context to identify the game.
+`.trim();
+
+    const prompt3 = `
+${basePrompt}
+
+COMPOSITION:
+Dramatic sports-photography meme.
+Wide cinematic shot showing the exact action/situation requested.
+Use exaggerated but believable body language.
+Make the joke visually obvious.
+`.trim();
+
+    const makeUrl = (promptText) => {
+      const seed =
+        Math.floor(Math.random() * 9000000) + 1000000;
+
+      return (
+        `https://image.pollinations.ai/prompt/` +
+        `${encodeURIComponent(promptText)}` +
+        `?width=1024` +
+        `&height=768` +
+        `&nologo=true` +
+        `&seed=${seed}` +
+        `&model=flux`
+      );
     };
 
-    candidates.push(makeUrl(prompt1, seed1));
-    candidates.push(makeUrl(prompt2, seed2));
-    candidates.push(makeUrl(prompt3, seed3));
+    const candidates = [
+      makeUrl(prompt1),
+      makeUrl(prompt2),
+      makeUrl(prompt3)
+    ];
 
-    if (entity && entity.image) {
-      responseType = 'entity';
-      sourceImage = entity.image;
-    }
+    res.json({
+      type: entity ? 'entity' : 'generic',
 
-    res.json({ 
-      type: responseType,
-      sourceImage,
-      entityName: entity ? entity.name : null,
-      candidates 
+      entity: entity
+        ? {
+            type: entity.type,
+            id: entity.id,
+            name: entity.name,
+            team: entity.team || null,
+            sport: entity.sport || null,
+            image: entity.image || null
+          }
+        : null,
+
+      candidates
     });
+
   } catch (error) {
-    console.error('Error generating AI meme URL:', error.message);
-    res.status(500).json({ message: 'Server error generating meme' });
+    console.error(
+      'Error generating AI meme:',
+      error
+    );
+
+    res.status(500).json({
+      message: 'Server error generating meme'
+    });
   }
 });
 
