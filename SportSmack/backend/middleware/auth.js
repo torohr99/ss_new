@@ -13,7 +13,11 @@ const authMiddleware = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod');
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({ message: 'Server authentication configuration error' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
