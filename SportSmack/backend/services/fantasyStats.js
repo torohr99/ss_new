@@ -89,71 +89,145 @@ async function getWeeklyStats(weekNumber) {
   const url =
     `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026`;
 
-  const response =
-    await axios.get(url, {
-      timeout: 15000
-    });
+  const response = await axios.get(url, {
+    timeout: 15000
+  });
 
-  const events =
-    response.data?.events || [];
-
+  const events = response.data?.events || [];
   const stats = new Map();
 
   for (const event of events) {
-    const competitions =
-      event.competitions || [];
+    const eventId = event.id;
 
-    for (const competition of competitions) {
-      const competitors =
-        competition.competitors || [];
+    try {
+      const summaryResponse = await axios.get(
+        `https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${eventId}`,
+        { timeout: 15000 }
+      );
 
-      for (const competitor of competitors) {
-        const athletes =
-          competitor.roster?.athletes ||
-          [];
+      const summary = summaryResponse.data;
 
-        for (const athlete of athletes) {
-          if (!athlete.id) continue;
+      const players =
+        summary?.boxscore?.players || [];
 
-          stats.set(
-            String(athlete.id),
-            {
-              passingYards:
-                number(
-                  athlete.stats?.passingYards
-                ),
-              passingTD:
-                number(
-                  athlete.stats?.passingTD
-                ),
-              interceptions:
-                number(
-                  athlete.stats?.interceptions
-                ),
-              rushingYards:
-                number(
-                  athlete.stats?.rushingYards
-                ),
-              rushingTD:
-                number(
-                  athlete.stats?.rushingTD
-                ),
-              receptions:
-                number(
-                  athlete.stats?.receptions
-                ),
-              receivingYards:
-                number(
-                  athlete.stats?.receivingYards
-                ),
-              receivingTD:
-                number(
-                  athlete.stats?.receivingTD
-                )
+      for (const teamData of players) {
+        const statistics =
+          teamData.statistics || [];
+
+        for (const group of statistics) {
+          const labels = group.labels || [];
+          const athletes = group.athletes || [];
+
+          for (const athlete of athletes) {
+            const id = athlete?.athlete?.id;
+
+            if (!id) continue;
+
+            const values = athlete.stats || [];
+
+            const getStat = (...names) => {
+              for (const name of names) {
+                const index = labels.indexOf(name);
+
+                if (index !== -1) {
+                  return number(values[index]);
+                }
+              }
+
+              return 0;
+            };
+
+            const current =
+              stats.get(String(id)) || {
+                passingYards: 0,
+                passingTD: 0,
+                interceptions: 0,
+                rushingYards: 0,
+                rushingTD: 0,
+                receptions: 0,
+                receivingYards: 0,
+                receivingTD: 0,
+                fumbles: 0,
+                twoPointConversions: 0,
+                extraPoints: 0,
+                fieldGoals: 0,
+                sacks: 0,
+                defensiveInterceptions: 0,
+                fumbleRecoveries: 0,
+                defensiveTD: 0
+              };
+
+            if (group.name === 'passing') {
+              current.passingYards =
+                getStat('YDS', 'Yards');
+
+              current.passingTD =
+                getStat('TD');
+
+              current.interceptions =
+                getStat('INT');
             }
-          );
+
+            if (group.name === 'rushing') {
+              current.rushingYards =
+                getStat('YDS', 'Yards');
+
+              current.rushingTD =
+                getStat('TD');
+            }
+
+            if (group.name === 'receiving') {
+              current.receptions =
+                getStat('REC');
+
+              current.receivingYards =
+                getStat('YDS', 'Yards');
+
+              current.receivingTD =
+                getStat('TD');
+            }
+
+            if (group.name === 'fumbles') {
+              current.fumbles =
+                getStat('FUM');
+            }
+
+            if (group.name === 'kicking') {
+              current.extraPoints =
+                getStat('XPA', 'XPM');
+
+              current.fieldGoals =
+                getStat('FGM');
+            }
+
+            if (
+              group.name === 'defensive'
+            ) {
+              current.sacks =
+                getStat('SACK');
+
+              current.defensiveInterceptions =
+                getStat('INT');
+
+              current.fumbleRecoveries =
+                getStat('FR');
+
+              current.defensiveTD =
+                getStat('TD');
+            }
+
+            stats.set(
+              String(id),
+              current
+            );
+          }
         }
       }
+    } catch (error) {
+      console.error(
+        `Fantasy stats error for event ${eventId}:`,
+        error.message
+      );
     }
   }
 
