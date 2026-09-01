@@ -428,7 +428,9 @@ router.get(
                   orderBy: {
                     weekNumber: 'asc'
                   }
-                }
+                },
+                homeMatchups: true,
+                awayMatchups: true
               }
             },
             matchups: {
@@ -862,42 +864,83 @@ router.get(
             leagueId: Number(req.params.id)
           },
           include: {
-            weeklyScores: true
+            weeklyScores: true,
+            homeMatchups: true,
+            awayMatchups: true
           }
         });
 
-      const standings =
-        teams.map(team => {
-          const scores =
-            team.weeklyScores;
+      const standings = teams.map(team => {
+        const matchups = [
+          ...team.homeMatchups,
+          ...team.awayMatchups
+        ];
 
-          const wins =
-            scores.filter(s => s.points > 0).length;
+        let wins = 0;
+        let losses = 0;
+        let ties = 0;
 
-          const totalPoints =
-            scores.reduce(
-              (sum, score) =>
-                sum + score.points,
-              0
-            );
+        for (const matchup of matchups) {
+          if (matchup.status !== 'FINAL') {
+            continue;
+          }
 
-          return {
-            teamId: team.id,
-            teamName: team.name,
-            wins,
-            losses: 0,
-            totalPoints
-          };
-        });
+          const isHome =
+            matchup.homeTeamId === team.id;
 
-      standings.sort(
-        (a, b) =>
-          b.totalPoints -
-          a.totalPoints
-      );
+          const teamScore = isHome
+            ? matchup.homeScore
+            : matchup.awayScore;
+
+          const opponentScore = isHome
+            ? matchup.awayScore
+            : matchup.homeScore;
+
+          if (teamScore > opponentScore) {
+            wins++;
+          } else if (teamScore < opponentScore) {
+            losses++;
+          } else {
+            ties++;
+          }
+        }
+
+        const totalPoints =
+          team.weeklyScores.reduce(
+            (sum, score) =>
+              sum + Number(score.points || 0),
+            0
+          );
+
+        return {
+          teamId: team.id,
+          teamName: team.name,
+          wins,
+          losses,
+          ties,
+          totalPoints
+        };
+      });
+
+      standings.sort((a, b) => {
+        if (b.wins !== a.wins) {
+          return b.wins - a.wins;
+        }
+
+        if (b.ties !== a.ties) {
+          return b.ties - a.ties;
+        }
+
+        return b.totalPoints - a.totalPoints;
+      });
 
       res.json(standings);
     } catch (err) {
+      console.error(
+        'Fantasy standings error:',
+        err
+      );
+
       res.status(500).json({
         error: 'Failed to fetch standings'
       });
