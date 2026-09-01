@@ -126,8 +126,6 @@ function setupFantasySockets(io) {
 
               const nextIndex = league.currentPickIndex + 1;
               let newStatus = 'DRAFTING';
-              const nextIndex =
-  league.currentPickIndex + 1;
 
 let newStatus = 'DRAFTING';
 
@@ -293,7 +291,6 @@ if (nextIndex >= totalPicks) {
         // Advance pick
         const nextIndex = league.currentPickIndex + 1;
         let newStatus = 'DRAFTING';
-        const nextIndex =
   league.currentPickIndex + 1;
 
 let newStatus = 'DRAFTING';
