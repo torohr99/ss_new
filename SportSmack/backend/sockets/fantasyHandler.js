@@ -123,7 +123,35 @@ function setupFantasySockets(io) {
 
               const nextIndex = league.currentPickIndex + 1;
               let newStatus = 'DRAFTING';
-              if (nextIndex >= totalPicks) newStatus = 'SEASON';
+              const nextIndex =
+  league.currentPickIndex + 1;
+
+let newStatus = 'DRAFTING';
+
+if (nextIndex >= totalPicks) {
+  newStatus = 'SEASON';
+
+  // Automatically create Week 1 matchups
+  try {
+    const {
+      generateWeeklyMatchups
+    } = require('../services/fantasyMatchups');
+
+    await generateWeeklyMatchups(
+      league.id,
+      1
+    );
+
+    console.log(
+      `Week 1 matchups generated for fantasy league ${league.id}`
+    );
+  } catch (matchupError) {
+    console.error(
+      `Failed to generate Week 1 matchups for league ${league.id}:`,
+      matchupError
+    );
+  }
+}
 
               await prisma.fantasyLeague.update({
                 where: { id: league.id },
@@ -267,9 +295,35 @@ function setupFantasySockets(io) {
         // Advance pick
         const nextIndex = league.currentPickIndex + 1;
         let newStatus = 'DRAFTING';
-        if (nextIndex >= totalPicks) {
-          newStatus = 'SEASON';
-        }
+        const nextIndex =
+  league.currentPickIndex + 1;
+
+let newStatus = 'DRAFTING';
+
+if (nextIndex >= totalPicks) {
+  newStatus = 'SEASON';
+
+  // Automatically create Week 1 matchups
+  try {
+    const {
+      generateWeeklyMatchups
+    } = require('../services/fantasyMatchups');
+
+    await generateWeeklyMatchups(
+      league.id,
+      1
+    );
+
+    console.log(
+      `Week 1 matchups generated for fantasy league ${league.id}`
+    );
+  } catch (matchupError) {
+    console.error(
+      `Failed to generate Week 1 matchups for league ${league.id}:`,
+      matchupError
+    );
+  }
+}
 
         await prisma.fantasyLeague.update({
           where: { id: league.id },
