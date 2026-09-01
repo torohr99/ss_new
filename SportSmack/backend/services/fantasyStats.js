@@ -363,10 +363,7 @@ async function updateMatchups(
           home?.points || 0,
         awayScore:
           away?.points || 0,
-        status:
-          home && away
-            ? 'FINAL'
-            : 'LIVE'
+        status: 'LIVE'
       }
     });
   }
