@@ -1,189 +1,184 @@
+'use strict';
+
 const axios = require('axios');
 
-/**
- * Advanced Entity Recognition Service
- * Identifies athletes, teams, and mascots from a raw text prompt.
- * It utilizes the ESPN Search API to match entities across all major sports leagues.
- */
 class EntityDb {
   constructor() {
-    // Dictionary of common slang and nicknames to improve recognition
     this.slangDictionary = {
-      'yanks': 'New York Yankees',
-      'bosox': 'Boston Red Sox',
-      'niners': 'San Francisco 49ers',
-      'chiefs': 'Kansas City Chiefs',
-      'pats': 'New England Patriots',
-      'mavs': 'Dallas Mavericks',
-      'cavs': 'Cleveland Cavaliers',
-      'tb12': 'Tom Brady',
-      'lbj': 'LeBron James',
+      yanks: 'New York Yankees',
+      bosox: 'Boston Red Sox',
+      sox: 'Boston Red Sox',
+      niners: 'San Francisco 49ers',
+      forty niners: 'San Francisco 49ers',
+      chiefs: 'Kansas City Chiefs',
+      pats: 'New England Patriots',
+      patriots: 'New England Patriots',
+      mavs: 'Dallas Mavericks',
+      cavs: 'Cleveland Cavaliers',
+      tb12: 'Tom Brady',
+      brady: 'Tom Brady',
+      lbj: 'LeBron James',
       'king james': 'LeBron James',
-      'steph': 'Stephen Curry',
-      'mahomes': 'Patrick Mahomes',
-      'joker': 'Nikola Jokic',
-      'kd': 'Kevin Durant'
+      steph: 'Stephen Curry',
+      curry: 'Stephen Curry',
+      mahomes: 'Patrick Mahomes',
+      joker: 'Nikola Jokic',
+      jokic: 'Nikola Jokic',
+      kd: 'Kevin Durant',
+      durant: 'Kevin Durant',
+      'the king': 'LeBron James'
     };
   }
 
-  /**
-   * Pre-processes the prompt to expand known slang and nicknames.
-   */
   expandSlang(prompt) {
-    let expanded = prompt.toLowerCase();
-    for (const [slang, official] of Object.entries(this.slangDictionary)) {
-      const regex = new RegExp(`\\b${slang}\\b`, 'gi');
-      if (regex.test(expanded)) {
-        expanded = expanded.replace(regex, official);
-      }
+    let expanded = String(prompt || '');
+
+    const entries = Object.entries(this.slangDictionary)
+      .sort((a, b) => b[0].length - a[0].length);
+
+    for (const [slang, official] of entries) {
+      const escaped = slang.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      expanded = expanded.replace(
+        new RegExp(`\\b${escaped}\\b`, 'gi'),
+        official
+      );
     }
+
     return expanded;
   }
 
-  /**
-   * Identifies the primary sports entity in a text prompt.
-   * Returns the entity details (type, name, team, sport, image URL) or null if generic.
-   */
-  async identifyEntity(prompt, gameContext = null) {
+  async search(query) {
     try {
-      const cleanPrompt = this.expandSlang(prompt).toLowerCase();
-  
-      /*
-       * FIRST: resolve against the actual game.
-       * This is much more reliable than a global ESPN search.
-       */
-      if (gameContext) {
-        const teams = [
-          gameContext.teams?.home,
-          gameContext.teams?.away
-        ].filter(Boolean);
-  
-        // Exact/current-game team matching.
-        for (const team of teams) {
-          const names = [
-            team.name,
-            team.abbreviation
-          ]
-            .filter(Boolean)
-            .map(v => v.toLowerCase());
-  
-          if (
-            names.some(name =>
-              name.length >= 2 && cleanPrompt.includes(name)
-            )
-          ) {
-            return {
-              type: 'team',
-              id: team.id,
-              name: team.name,
-              abbreviation: team.abbreviation,
-              sport: gameContext.league,
-              image: team.logo,
-              source: 'current_game'
-            };
-          }
-        }
-  
-        // Exact/current-game player matching.
-        const players = Array.isArray(gameContext.players)
-          ? gameContext.players
-          : [];
-  
-        for (const player of players) {
-          if (!player.name) continue;
-  
-          const fullName = player.name.toLowerCase();
-          const parts = fullName.split(/\s+/);
-          const lastName = parts[parts.length - 1];
-  
-          // Prefer full-name matches.
-          if (cleanPrompt.includes(fullName)) {
-            return {
-              type: 'player',
-              id: player.id,
-              name: player.name,
-              team: player.teamName,
-              sport: gameContext.league,
-              image: player.image || null,
-              source: 'current_game'
-            };
-          }
-  
-          // Only use last-name matching when it is reasonably distinctive.
-          if (
-            lastName &&
-            lastName.length >= 5 &&
-            new RegExp(`\\b${lastName}\\b`, 'i').test(cleanPrompt)
-          ) {
-            return {
-              type: 'player',
-              id: player.id,
-              name: player.name,
-              team: player.teamName,
-              sport: gameContext.league,
-              image: player.image || null,
-              source: 'current_game'
-            };
-          }
-        }
-      }
-  
-      /*
-       * FALLBACK: ESPN global search.
-       * Search the ENTIRE prompt instead of only its first four words.
-       */
-      const searchTerms = cleanPrompt;
-  
       const response = await axios.get(
-        `http://site.api.espn.com/apis/search/v2?query=${encodeURIComponent(searchTerms)}&limit=10`
+        'http://site.api.espn.com/apis/search/v2',
+        {
+          params: {
+            query,
+            limit: 10
+          },
+          timeout: 10000
+        }
       );
-  
-      if (!response.data?.results) return null;
-  
-      const playerResults =
-        response.data.results.find(r => r.type === 'player');
-  
-      if (
-        playerResults?.contents &&
-        playerResults.contents.length > 0
-      ) {
-        const player = playerResults.contents[0];
-  
-        return {
-          type: 'player',
-          id: player.id,
-          name: player.displayName,
-          team: player.subtitle,
-          sport: player.sport,
-          image: player.image?.default || null,
-          source: 'espn_search'
-        };
-      }
-  
-      const teamResults =
-        response.data.results.find(r => r.type === 'team');
-  
-      if (
-        teamResults?.contents &&
-        teamResults.contents.length > 0
-      ) {
-        const team = teamResults.contents[0];
-  
-        return {
-          type: 'team',
-          id: team.id,
-          name: team.displayName,
-          sport: team.sport,
-          image: team.image?.default || null,
-          source: 'espn_search'
-        };
-      }
-  
-      return null;
+
+      return response.data?.results || [];
     } catch (error) {
-      console.error('Error in EntityDb:', error.message);
-      return null;
+      console.error(
+        `ESPN entity search failed for "${query}":`,
+        error.message
+      );
+      return [];
     }
+  }
+
+  scoreResult(result, query) {
+    const text = JSON.stringify(result).toLowerCase();
+    const q = query.toLowerCase();
+
+    let score = 0;
+
+    if (text.includes(q)) score += 100;
+
+    const words = q
+      .split(/\s+/)
+      .filter(word => word.length >= 3);
+
+    for (const word of words) {
+      if (text.includes(word)) score += 10;
+    }
+
+    return score;
+  }
+
+  async identifyEntities(prompt) {
+    const expanded = this.expandSlang(prompt);
+
+    // Search several portions of the prompt rather than only
+    // the first four words.
+    const words = expanded.split(/\s+/).filter(Boolean);
+
+    const queries = new Set();
+
+    queries.add(expanded);
+
+    for (let i = 0; i < words.length; i++) {
+      for (let length = 2; length <= 4; length++) {
+        const phrase = words.slice(i, i + length).join(' ');
+        if (phrase.length >= 4) {
+          queries.add(phrase);
+        }
+      }
+    }
+
+    const candidates = [];
+
+    for (const query of queries) {
+      const results = await this.search(query);
+
+      for (const result of results) {
+        const score = this.scoreResult(result, query);
+
+        if (result.contents) {
+          for (const content of result.contents) {
+            candidates.push({
+              ...content,
+              resultType: result.type,
+              score
+            });
+          }
+        }
+      }
+    }
+
+    // Deduplicate entities.
+    const unique = new Map();
+
+    for (const candidate of candidates) {
+      const id = String(candidate.id || '');
+
+      if (!id) continue;
+
+      const existing = unique.get(id);
+
+      if (!existing || candidate.score > existing.score) {
+        unique.set(id, candidate);
+      }
+    }
+
+    const ranked = [...unique.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+
+    return ranked.map(entity => ({
+      id: entity.id,
+      type: entity.type || entity.resultType,
+      name:
+        entity.displayName ||
+        entity.fullName ||
+        entity.name ||
+        'Unknown',
+      team:
+        entity.subtitle ||
+        entity.team?.displayName ||
+        entity.team?.name ||
+        null,
+      sport:
+        entity.sport ||
+        entity.sportType ||
+        null,
+      image:
+        entity.image?.default ||
+        entity.headshot?.href ||
+        null,
+      score: entity.score
+    }));
+  }
+
+  async identifyEntity(prompt) {
+    const entities = await this.identifyEntities(prompt);
+
+    if (!entities.length) return null;
+
+    return entities[0];
   }
 }
 
