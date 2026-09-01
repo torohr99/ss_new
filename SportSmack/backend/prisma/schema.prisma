@@ -172,6 +172,8 @@ model FantasyLeague {
   owner      User               @relation("LeagueOwner", fields: [ownerId], references: [id])
   teams      FantasyTeam[]
   draftPicks FantasyDraftPick[]
+  matchups      FantasyMatchup[]
+  transactions  FantasyTransaction[]
 }
 
 model FantasyTeam {
@@ -186,6 +188,9 @@ model FantasyTeam {
   user         User                 @relation(fields: [userId], references: [id])
   players      FantasyTeamPlayer[]
   weeklyScores FantasyWeeklyScore[]
+  homeMatchups FantasyMatchup[] @relation("HomeMatchups")
+  awayMatchups FantasyMatchup[] @relation("AwayMatchups")
+  transactions FantasyTransaction[]
 
   @@index([leagueId])
   @@index([userId])
@@ -201,6 +206,7 @@ model FantasyPlayer {
 
   draftPicks  FantasyDraftPick[]
   teamRosters FantasyTeamPlayer[]
+  transactions FantasyTransaction[]
 }
 
 model FantasyDraftPick {
@@ -261,4 +267,38 @@ model BracketPick {
 
   league BracketLeague @relation(fields: [leagueId], references: [id])
   user   User          @relation("UserBracketPicks", fields: [userId], references: [id])
+}
+
+model FantasyMatchup {
+  id              Int      @id @default(autoincrement())
+  leagueId        Int
+  weekNumber      Int
+  homeTeamId      Int
+  awayTeamId      Int
+  homeScore       Float    @default(0)
+  awayScore       Float    @default(0)
+  status          String   @default("UPCOMING")
+
+  league   FantasyLeague @relation(fields: [leagueId], references: [id])
+  homeTeam FantasyTeam   @relation("HomeMatchups", fields: [homeTeamId], references: [id])
+  awayTeam FantasyTeam   @relation("AwayMatchups", fields: [awayTeamId], references: [id])
+
+  @@index([leagueId, weekNumber])
+}
+
+model FantasyTransaction {
+  id         Int      @id @default(autoincrement())
+  leagueId   Int
+  teamId     Int
+  type       String
+  playerId   Int?
+  relatedTeamId Int?
+  createdAt  DateTime @default(now())
+
+  league FantasyLeague @relation(fields: [leagueId], references: [id])
+  team   FantasyTeam   @relation(fields: [teamId], references: [id])
+  player FantasyPlayer? @relation(fields: [playerId], references: [id])
+
+  @@index([leagueId])
+  @@index([teamId])
 }
