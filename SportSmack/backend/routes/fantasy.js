@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const {
+  generateWeeklyMatchups
+} = require('../services/fantasyMatchups');
 
 const { seedFantasyPlayers } = require('../services/fantasySeeder');
 const fantasyStats = require('../services/fantasyStats');
@@ -1013,6 +1016,29 @@ router.post(
 
       res.status(500).json({
         error: 'Failed to score week'
+      });
+    }
+  }
+);
+
+router.post(
+  '/league/:id/generate-matchups',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const matchups =
+        await generateWeeklyMatchups(
+          Number(req.params.id),
+          Number(req.body.weekNumber || 1)
+        );
+
+      res.json(matchups);
+    } catch (err) {
+      console.error(err);
+
+      res.status(500).json({
+        error:
+          'Failed to generate matchups'
       });
     }
   }
