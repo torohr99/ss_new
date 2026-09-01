@@ -50,14 +50,57 @@ class EntityDb {
       
       // We take the first 4 words of the prompt assuming the subject is mentioned early,
       // or we just search the whole prompt if it's short.
-      const searchTerms = cleanPrompt.split(' ').slice(0, 4).join(' ');
+      const searchTerms = cleanPrompt;
 
-      const response = await axios.get(`http://site.api.espn.com/apis/search/v2?query=${encodeURIComponent(searchTerms)}&limit=3`);
-      
-      if (!response.data || !response.data.results) return null;
+const response = await axios.get(
+  `http://site.api.espn.com/apis/search/v2?query=${encodeURIComponent(searchTerms)}&limit=10`
+);
 
-      // Check for players first, then teams
-      const playerResults = response.data.results.find(r => r.type === 'player');
+if (
+  !response.data ||
+  !Array.isArray(response.data.results)
+) {
+  return null;
+}
+
+// Prefer an exact or near-exact player name match.
+const playerResults =
+  response.data.results.find(
+    r => r.type === 'player'
+  );
+
+if (
+  playerResults &&
+  Array.isArray(playerResults.contents) &&
+  playerResults.contents.length > 0
+) {
+  const normalizedPrompt =
+    cleanPrompt.toLowerCase();
+
+  const player =
+    playerResults.contents.find(p => {
+      const name =
+        String(p.displayName || '')
+          .toLowerCase();
+
+      return (
+        normalizedPrompt.includes(name) ||
+        name.includes(normalizedPrompt)
+      );
+    }) ||
+    playerResults.contents[0];
+
+  return {
+    type: 'player',
+    id: player.id,
+    name: player.displayName,
+    team: player.subtitle,
+    sport: player.sport,
+    image:
+      player.image?.default ||
+      null
+  };
+}
       if (playerResults && playerResults.contents && playerResults.contents.length > 0) {
         const player = playerResults.contents[0];
         return {
