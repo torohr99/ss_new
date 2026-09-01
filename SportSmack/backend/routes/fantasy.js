@@ -2,45 +2,201 @@ const express = require('express');
 const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-const { seedFantasyPlayers } = require('../services/fantasySeeder');
 
-// Middleware to authenticate user from JWT
+const { seedFantasyPlayers } = require('../services/fantasySeeder');
+const fantasyStats = require('../services/fantasyStats');
+
 const authenticateToken = require('../middleware/auth');
 
-// Seed players (Admin route)
-router.post('/seed', async (req, res) => {
+const VALID_POSITIONS = new Set([
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DST'
+]);
+
+const STARTER_LIMITS = {
+  QB: 1,
+  RB: 2,
+  WR: 2,
+  TE: 1,
+  K: 1,
+  DST: 1
+};
+
+const FLEX_LIMIT = 1;
+const MAX_ROSTER_SIZE = 15;
+
+function normalizePosition(position) {
+  return String(position || '').toUpperCase();
+}
+
+function isFlexEligible(position) {
+  return ['RB', 'WR', 'TE'].includes(position);
+}
+
+function validateStarterRoster(players) {
+  const starters = players.filter(p => p.status === 'STARTER');
+
+  const counts = {
+    QB: 0,
+    RB: 0,
+    WR: 0,
+    TE: 0,
+    K: 0,
+    DST: 0
+  };
+
+  for (const player of starters) {
+    const position = normalizePosition(player.player.position);
+
+    if (counts[position] !== undefined) {
+      counts[position]++;
+    }
+  }
+
+  if (counts.QB > STARTER_LIMITS.QB) {
+    return 'You can only start 1 QB.';
+  }
+
+  if (counts.K > STARTER_LIMITS.K) {
+    return 'You can only start 1 K.';
+  }
+
+  if (counts.DST > STARTER_LIMITS.DST) {
+    return 'You can only start 1 DST.';
+  }
+
+  if (counts.RB > STARTER_LIMITS.RB + FLEX_LIMIT) {
+    return 'Too many RB starters.';
+  }
+
+  if (counts.WR > STARTER_LIMITS.WR + FLEX_LIMIT) {
+    return 'Too many WR starters.';
+  }
+
+  if (counts.TE > STARTER_LIMITS.TE + FLEX_LIMIT) {
+    return 'Too many TE starters.';
+  }
+
+  const requiredBase =
+    counts.QB +
+    Math.min(counts.RB, 2) +
+    Math.min(counts.WR, 2) +
+    Math.min(counts.TE, 1) +
+    counts.K +
+    counts.DST;
+
+  const flexUsed =
+    Math.max(0, counts.RB - 2) +
+    Math.max(0, counts.WR - 2) +
+    Math.max(0, counts.TE - 1);
+
+  if (flexUsed > FLEX_LIMIT) {
+    return 'You can only use 1 FLEX position.';
+  }
+
+  return null;
+}
+
+/* =========================================================
+   PLAYERS
+========================================================= */
+
+router.post('/seed', authenticateToken, async (req, res) => {
   try {
     const total = await seedFantasyPlayers();
-    res.json({ message: 'Seeding complete', total });
+    res.json({
+      message: 'Seeding complete',
+      total
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to seed players' });
+    console.error('Fantasy seed error:', err);
+    res.status(500).json({
+      error: 'Failed to seed players'
+    });
   }
 });
 
-// Get all players available for draft
 router.get('/players', authenticateToken, async (req, res) => {
   try {
     const players = await prisma.fantasyPlayer.findMany({
-      orderBy: { name: 'asc' }
+      orderBy: {
+        name: 'asc'
+      }
     });
+
     res.json(players);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch players' });
+    console.error(err);
+    res.status(500).json({
+      error: 'Failed to fetch players'
+    });
   }
 });
 
-// Create a new league
+router.get('/players/search', authenticateToken, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const position = normalizePosition(req.query.position);
+    const team = String(req.query.team || '').trim().toUpperCase();
+
+    const where = {};
+
+    if (q) {
+      where.name = {
+        contains: q
+      };
+    }
+
+    if (position && VALID_POSITIONS.has(position)) {
+      where.position = position;
+    }
+
+    if (team) {
+      where.team = team;
+    }
+
+    const players = await prisma.fantasyPlayer.findMany({
+      where,
+      orderBy: {
+        name: 'asc'
+      },
+      take: 100
+    });
+
+    res.json(players);
+  } catch (err) {
+    console.error('Player search error:', err);
+    res.status(500).json({
+      error: 'Failed to search players'
+    });
+  }
+});
+
+/* =========================================================
+   LEAGUES
+========================================================= */
+
 router.post('/league', authenticateToken, async (req, res) => {
   const { name } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({
+      error: 'League name is required'
+    });
+  }
+
   try {
     const league = await prisma.fantasyLeague.create({
       data: {
-        name,
+        name: name.trim(),
         ownerId: req.user.id
       }
     });
 
-    // Auto-create a team for the owner
     await prisma.fantasyTeam.create({
       data: {
         leagueId: league.id,
@@ -51,23 +207,23 @@ router.post('/league', authenticateToken, async (req, res) => {
 
     res.json(league);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create league' });
+    console.error('Create league error:', err);
+    res.status(500).json({
+      error: 'Failed to create league'
+    });
   }
 });
 
-// Create a test league with bots
 router.post('/league/test-bots', authenticateToken, async (req, res) => {
-  const name = "Test League with Bots";
   try {
     const league = await prisma.fantasyLeague.create({
       data: {
-        name,
+        name: 'Test League with Bots',
         ownerId: req.user.id,
         status: 'DRAFTING'
       }
     });
 
-    // Auto-create a team for the owner
     const userTeam = await prisma.fantasyTeam.create({
       data: {
         leagueId: league.id,
@@ -76,23 +232,33 @@ router.post('/league/test-bots', authenticateToken, async (req, res) => {
       }
     });
 
-    // Create or find 9 bot users
     const botTeams = [];
+
     for (let i = 1; i <= 9; i++) {
       const botUsername = `Bot_${i}`;
-      let bot = await prisma.user.findUnique({ where: { username: botUsername } });
+
+      let bot = await prisma.user.findUnique({
+        where: {
+          username: botUsername
+        }
+      });
+
       if (!bot) {
         const bcrypt = require('bcrypt');
-        const botHash = await bcrypt.hash('bot_password_123', 10);
+
         bot = await prisma.user.create({
           data: {
             username: botUsername,
             email: `bot${i}@sportsmack.test`,
-            password_hash: botHash,
+            password_hash: await bcrypt.hash(
+              'bot_password_123',
+              10
+            ),
             isVerified: true
           }
         });
       }
+
       const botTeam = await prisma.fantasyTeam.create({
         data: {
           leagueId: league.id,
@@ -100,367 +266,756 @@ router.post('/league/test-bots', authenticateToken, async (req, res) => {
           name: `Team ${botUsername}`
         }
       });
+
       botTeams.push(botTeam);
     }
 
-    // Set Draft Order by shuffling then updating each team's draftOrder
     const allTeams = [userTeam, ...botTeams];
+
     for (let i = allTeams.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [allTeams[i], allTeams[j]] = [allTeams[j], allTeams[i]];
+
+      [allTeams[i], allTeams[j]] =
+        [allTeams[j], allTeams[i]];
     }
 
     for (let i = 0; i < allTeams.length; i++) {
       await prisma.fantasyTeam.update({
-        where: { id: allTeams[i].id },
-        data: { draftOrder: i + 1 }
+        where: {
+          id: allTeams[i].id
+        },
+        data: {
+          draftOrder: i + 1
+        }
       });
     }
 
     res.json(league);
   } catch (err) {
     console.error('test-bots error:', err);
-    res.status(500).json({ error: 'Failed to create test league', detail: err.message });
+
+    res.status(500).json({
+      error: 'Failed to create test league'
+    });
   }
 });
 
-// Get user's leagues
 router.get('/leagues', authenticateToken, async (req, res) => {
   try {
     const teams = await prisma.fantasyTeam.findMany({
-      where: { userId: req.user.id },
-      include: { league: true }
-    });
-    res.json(teams.map(t => t.league));
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch leagues' });
-  }
-});
-
-// Get league details
-router.get('/league/:id', authenticateToken, async (req, res) => {
-  try {
-    const league = await prisma.fantasyLeague.findUnique({
-      where: { id: parseInt(req.params.id) },
-      include: {
-        teams: {
-          include: {
-            user: { select: { id: true, username: true } },
-            players: { include: { player: true } },
-            weeklyScores: true
-          }
-        }
-      }
-    });
-    if (!league) return res.status(404).json({ error: 'League not found' });
-    res.json(league);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch league' });
-  }
-});
-
-// Join a league
-router.post('/league/:id/join', authenticateToken, async (req, res) => {
-  const { teamName } = req.body;
-  try {
-    const league = await prisma.fantasyLeague.findUnique({ where: { id: parseInt(req.params.id) } });
-    if (!league) return res.status(404).json({ error: 'League not found' });
-    if (league.status !== 'PREDRAFT') return res.status(400).json({ error: 'League already drafted' });
-
-    const existingTeam = await prisma.fantasyTeam.findFirst({
-      where: { leagueId: league.id, userId: req.user.id }
-    });
-    if (existingTeam) return res.status(400).json({ error: 'Already in this league' });
-
-    const team = await prisma.fantasyTeam.create({
-      data: {
-        leagueId: league.id,
-        userId: req.user.id,
-        name: teamName || `${req.user.username}'s Team`
-      }
-    });
-    res.json(team);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to join league' });
-  }
-});
-
-// Manage Roster (Set Starter/Bench)
-router.post('/team/:id/roster', authenticateToken, async (req, res) => {
-  const { teamPlayerId, status } = req.body; // status: 'STARTER' or 'BENCH'
-  try {
-    // Verify ownership
-    const team = await prisma.fantasyTeam.findUnique({ where: { id: parseInt(req.params.id) } });
-    if (team.userId !== req.user.id) return res.status(403).json({ error: 'Not your team' });
-
-    const updated = await prisma.fantasyTeamPlayer.update({
-      where: { id: parseInt(teamPlayerId) },
-      data: { status }
-    });
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update roster' });
-  }
-});
-
-router.get('/players/search', authenticateToken, async (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim();
-    const position = String(req.query.position || '').trim().toUpperCase();
-    const team = String(req.query.team || '').trim().toUpperCase();
-
-    const where = {
-      ...(q ? {
-        name: {
-          contains: q
-        }
-      } : {}),
-      ...(position ? { position } : {}),
-      ...(team ? { team } : {})
-    };
-
-    const players = await prisma.fantasyPlayer.findMany({
-      where,
-      orderBy: [
-        { position: 'asc' },
-        { name: 'asc' }
-      ],
-      take: 100
-    });
-
-    res.json(players);
-  } catch (err) {
-    console.error('Fantasy player search:', err);
-    res.status(500).json({
-      error: 'Failed to search players'
-    });
-  }
-});
-
-router.get('/team/:id', authenticateToken, async (req, res) => {
-  try {
-    const team = await prisma.fantasyTeam.findUnique({
       where: {
-        id: Number(req.params.id)
+        userId: req.user.id
       },
       include: {
-        user: {
+        league: true
+      }
+    });
+
+    res.json(
+      teams.map(team => team.league)
+    );
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to fetch leagues'
+    });
+  }
+});
+
+router.post(
+  '/league/:id/join',
+  authenticateToken,
+  async (req, res) => {
+    const { teamName } = req.body;
+
+    try {
+      const leagueId = Number(req.params.id);
+
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          }
+        });
+
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found'
+        });
+      }
+
+      if (league.status !== 'PREDRAFT') {
+        return res.status(400).json({
+          error: 'League is no longer accepting teams'
+        });
+      }
+
+      const existingTeam =
+        await prisma.fantasyTeam.findFirst({
+          where: {
+            leagueId,
+            userId: req.user.id
+          }
+        });
+
+      if (existingTeam) {
+        return res.status(400).json({
+          error: 'Already in this league'
+        });
+      }
+
+      const team =
+        await prisma.fantasyTeam.create({
+          data: {
+            leagueId,
+            userId: req.user.id,
+            name:
+              teamName ||
+              `${req.user.username}'s Team`
+          }
+        });
+
+      res.json(team);
+    } catch (err) {
+      console.error(err);
+
+      res.status(500).json({
+        error: 'Failed to join league'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   LEAGUE DETAILS
+========================================================= */
+
+router.get(
+  '/league/:id',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          },
+          include: {
+            teams: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                },
+                players: {
+                  include: {
+                    player: true
+                  }
+                },
+                weeklyScores: {
+                  orderBy: {
+                    weekNumber: 'asc'
+                  }
+                }
+              }
+            },
+            matchups: {
+              orderBy: [
+                {
+                  weekNumber: 'asc'
+                },
+                {
+                  id: 'asc'
+                }
+              ]
+            }
+          }
+        });
+
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found'
+        });
+      }
+
+      res.json(league);
+    } catch (err) {
+      console.error('League details error:', err);
+
+      res.status(500).json({
+        error: 'Failed to fetch league'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   ROSTER
+========================================================= */
+
+router.get(
+  '/team/:id',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: {
+            id: Number(req.params.id)
+          },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true
+              }
+            },
+            players: {
+              include: {
+                player: true
+              }
+            },
+            weeklyScores: {
+              orderBy: {
+                weekNumber: 'asc'
+              }
+            }
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
+
+      res.json(team);
+    } catch (err) {
+      res.status(500).json({
+        error: 'Failed to fetch roster'
+      });
+    }
+  }
+);
+
+router.post(
+  '/team/:id/roster',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teamId = Number(req.params.id);
+      const teamPlayerId =
+        Number(req.body.teamPlayerId);
+      const status =
+        String(req.body.status || '').toUpperCase();
+
+      if (!['STARTER', 'BENCH'].includes(status)) {
+        return res.status(400).json({
+          error: 'Invalid roster status'
+        });
+      }
+
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: {
+            id: teamId
+          },
+          include: {
+            players: {
+              include: {
+                player: true
+              }
+            }
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
+
+      if (team.userId !== req.user.id) {
+        return res.status(403).json({
+          error: 'Not your team'
+        });
+      }
+
+      const target =
+        team.players.find(
+          player =>
+            player.id === teamPlayerId
+        );
+
+      if (!target) {
+        return res.status(404).json({
+          error: 'Player not found on roster'
+        });
+      }
+
+      const updatedPlayers =
+        team.players.map(player =>
+          player.id === teamPlayerId
+            ? {
+                ...player,
+                status
+              }
+            : player
+        );
+
+      const validationError =
+        validateStarterRoster(
+          updatedPlayers
+        );
+
+      if (validationError) {
+        return res.status(400).json({
+          error: validationError
+        });
+      }
+
+      const updated =
+        await prisma.fantasyTeamPlayer.update({
+          where: {
+            id: teamPlayerId
+          },
+          data: {
+            status
+          },
+          include: {
+            player: true
+          }
+        });
+
+      res.json(updated);
+    } catch (err) {
+      console.error('Roster update error:', err);
+
+      res.status(500).json({
+        error: 'Failed to update roster'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   FREE AGENTS
+========================================================= */
+
+router.get(
+  '/league/:id/free-agents',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+
+      const rostered =
+        await prisma.fantasyTeamPlayer.findMany({
+          where: {
+            team: {
+              leagueId
+            }
+          },
           select: {
-            id: true,
-            username: true
+            playerId: true
           }
-        },
-        players: {
+        });
+
+      const rosteredIds =
+        rostered.map(p => p.playerId);
+
+      const players =
+        await prisma.fantasyPlayer.findMany({
+          where: {
+            id: {
+              notIn: rosteredIds
+            }
+          },
+          orderBy: [
+            {
+              position: 'asc'
+            },
+            {
+              name: 'asc'
+            }
+          ]
+        });
+
+      res.json(players);
+    } catch (err) {
+      console.error('Free agent error:', err);
+
+      res.status(500).json({
+        error: 'Failed to fetch free agents'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   ADD PLAYER
+========================================================= */
+
+router.post(
+  '/team/:id/add-player',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teamId = Number(req.params.id);
+      const playerId =
+        Number(req.body.playerId);
+
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: {
+            id: teamId
+          },
+          include: {
+            league: true,
+            players: true
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
+
+      if (team.userId !== req.user.id) {
+        return res.status(403).json({
+          error: 'Not your team'
+        });
+      }
+
+      if (team.league.status !== 'SEASON') {
+        return res.status(400).json({
+          error: 'League is not in season'
+        });
+      }
+
+      if (team.players.length >= MAX_ROSTER_SIZE) {
+        return res.status(400).json({
+          error: 'Roster is full'
+        });
+      }
+
+      const player =
+        await prisma.fantasyPlayer.findUnique({
+          where: {
+            id: playerId
+          }
+        });
+
+      if (!player) {
+        return res.status(404).json({
+          error: 'Player not found'
+        });
+      }
+
+      const alreadyRostered =
+        await prisma.fantasyTeamPlayer.findFirst({
+          where: {
+            team: {
+              leagueId: team.leagueId
+            },
+            playerId
+          }
+        });
+
+      if (alreadyRostered) {
+        return res.status(400).json({
+          error: 'Player is already rostered'
+        });
+      }
+
+      const rosterPlayer =
+        await prisma.fantasyTeamPlayer.create({
+          data: {
+            teamId,
+            playerId,
+            status: 'BENCH'
+          },
           include: {
             player: true
           }
-        },
-        weeklyScores: {
-          orderBy: {
-            weekNumber: 'asc'
-          }
-        }
-      }
-    });
+        });
 
-    if (!team) {
-      return res.status(404).json({
-        error: 'Team not found'
-      });
-    }
-
-    res.json(team);
-  } catch (err) {
-    res.status(500).json({
-      error: 'Failed to fetch team'
-    });
-  }
-});
-
-router.get('/league/:id/free-agents', authenticateToken, async (req, res) => {
-  try {
-    const leagueId = Number(req.params.id);
-
-    const drafted = await prisma.fantasyTeamPlayer.findMany({
-      where: {
-        team: {
-          leagueId
-        }
-      },
-      select: {
-        playerId: true
-      }
-    });
-
-    const draftedIds = drafted.map(p => p.playerId);
-
-    const players = await prisma.fantasyPlayer.findMany({
-      where: {
-        id: {
-          notIn: draftedIds
-        }
-      },
-      orderBy: [
-        { position: 'asc' },
-        { name: 'asc' }
-      ]
-    });
-
-    res.json(players);
-  } catch (err) {
-    res.status(500).json({
-      error: 'Failed to fetch free agents'
-    });
-  }
-});
-
-router.post('/team/:id/add-player', authenticateToken, async (req, res) => {
-  try {
-    const teamId = Number(req.params.id);
-    const playerId = Number(req.body.playerId);
-
-    const team = await prisma.fantasyTeam.findUnique({
-      where: { id: teamId },
-      include: {
-        league: true,
-        players: {
-          include: {
-            player: true
-          }
-        }
-      }
-    });
-
-    if (!team) {
-      return res.status(404).json({
-        error: 'Team not found'
-      });
-    }
-
-    if (team.userId !== req.user.id) {
-      return res.status(403).json({
-        error: 'Not your team'
-      });
-    }
-
-    if (team.league.status !== 'SEASON') {
-      return res.status(400).json({
-        error: 'League is not in season'
-      });
-    }
-
-    const alreadyRostered =
-      await prisma.fantasyTeamPlayer.findFirst({
-        where: {
-          teamId,
-          playerId
-        }
-      });
-
-    if (alreadyRostered) {
-      return res.status(400).json({
-        error: 'Player already on your roster'
-      });
-    }
-
-    const player = await prisma.fantasyPlayer.findUnique({
-      where: { id: playerId }
-    });
-
-    if (!player) {
-      return res.status(404).json({
-        error: 'Player not found'
-      });
-    }
-
-    const rosterPlayer =
-      await prisma.fantasyTeamPlayer.create({
+      await prisma.fantasyTransaction.create({
         data: {
+          leagueId: team.leagueId,
           teamId,
           playerId,
-          status: 'BENCH'
-        },
-        include: {
-          player: true
+          type: 'ADD'
         }
       });
 
-    await prisma.fantasyTransaction.create({
-      data: {
-        leagueId: team.leagueId,
-        teamId,
-        playerId,
-        type: 'ADD'
-      }
-    });
+      res.json(rosterPlayer);
+    } catch (err) {
+      console.error('Add player error:', err);
 
-    res.json(rosterPlayer);
-  } catch (err) {
-    console.error('Add fantasy player:', err);
-    res.status(500).json({
-      error: 'Failed to add player'
-    });
+      res.status(500).json({
+        error: 'Failed to add player'
+      });
+    }
   }
-});
+);
 
-router.post('/team/:id/drop-player', authenticateToken, async (req, res) => {
-  try {
-    const teamId = Number(req.params.id);
-    const playerId = Number(req.body.playerId);
+/* =========================================================
+   DROP PLAYER
+========================================================= */
 
-    const team = await prisma.fantasyTeam.findUnique({
-      where: { id: teamId }
-    });
+router.post(
+  '/team/:id/drop-player',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teamId = Number(req.params.id);
+      const playerId =
+        Number(req.body.playerId);
 
-    if (!team) {
-      return res.status(404).json({
-        error: 'Team not found'
-      });
-    }
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: {
+            id: teamId
+          }
+        });
 
-    if (team.userId !== req.user.id) {
-      return res.status(403).json({
-        error: 'Not your team'
-      });
-    }
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
 
-    const rosterPlayer =
-      await prisma.fantasyTeamPlayer.findFirst({
+      if (team.userId !== req.user.id) {
+        return res.status(403).json({
+          error: 'Not your team'
+        });
+      }
+
+      const rosterPlayer =
+        await prisma.fantasyTeamPlayer.findFirst({
+          where: {
+            teamId,
+            playerId
+          }
+        });
+
+      if (!rosterPlayer) {
+        return res.status(404).json({
+          error: 'Player is not on your roster'
+        });
+      }
+
+      await prisma.fantasyTeamPlayer.delete({
         where: {
-          teamId,
-          playerId
+          id: rosterPlayer.id
         }
       });
 
-    if (!rosterPlayer) {
-      return res.status(404).json({
-        error: 'Player is not on your roster'
+      await prisma.fantasyTransaction.create({
+        data: {
+          leagueId: team.leagueId,
+          teamId,
+          playerId,
+          type: 'DROP'
+        }
+      });
+
+      res.json({
+        success: true
+      });
+    } catch (err) {
+      console.error('Drop player error:', err);
+
+      res.status(500).json({
+        error: 'Failed to drop player'
       });
     }
-
-    await prisma.fantasyTeamPlayer.delete({
-      where: {
-        id: rosterPlayer.id
-      }
-    });
-
-    await prisma.fantasyTransaction.create({
-      data: {
-        leagueId: team.leagueId,
-        teamId,
-        playerId,
-        type: 'DROP'
-      }
-    });
-
-    res.json({
-      success: true
-    });
-  } catch (err) {
-    res.status(500).json({
-      error: 'Failed to drop player'
-    });
   }
-});
+);
+
+/* =========================================================
+   STANDINGS
+========================================================= */
+
+router.get(
+  '/league/:id/standings',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teams =
+        await prisma.fantasyTeam.findMany({
+          where: {
+            leagueId: Number(req.params.id)
+          },
+          include: {
+            weeklyScores: true
+          }
+        });
+
+      const standings =
+        teams.map(team => {
+          const scores =
+            team.weeklyScores;
+
+          const wins =
+            scores.filter(s => s.points > 0).length;
+
+          const totalPoints =
+            scores.reduce(
+              (sum, score) =>
+                sum + score.points,
+              0
+            );
+
+          return {
+            teamId: team.id,
+            teamName: team.name,
+            wins,
+            losses: 0,
+            totalPoints
+          };
+        });
+
+      standings.sort(
+        (a, b) =>
+          b.totalPoints -
+          a.totalPoints
+      );
+
+      res.json(standings);
+    } catch (err) {
+      res.status(500).json({
+        error: 'Failed to fetch standings'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   MATCHUPS
+========================================================= */
+
+router.get(
+  '/league/:id/matchups/:week',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const matchups =
+        await prisma.fantasyMatchup.findMany({
+          where: {
+            leagueId:
+              Number(req.params.id),
+            weekNumber:
+              Number(req.params.week)
+          },
+          include: {
+            homeTeam: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            awayTeam: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        });
+
+      res.json(matchups);
+    } catch (err) {
+      res.status(500).json({
+        error: 'Failed to fetch matchups'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   TRANSACTIONS
+========================================================= */
+
+router.get(
+  '/league/:id/transactions',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const transactions =
+        await prisma.fantasyTransaction.findMany({
+          where: {
+            leagueId:
+              Number(req.params.id)
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          include: {
+            team: {
+              select: {
+                id: true,
+                name: true
+              }
+            },
+            player: true
+          },
+          take: 100
+        });
+
+      res.json(transactions);
+    } catch (err) {
+      res.status(500).json({
+        error: 'Failed to fetch transactions'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   SCORE WEEK
+========================================================= */
+
+router.post(
+  '/league/:id/score-week',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId =
+        Number(req.params.id);
+
+      const weekNumber =
+        Number(req.body.weekNumber);
+
+      if (!weekNumber) {
+        return res.status(400).json({
+          error: 'weekNumber is required'
+        });
+      }
+
+      const results =
+        await fantasyStats.scoreLeagueWeek(
+          leagueId,
+          weekNumber
+        );
+
+      res.json(results);
+    } catch (err) {
+      console.error(
+        'Score week error:',
+        err
+      );
+
+      res.status(500).json({
+        error: 'Failed to score week'
+      });
+    }
+  }
+);
 
 module.exports = router;
