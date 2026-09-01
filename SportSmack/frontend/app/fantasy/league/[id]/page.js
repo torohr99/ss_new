@@ -238,6 +238,31 @@ export default function LeaguePage({ params }) {
     }
   };
 
+  const submitWaiverClaim = async (
+    playerId,
+    bidAmount
+  ) => {
+    try {
+      await axios.post(
+        `${API}/api/fantasy/league/${id}/waivers/claim`,
+        {
+          playerId,
+          bidAmount
+        },
+        {
+          withCredentials: true
+        }
+      );
+  
+      alert('Waiver claim submitted.');
+    } catch (err) {
+      alert(
+        err.response?.data?.error ||
+        'Failed to submit waiver claim.'
+      );
+    }
+  };
+
   const dropPlayer = async playerId => {
     try {
       await axios.post(
@@ -483,11 +508,21 @@ export default function LeaguePage({ params }) {
 
               <button
                 className="btn-primary"
-                onClick={() =>
-                  addPlayer(player.id)
-                }
+                onClick={() => {
+                  const bid = window.prompt(
+                    `FAAB bid for ${player.name}:`,
+                    '0'
+                  );
+              
+                  if (bid === null) return;
+              
+                  submitWaiverClaim(
+                    player.id,
+                    Number(bid)
+                  );
+                }}
               >
-                Add
+                Waiver Claim
               </button>
             </div>
           ))}
