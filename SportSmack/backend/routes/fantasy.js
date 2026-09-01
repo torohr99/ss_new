@@ -41,7 +41,10 @@ function isFlexEligible(position) {
 }
 
 function validateStarterRoster(players) {
-  const starters = players.filter(p => p.status === 'STARTER');
+  const starters =
+    players.filter(
+      p => p.status === 'STARTER'
+    );
 
   const counts = {
     QB: 0,
@@ -53,51 +56,54 @@ function validateStarterRoster(players) {
   };
 
   for (const player of starters) {
-    const position = normalizePosition(player.player.position);
+    const position =
+      normalizePosition(
+        player.player.position
+      );
 
     if (counts[position] !== undefined) {
       counts[position]++;
     }
   }
 
-  if (counts.QB > STARTER_LIMITS.QB) {
+  if (counts.QB > 1) {
     return 'You can only start 1 QB.';
   }
 
-  if (counts.K > STARTER_LIMITS.K) {
+  if (counts.RB > 3) {
+    return 'You can only start 3 RBs including FLEX.';
+  }
+
+  if (counts.WR > 3) {
+    return 'You can only start 3 WRs including FLEX.';
+  }
+
+  if (counts.TE > 2) {
+    return 'You can only start 2 TEs including FLEX.';
+  }
+
+  if (counts.K > 1) {
     return 'You can only start 1 K.';
   }
 
-  if (counts.DST > STARTER_LIMITS.DST) {
+  if (counts.DST > 1) {
     return 'You can only start 1 DST.';
   }
 
-  if (counts.RB > STARTER_LIMITS.RB + FLEX_LIMIT) {
-    return 'Too many RB starters.';
-  }
-
-  if (counts.WR > STARTER_LIMITS.WR + FLEX_LIMIT) {
-    return 'Too many WR starters.';
-  }
-
-  if (counts.TE > STARTER_LIMITS.TE + FLEX_LIMIT) {
-    return 'Too many TE starters.';
-  }
-
-  const requiredBase =
-    counts.QB +
+  const basePlayers =
+    Math.min(counts.QB, 1) +
     Math.min(counts.RB, 2) +
     Math.min(counts.WR, 2) +
     Math.min(counts.TE, 1) +
-    counts.K +
-    counts.DST;
+    Math.min(counts.K, 1) +
+    Math.min(counts.DST, 1);
 
   const flexUsed =
     Math.max(0, counts.RB - 2) +
     Math.max(0, counts.WR - 2) +
     Math.max(0, counts.TE - 1);
 
-  if (flexUsed > FLEX_LIMIT) {
+  if (flexUsed > 1) {
     return 'You can only use 1 FLEX position.';
   }
 
