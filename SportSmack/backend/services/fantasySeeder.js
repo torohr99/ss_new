@@ -44,15 +44,37 @@ async function seedFantasyPlayers() {
                   name: item.fullName,
                   position: position,
                   team: teamAbbrev,
-                  imageUrl: item.headshot ? item.headshot.href : null
+                  imageUrl:
+                    item.headshot
+                      ? item.headshot.href
+                      : null,
+                  byeWeek:
+                    item.byeWeek
+                      ? Number(item.byeWeek)
+                      : null,
+                  projectedPoints:
+                    item.projectedPoints
+                      ? Number(item.projectedPoints)
+                      : null
                 },
                 create: {
                   espnId: String(item.id),
                   name: item.fullName,
                   position: position,
                   team: teamAbbrev,
-                  imageUrl: item.headshot ? item.headshot.href : null
-                }
+                  imageUrl:
+                    item.headshot
+                      ? item.headshot.href
+                      : null,
+                  byeWeek:
+                    item.byeWeek
+                      ? Number(item.byeWeek)
+                      : null,
+                  projectedPoints:
+                    item.projectedPoints
+                      ? Number(item.projectedPoints)
+                      : null
+                },
               });
               totalAdded++;
             }
