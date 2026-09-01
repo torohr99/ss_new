@@ -83,7 +83,7 @@ export default function FantasyDashboard() {
   return (
     <div className="page-container">
       <div className="feed-header">
-        <h1>Fantasy Football Hub</h1>
+        <h1>SportSmack Fantasy Football</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button className="btn-secondary" onClick={() => setDevOverride(!devOverride)}>
             Dev Override: {devOverride ? 'ON' : 'OFF'}
@@ -115,17 +115,55 @@ export default function FantasyDashboard() {
           <div className="profile-section">
             <h2 className="section-title">My Leagues</h2>
             {leagues.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>You haven't joined any leagues yet.</p>
+              <p style={{
+                color: 'var(--text-secondary)'
+              }}>
+                You haven't joined any leagues yet.
+              </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem'
+              }}>
                 {leagues.map(l => (
-                  <div key={l.id} className="post-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => router.push(`/fantasy/league/${l.id}`)}>
-                    <div>
-                      <h3 style={{ margin: 0 }}>{l.name}</h3>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.2rem' }}>Status: {l.status}</div>
+                  <div
+                    key={l.id}
+                    className="post-card"
+                    style={{
+                      cursor: 'pointer'
+                    }}
+                    onClick={() =>
+                      router.push(
+                        `/fantasy/league/${l.id}`
+                      )
+                    }
+                  >
+                    <h3>
+                      {l.name}
+                    </h3>
+            
+                    <div style={{
+                      color:
+                        'var(--text-secondary)'
+                    }}>
+                      {l.status}
                     </div>
-                    <button className="btn-primary" onClick={(e) => { e.stopPropagation(); router.push(`/fantasy/league/${l.id}`); }}>
-                      View
+            
+                    <button
+                      className="btn-primary"
+                      style={{
+                        marginTop: '0.75rem'
+                      }}
+                      onClick={e => {
+                        e.stopPropagation();
+            
+                        router.push(
+                          `/fantasy/league/${l.id}`
+                        );
+                      }}
+                    >
+                      Enter League
                     </button>
                   </div>
                 ))}
