@@ -103,7 +103,11 @@ module.exports = function(io) {
       if (!token) {
         return next(new Error('Authentication error'));
       }
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod');
+      if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
         include: { teams: { include: { team: true } } }
