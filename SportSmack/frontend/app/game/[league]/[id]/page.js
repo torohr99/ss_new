@@ -333,30 +333,108 @@ export default function GameHubPage({ params }) {
   };
 
   const handleGenerateMeme = async (e) => {
-    e.preventDefault();
-    if (!memeInput.trim()) return;
-    setMemeGenerating(true);
-    setGeneratedCandidates([]);
-    setSelectedCandidate(null);
+      e.preventDefault();
     
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/ai/meme`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('smack_token')}` },
-        body: JSON.stringify({ prompt: memeInput })
-      });
-      if (res.ok) {
+      if (!memeInput.trim()) return;
+    
+      setMemeGenerating(true);
+      setGeneratedCandidates([]);
+      setSelectedCandidate(null);
+    
+      try {
+        const competitors =
+          gameData?.header?.competitions?.[0]?.competitors ||
+          gameData?.competitors ||
+          [];
+    
+        const home = competitors.find(
+          c => c.homeAway === 'home'
+        );
+    
+        const away = competitors.find(
+          c => c.homeAway === 'away'
+        );
+    
+        const gameContext = {
+          league,
+    
+          homeTeam:
+            home?.team?.displayName ||
+            home?.team?.name ||
+            gameData?.homeTeam ||
+            null,
+    
+          awayTeam:
+            away?.team?.displayName ||
+            away?.team?.name ||
+            gameData?.awayTeam ||
+            null,
+    
+          score:
+            home?.score != null && away?.score != null
+              ? `${away?.team?.displayName || 'Away'} ${away.score} - ${home?.team?.displayName || 'Home'} ${home.score}`
+              : null,
+    
+          status:
+            gameData?.status ||
+            gameData?.statusDetail ||
+            null,
+    
+          situation:
+            gameData?.situation ||
+            null
+        };
+    
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/ai/meme`,
+          {
+            method: 'POST',
+    
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization':
+                `Bearer ${localStorage.getItem('smack_token')}`
+            },
+    
+            body: JSON.stringify({
+              prompt: memeInput,
+              gameContext
+            })
+          }
+        );
+    
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+    
+          throw new Error(
+            errorData.message ||
+            'Failed to generate meme'
+          );
+        }
+    
         const data = await res.json();
-        setGeneratedCandidates(data.candidates);
-      } else {
-        alert('Failed to generate meme');
+    
+        setGeneratedCandidates(
+          Array.isArray(data.candidates)
+            ? data.candidates
+            : []
+        );
+    
+      } catch (err) {
+        console.error(
+          'AI meme generation error:',
+          err
+        );
+    
+        alert(
+          err.message ||
+          'Failed to generate meme'
+        );
+    
+      } finally {
+        setMemeGenerating(false);
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setMemeGenerating(false);
-    }
-  };
+    };
 
   const publishMeme = (dataUrl) => {
     handleSendMessage(null, `[MEME] ${dataUrl}`);
