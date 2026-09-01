@@ -306,3 +306,22 @@ model FantasyTransaction {
   @@index([leagueId])
   @@index([teamId])
 }
+
+model FantasyWaiverClaim {
+  id          Int      @id @default(autoincrement())
+  leagueId    Int
+  teamId      Int
+  playerId    Int
+  bidAmount   Int      @default(0)
+  priority    Int?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+
+  league FantasyLeague @relation(fields: [leagueId], references: [id])
+  team   FantasyTeam   @relation(fields: [teamId], references: [id])
+  player FantasyPlayer @relation(fields: [playerId], references: [id])
+
+  @@index([leagueId, status])
+  @@index([teamId])
+  @@index([playerId])
+}
