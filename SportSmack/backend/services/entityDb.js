@@ -9,7 +9,7 @@ class EntityDb {
       bosox: 'Boston Red Sox',
       sox: 'Boston Red Sox',
       niners: 'San Francisco 49ers',
-      forty niners: 'San Francisco 49ers',
+      'forty niners': 'San Francisco 49ers',
       chiefs: 'Kansas City Chiefs',
       pats: 'New England Patriots',
       patriots: 'New England Patriots',
