@@ -242,6 +242,8 @@ model FantasyWeeklyScore {
   isLive     Boolean @default(true)
 
   team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, weekNumber])
 }
 
 model BracketLeague {
