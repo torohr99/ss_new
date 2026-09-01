@@ -126,28 +126,23 @@ function setupFantasySockets(io) {
 
               const nextIndex = league.currentPickIndex + 1;
               let newStatus = 'DRAFTING';
-
-let newStatus = 'DRAFTING';
-
-if (nextIndex >= totalPicks) {
-  newStatus = 'SEASON';
-
-  try {
-    await generateWeeklyMatchups(
-      league.id,
-      1
-    );
-
-    console.log(
-      `Week 1 matchups generated for league ${league.id}`
-    );
-  } catch (matchupError) {
-    console.error(
-      `Failed to generate Week 1 matchups for league ${league.id}:`,
-      matchupError
-    );
-  }
-}
+              
+              if (nextIndex >= totalPicks) {
+                newStatus = 'SEASON';
+              
+                try {
+                  await generateWeeklyMatchups(league.id, 1);
+              
+                  console.log(
+                    `Week 1 matchups generated for league ${league.id}`
+                  );
+                } catch (matchupError) {
+                  console.error(
+                    `Failed to generate Week 1 matchups for league ${league.id}:`,
+                    matchupError
+                  );
+                }
+              }
 
               await prisma.fantasyLeague.update({
                 where: { id: league.id },
@@ -291,29 +286,23 @@ if (nextIndex >= totalPicks) {
         // Advance pick
         const nextIndex = league.currentPickIndex + 1;
         let newStatus = 'DRAFTING';
-  league.currentPickIndex + 1;
-
-let newStatus = 'DRAFTING';
-
-if (nextIndex >= totalPicks) {
-  newStatus = 'SEASON';
-
-  try {
-    await generateWeeklyMatchups(
-      league.id,
-      1
-    );
-
-    console.log(
-      `Week 1 matchups generated for league ${league.id}`
-    );
-  } catch (matchupError) {
-    console.error(
-      `Failed to generate Week 1 matchups for league ${league.id}:`,
-      matchupError
-    );
-  }
-}
+        
+        if (nextIndex >= totalPicks) {
+          newStatus = 'SEASON';
+        
+          try {
+            await generateWeeklyMatchups(league.id, 1);
+        
+            console.log(
+              `Week 1 matchups generated for league ${league.id}`
+            );
+          } catch (matchupError) {
+            console.error(
+              `Failed to generate Week 1 matchups for league ${league.id}:`,
+              matchupError
+            );
+          }
+        }
 
         await prisma.fantasyLeague.update({
           where: { id: league.id },
