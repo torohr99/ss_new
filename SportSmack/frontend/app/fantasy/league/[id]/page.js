@@ -18,11 +18,10 @@ const POSITIONS = [
   'DST'
 ];
 
-const [week, setWeek] = useState(1);
-
 export default function LeaguePage({ params }) {
   const { id } = params;
   const router = useRouter();
+  const [week, setWeek] = useState(1);
 
   const [league, setLeague] = useState(null);
   const [currentUser, setCurrentUser] =
@@ -498,86 +497,97 @@ export default function LeaguePage({ params }) {
 
       {activeTab === 'standings' && (
         <div className="profile-section">
-
           <h2 className="section-title">
             Standings
           </h2>
-
-          const teams =
-            await prisma.fantasyTeam.findMany({
-              where: {
-                leagueId: Number(req.params.id)
-              },
-              include: {
-                weeklyScores: true,
-                homeMatchups: true,
-                awayMatchups: true
-              }
-            });
-          
-          const standings = teams.map(team => {
-            const matchups = [
-              ...team.homeMatchups,
-              ...team.awayMatchups
-            ];
-          
-            let wins = 0;
-            let losses = 0;
-            let ties = 0;
-          
-            for (const matchup of matchups) {
-              const isHome =
-                matchup.homeTeamId === team.id;
-          
-              const teamScore =
-                isHome
+      
+          {[...(league.teams || [])]
+            .map(team => {
+              const matchups = [
+                ...(team.homeMatchups || []),
+                ...(team.awayMatchups || [])
+              ];
+      
+              let wins = 0;
+              let losses = 0;
+              let ties = 0;
+      
+              for (const matchup of matchups) {
+                if (matchup.status !== 'FINAL') continue;
+      
+                const isHome =
+                  matchup.homeTeamId === team.id;
+      
+                const teamScore = isHome
                   ? matchup.homeScore
                   : matchup.awayScore;
-          
-              const opponentScore =
-                isHome
+      
+                const opponentScore = isHome
                   ? matchup.awayScore
                   : matchup.homeScore;
-          
-              if (matchup.status !== 'FINAL') {
-                continue;
+      
+                if (teamScore > opponentScore) {
+                  wins++;
+                } else if (teamScore < opponentScore) {
+                  losses++;
+                } else {
+                  ties++;
+                }
               }
-          
-              if (teamScore > opponentScore) {
-                wins++;
-              } else if (teamScore < opponentScore) {
-                losses++;
-              } else {
-                ties++;
+      
+              const totalPoints =
+                (team.weeklyScores || []).reduce(
+                  (sum, score) =>
+                    sum + Number(score.points || 0),
+                  0
+                );
+      
+              return {
+                ...team,
+                wins,
+                losses,
+                ties,
+                totalPoints
+              };
+            })
+            .sort((a, b) => {
+              if (b.wins !== a.wins) {
+                return b.wins - a.wins;
               }
-            }
-          
-            const totalPoints =
-              team.weeklyScores.reduce(
-                (sum, score) =>
-                  sum + Number(score.points || 0),
-                0
-              );
-          
-            return {
-              teamId: team.id,
-              teamName: team.name,
-              wins,
-              losses,
-              ties,
-              totalPoints
-            };
-          });
-          
-          standings.sort((a, b) => {
-            if (b.wins !== a.wins) {
-              return b.wins - a.wins;
-            }
-          
-            return b.totalPoints - a.totalPoints;
-          });
-          
-          res.json(standings);
+      
+              if (b.ties !== a.ties) {
+                return b.ties - a.ties;
+              }
+      
+              return b.totalPoints - a.totalPoints;
+            })
+            .map((team, index) => (
+              <div
+                key={team.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    '50px 1fr repeat(3, 70px) 100px',
+                  gap: '1rem',
+                  alignItems: 'center',
+                  padding: '1rem',
+                  borderBottom:
+                    '1px solid var(--border)'
+                }}
+              >
+                <strong>{index + 1}</strong>
+      
+                <strong>{team.name}</strong>
+      
+                <span>{team.wins}</span>
+                <span>{team.losses}</span>
+                <span>{team.ties}</span>
+      
+                <span>
+                  {team.totalPoints.toFixed(1)}
+                </span>
+              </div>
+            ))}
         </div>
       )}
 
