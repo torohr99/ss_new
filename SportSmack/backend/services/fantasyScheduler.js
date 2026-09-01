@@ -18,17 +18,20 @@ async function scoreActiveLeagues() {
       });
 
     const seasonStart =
-      new Date('2026-09-01T00:00:00Z');
-
+      new Date('2026-09-09T00:00:00Z');
+    
     const now = new Date();
-
+    
     const week =
-      Math.max(
-        1,
-        Math.floor(
-          (now - seasonStart) /
-            (7 * 24 * 60 * 60 * 1000)
-        ) + 1
+      Math.min(
+        18,
+        Math.max(
+          1,
+          Math.floor(
+            (now - seasonStart) /
+              (7 * 24 * 60 * 60 * 1000)
+          ) + 1
+        )
       );
 
     for (const league of leagues) {
