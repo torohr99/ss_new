@@ -87,7 +87,7 @@ function calculatePlayerPoints(stats) {
 
 async function getWeeklyStats(weekNumber) {
   const url =
-    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026`;
+    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026&seasontype=2&week=${weekNumber}`;
 
   const response = await axios.get(url, {
     timeout: 15000
@@ -236,7 +236,8 @@ async function getWeeklyStats(weekNumber) {
 
 async function scoreLeagueWeek(
   leagueId,
-  weekNumber
+  weekNumber,
+  isLive = true
 ) {
   const teams =
     await prisma.fantasyTeam.findMany({
@@ -294,13 +295,13 @@ async function scoreLeagueWeek(
         },
         update: {
           points: total,
-          isLive: false
+          isLive
         },
         create: {
           teamId: team.id,
           weekNumber,
           points: total,
-          isLive: false
+          isLive
         }
       });
 
