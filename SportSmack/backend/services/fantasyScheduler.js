@@ -108,6 +108,42 @@ async function generateMissingMatchups(
   );
 }
 
+async function processDueWaivers() {
+  const leagues =
+    await prisma.fantasyLeague.findMany({
+      where: {
+        status: 'SEASON'
+      }
+    });
+
+  for (const league of leagues) {
+    try {
+      const claims =
+        await prisma.fantasyWaiverClaim.count({
+          where: {
+            leagueId: league.id,
+            status: 'PENDING'
+          }
+        });
+
+      if (claims === 0) continue;
+
+      // For now, process once every Tuesday.
+      const day = new Date().getUTCDay();
+
+      if (day !== 2) continue;
+
+      // Reuse the same processing logic through a
+      // service function in the next cleanup step.
+    } catch (err) {
+      console.error(
+        `Waiver processing failed for league ${league.id}:`,
+        err.message
+      );
+    }
+  }
+}
+
 module.exports = {
   startFantasyScheduler,
   stopFantasyScheduler
