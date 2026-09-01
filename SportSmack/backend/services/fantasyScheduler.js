@@ -33,9 +33,15 @@ async function scoreActiveLeagues() {
 
     for (const league of leagues) {
       try {
-        await fantasyStats.scoreLeagueWeek(
+        await generateMissingMatchups(
           league.id,
           week
+        );
+    
+        await fantasyStats.scoreLeagueWeek(
+          league.id,
+          week,
+          true
         );
       } catch (error) {
         console.error(
