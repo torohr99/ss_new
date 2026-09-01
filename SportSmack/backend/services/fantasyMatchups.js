@@ -8,12 +8,8 @@ async function generateWeeklyMatchups(
 ) {
   const teams =
     await prisma.fantasyTeam.findMany({
-      where: {
-        leagueId
-      },
-      orderBy: {
-        id: 'asc'
-      }
+      where: { leagueId },
+      orderBy: { draftOrder: 'asc' }
     });
 
   if (teams.length < 2) {
@@ -29,17 +25,31 @@ async function generateWeeklyMatchups(
     }
   });
 
+  const rotation = [...teams];
+
+  // Circle-method rotation.
+  // Keeps one team fixed and rotates the others.
+  const fixed = rotation.shift();
+
+  for (let i = 0; i < weekNumber - 1; i++) {
+    rotation.unshift(rotation.pop());
+  }
+
+  const ordered = [
+    fixed,
+    ...rotation
+  ];
+
   const matchups = [];
 
   for (
     let i = 0;
-    i < teams.length;
-    i += 2
+    i < Math.floor(ordered.length / 2);
+    i++
   ) {
-    const home = teams[i];
-    const away = teams[i + 1];
-
-    if (!away) continue;
+    const home = ordered[i];
+    const away =
+      ordered[ordered.length - 1 - i];
 
     const matchup =
       await prisma.fantasyMatchup.create({
