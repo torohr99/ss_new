@@ -18,6 +18,8 @@ const POSITIONS = [
   'DST'
 ];
 
+const [week, setWeek] = useState(1);
+
 export default function LeaguePage({ params }) {
   const { id } = params;
   const router = useRouter();
@@ -85,10 +87,10 @@ export default function LeaguePage({ params }) {
 
   const fetchMatchups = async () => {
     const res = await axios.get(
-      `${API}/api/fantasy/league/${id}/matchups/1`,
+      `${API}/api/fantasy/league/${id}/matchups/${week}`,
       { withCredentials: true }
     );
-
+  
     setMatchups(res.data);
   };
 
@@ -123,7 +125,7 @@ export default function LeaguePage({ params }) {
     if (activeTab === 'matchup') {
       fetchMatchups();
     }
-  }, [activeTab]);
+  }, [activeTab, week]);
 
   if (loading) {
     return (
@@ -501,70 +503,113 @@ export default function LeaguePage({ params }) {
             Standings
           </h2>
 
-          {[...league.teams]
-            .sort((a, b) => {
-              const aPts =
-                a.weeklyScores?.reduce(
-                  (s, x) =>
-                    s +
-                    Number(
-                      x.points || 0
-                    ),
-                  0
-                ) || 0;
-
-              const bPts =
-                b.weeklyScores?.reduce(
-                  (s, x) =>
-                    s +
-                    Number(
-                      x.points || 0
-                    ),
-                  0
-                ) || 0;
-
-              return bPts - aPts;
-            })
-            .map((team, index) => (
-              <div
-                key={team.id}
-                style={{
-                  display: 'flex',
-                  justifyContent:
-                    'space-between',
-                  padding: '1rem',
-                  borderBottom:
-                    '1px solid var(--border)'
-                }}
-              >
-                <strong>
-                  #{index + 1}{' '}
-                  {team.name}
-                </strong>
-
-                <span>
-                  {(
-                    team.weeklyScores
-                      ?.reduce(
-                        (s, x) =>
-                          s +
-                          Number(
-                            x.points || 0
-                          ),
-                        0
-                      ) || 0
-                  ).toFixed(1)} pts
-                </span>
-              </div>
-            ))}
+          const teams =
+            await prisma.fantasyTeam.findMany({
+              where: {
+                leagueId: Number(req.params.id)
+              },
+              include: {
+                weeklyScores: true,
+                homeMatchups: true,
+                awayMatchups: true
+              }
+            });
+          
+          const standings = teams.map(team => {
+            const matchups = [
+              ...team.homeMatchups,
+              ...team.awayMatchups
+            ];
+          
+            let wins = 0;
+            let losses = 0;
+            let ties = 0;
+          
+            for (const matchup of matchups) {
+              const isHome =
+                matchup.homeTeamId === team.id;
+          
+              const teamScore =
+                isHome
+                  ? matchup.homeScore
+                  : matchup.awayScore;
+          
+              const opponentScore =
+                isHome
+                  ? matchup.awayScore
+                  : matchup.homeScore;
+          
+              if (matchup.status !== 'FINAL') {
+                continue;
+              }
+          
+              if (teamScore > opponentScore) {
+                wins++;
+              } else if (teamScore < opponentScore) {
+                losses++;
+              } else {
+                ties++;
+              }
+            }
+          
+            const totalPoints =
+              team.weeklyScores.reduce(
+                (sum, score) =>
+                  sum + Number(score.points || 0),
+                0
+              );
+          
+            return {
+              teamId: team.id,
+              teamName: team.name,
+              wins,
+              losses,
+              ties,
+              totalPoints
+            };
+          });
+          
+          standings.sort((a, b) => {
+            if (b.wins !== a.wins) {
+              return b.wins - a.wins;
+            }
+          
+            return b.totalPoints - a.totalPoints;
+          });
+          
+          res.json(standings);
         </div>
       )}
 
       {activeTab === 'matchup' && (
         <div className="profile-section">
-          <h2 className="section-title">
-            Week 1 Matchups
-          </h2>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+          }}>
+            <h2 className="section-title">
+              Week {week} Matchups
+            </h2>
+          
+            <select
+              className="auth-input"
+              value={week}
+              onChange={e =>
+                setWeek(Number(e.target.value))
+              }
+            >
+              {Array.from(
+                { length: 18 },
+                (_, i) => i + 1
+              ).map(w => (
+                <option key={w} value={w}>
+                  Week {w}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {matchups.length === 0 ? (
             <p>
