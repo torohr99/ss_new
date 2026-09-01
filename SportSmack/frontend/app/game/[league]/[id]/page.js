@@ -389,16 +389,17 @@ export default function GameHubPage({ params }) {
           `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/ai/meme`,
           {
             method: 'POST',
-    
+        
             headers: {
               'Content-Type': 'application/json',
               'Authorization':
                 `Bearer ${localStorage.getItem('smack_token')}`
             },
-    
+        
             body: JSON.stringify({
               prompt: memeInput,
-              gameContext
+              league,
+              gameId
             })
           }
         );
