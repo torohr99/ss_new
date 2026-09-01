@@ -203,6 +203,8 @@ model FantasyPlayer {
   position String
   team     String
   imageUrl String?
+  byeWeek        Int?
+  projectedPoints Float?
 
   draftPicks  FantasyDraftPick[]
   teamRosters FantasyTeamPlayer[]
