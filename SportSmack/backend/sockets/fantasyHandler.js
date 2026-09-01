@@ -1,6 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const jwt = require('jsonwebtoken');
+const {
+  generateWeeklyMatchups
+} = require('../services/fantasyMatchups');
 
 // Draft settings
 const DRAFT_ROUNDS = 15;
@@ -131,19 +134,14 @@ let newStatus = 'DRAFTING';
 if (nextIndex >= totalPicks) {
   newStatus = 'SEASON';
 
-  // Automatically create Week 1 matchups
   try {
-    const {
-      generateWeeklyMatchups
-    } = require('../services/fantasyMatchups');
-
     await generateWeeklyMatchups(
       league.id,
       1
     );
 
     console.log(
-      `Week 1 matchups generated for fantasy league ${league.id}`
+      `Week 1 matchups generated for league ${league.id}`
     );
   } catch (matchupError) {
     console.error(
@@ -303,19 +301,14 @@ let newStatus = 'DRAFTING';
 if (nextIndex >= totalPicks) {
   newStatus = 'SEASON';
 
-  // Automatically create Week 1 matchups
   try {
-    const {
-      generateWeeklyMatchups
-    } = require('../services/fantasyMatchups');
-
     await generateWeeklyMatchups(
       league.id,
       1
     );
 
     console.log(
-      `Week 1 matchups generated for fantasy league ${league.id}`
+      `Week 1 matchups generated for league ${league.id}`
     );
   } catch (matchupError) {
     console.error(
