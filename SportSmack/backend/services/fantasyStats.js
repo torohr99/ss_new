@@ -332,7 +332,7 @@ async function scoreLeagueWeek(
       scoreId: score.id
     });
   }
-
+  }
   await updateMatchups(
     leagueId,
     weekNumber
