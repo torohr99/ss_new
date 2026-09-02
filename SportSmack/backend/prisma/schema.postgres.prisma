@@ -212,6 +212,7 @@ model FantasyPlayer {
   teamRosters FantasyTeamPlayer[]
   transactions FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
+  weeklyScores FantasyPlayerWeeklyScore[]
 }
 
 model FantasyDraftPick {
@@ -249,6 +250,20 @@ model FantasyWeeklyScore {
   team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, weekNumber])
+}
+
+model FantasyPlayerWeeklyScore {
+  id Int @id @default(autoincrement())
+  playerId Int
+  weekNumber Int
+  points Float @default(0)
+  isLive Boolean @default(true)
+  statsJson String?
+
+  player FantasyPlayer @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, weekNumber])
+  @@index([weekNumber])
 }
 
 model BracketLeague {
