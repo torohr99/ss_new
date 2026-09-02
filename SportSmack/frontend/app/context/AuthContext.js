@@ -293,4 +293,3 @@ export const AuthProvider = ({
 
 export const useAuth = () =>
   useContext(AuthContext);
-```
