@@ -1007,6 +1007,22 @@ router.post(
       res.status(500).json({
         error: 'Failed to submit waiver claim'
       });
+      const bidAmount = Math.max(
+        0,
+        Number(req.body.bidAmount || 0)
+      );
+      
+      if (!Number.isInteger(bidAmount)) {
+        return res.status(400).json({
+          error: 'FAAB bid must be a whole number.'
+        });
+      }
+      
+      if (bidAmount > team.faab) {
+        return res.status(400).json({
+          error: 'Bid exceeds your remaining FAAB.'
+        });
+      }
     }
   }
 );
@@ -1192,7 +1208,18 @@ router.post(
               status: 'BENCH'
             }
           });
-
+        
+          await tx.fantasyTeam.update({
+            where: {
+              id: claim.teamId
+            },
+            data: {
+              faab: {
+                decrement: claim.bidAmount
+              }
+            }
+          });
+        
           await tx.fantasyTransaction.create({
             data: {
               leagueId,
@@ -1201,27 +1228,13 @@ router.post(
               type: 'WAIVER_ADD'
             }
           });
-
+        
           await tx.fantasyWaiverClaim.update({
             where: {
               id: claim.id
             },
             data: {
               status: 'APPROVED'
-            }
-          });
-
-          await tx.fantasyWaiverClaim.updateMany({
-            where: {
-              leagueId,
-              playerId: claim.playerId,
-              id: {
-                not: claim.id
-              },
-              status: 'PENDING'
-            },
-            data: {
-              status: 'REJECTED'
             }
           });
         });
