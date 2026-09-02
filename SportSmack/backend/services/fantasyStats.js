@@ -363,9 +363,49 @@ async function updateMatchups(
           home?.points || 0,
         awayScore:
           away?.points || 0,
-        status: 'LIVE'
+        status:
+          home && away
+            ? (
+                home.points > away.points
+                  ? 'FINAL_HOME'
+                  : away.points > home.points
+                    ? 'FINAL_AWAY'
+                    : 'FINAL_TIE'
+              )
+            : 'LIVE'
       }
     });
+  }
+}
+
+async function isWeekComplete(weekNumber) {
+  try {
+    const url =
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026&seasontype=2&week=${weekNumber}`;
+
+    const response = await axios.get(url, {
+      timeout: 15000
+    });
+
+    const events = response.data?.events || [];
+
+    if (events.length === 0) {
+      return false;
+    }
+
+    return events.every(event => {
+      const state =
+        event.competitions?.[0]?.status?.type?.state;
+
+      return state === 'post';
+    });
+  } catch (error) {
+    console.error(
+      `Could not determine completion of week ${weekNumber}:`,
+      error.message
+    );
+
+    return false;
   }
 }
 
@@ -374,5 +414,6 @@ module.exports = {
   calculatePlayerPoints,
   getWeeklyStats,
   scoreLeagueWeek,
-  updateMatchups
+  updateMatchups,
+  isWeekComplete
 };
