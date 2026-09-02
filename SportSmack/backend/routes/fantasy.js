@@ -463,6 +463,38 @@ router.get(
   }
 );
 
+function getCurrentFantasyWeek() {
+  const seasonStart = new Date('2026-09-09T00:00:00Z');
+  const now = new Date();
+
+  return Math.min(
+    18,
+    Math.max(
+      1,
+      Math.floor(
+        (now - seasonStart) /
+          (7 * 24 * 60 * 60 * 1000)
+      ) + 1
+    )
+  );
+}
+
+function isLineupLocked(weekNumber) {
+  const seasonStart = new Date('2026-09-09T00:00:00Z');
+
+  const weekStart = new Date(
+    seasonStart.getTime() +
+      (weekNumber - 1) *
+      7 *
+      24 *
+      60 *
+      60 *
+      1000
+  );
+
+  return new Date() >= weekStart;
+}
+
 /* =========================================================
    ROSTER
 ========================================================= */
@@ -522,6 +554,14 @@ router.post(
         Number(req.body.teamPlayerId);
       const status =
         String(req.body.status || '').toUpperCase();
+
+      const currentWeek = getCurrentFantasyWeek();
+
+      if (isLineupLocked(currentWeek)) {
+        return res.status(409).json({
+          error: `Week ${currentWeek} lineup is locked.`
+        });
+      }
 
       if (!['STARTER', 'BENCH'].includes(status)) {
         return res.status(400).json({
