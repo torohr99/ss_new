@@ -12,17 +12,22 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
-// Synchronously initialize axios default header if token exists
-// to prevent race conditions on initial component mounts.
+// ------------------------------------------------------------
+// INITIALIZE AUTHORIZATION HEADER
+// ------------------------------------------------------------
+
 if (typeof window !== 'undefined') {
-  const token = localStorage.getItem('smack_token');
+  const token =
+    localStorage.getItem('smack_token');
 
   if (token) {
-    axios.defaults.headers.common['Authorization'] =
-      `Bearer ${token}`;
+    axios.defaults.headers.common[
+      'Authorization'
+    ] = `Bearer ${token}`;
   }
 
-  // Global fetch interceptor for legacy fetch() calls.
+  // Global fetch interceptor for existing application
+  // requests that use fetch().
   const originalFetch = window.fetch;
 
   window.fetch = async function (...args) {
@@ -58,10 +63,16 @@ if (typeof window !== 'undefined') {
   };
 }
 
+// ------------------------------------------------------------
+// AUTH PROVIDER
+// ------------------------------------------------------------
+
 export const AuthProvider = ({
   children
 }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] =
+    useState(null);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -95,7 +106,7 @@ export const AuthProvider = ({
         'http://localhost:5000';
 
       const res = await fetch(
-        baseUrl + '/api/auth/me',
+        `${baseUrl}/api/auth/me`,
         {
           headers: {
             Authorization:
@@ -105,9 +116,11 @@ export const AuthProvider = ({
       );
 
       if (res.ok) {
-        const data = await res.json();
+        const data =
+          await res.json();
 
-        // Never keep an unverified user logged in.
+        // Never keep an unverified user
+        // authenticated in the frontend.
         if (data.isVerified === false) {
           localStorage.removeItem(
             'smack_token'
@@ -135,7 +148,7 @@ export const AuthProvider = ({
 
     } catch (error) {
       console.error(
-        'Failed to check auth status',
+        'Failed to check auth status:',
         error
       );
 
@@ -166,7 +179,7 @@ export const AuthProvider = ({
       'http://localhost:5000';
 
     const res = await fetch(
-      baseUrl + '/api/auth/login',
+      `${baseUrl}/api/auth/login`,
       {
         method: 'POST',
         headers: {
@@ -180,7 +193,8 @@ export const AuthProvider = ({
       }
     );
 
-    const data = await res.json();
+    const data =
+      await res.json();
 
     if (res.ok) {
       localStorage.setItem(
@@ -196,11 +210,11 @@ export const AuthProvider = ({
 
       router.push('/');
 
-      return;
+      return data;
     }
 
-    // If the backend says the email is not verified,
-    // send the user to the verification page.
+    // Unverified users are sent to the
+    // verification information page.
     if (
       res.status === 403 &&
       data.unverified
@@ -228,7 +242,7 @@ export const AuthProvider = ({
       'http://localhost:5000';
 
     const res = await fetch(
-      baseUrl + '/api/auth/register',
+      `${baseUrl}/api/auth/register`,
       {
         method: 'POST',
         headers: {
@@ -243,11 +257,12 @@ export const AuthProvider = ({
       }
     );
 
-    const data = await res.json();
+    const data =
+      await res.json();
 
     if (res.ok) {
-      // Do NOT log the user in.
-      // They must first verify their email.
+      // Registration does NOT log the user in.
+      // The user must first verify the email.
       router.push('/verify');
 
       return data;
