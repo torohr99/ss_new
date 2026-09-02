@@ -710,6 +710,176 @@ router.get(
 );
 
 /* =========================================================
+   WEEKLY MATCHUP API
+========================================================= */
+
+router.get(
+  '/league/:id/week/:week',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+      const weekNumber = Number(req.params.week);
+
+      if (
+        !Number.isInteger(leagueId) ||
+        !Number.isInteger(weekNumber) ||
+        weekNumber < 1 ||
+        weekNumber > 18
+      ) {
+        return res.status(400).json({
+          error: 'Invalid league or week'
+        });
+      }
+
+      const matchups =
+        await prisma.fantasyMatchup.findMany({
+          where: {
+            leagueId,
+            weekNumber
+          },
+          include: {
+            homeTeam: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                },
+                weeklyScores: {
+                  where: {
+                    weekNumber
+                  }
+                }
+              }
+            },
+            awayTeam: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                },
+                weeklyScores: {
+                  where: {
+                    weekNumber
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            id: 'asc'
+          }
+        });
+
+      res.json({
+        leagueId,
+        weekNumber,
+        matchups
+      });
+    } catch (err) {
+      console.error(
+        'Fantasy week error:',
+        err
+      );
+
+      res.status(500).json({
+        error: 'Failed to fetch weekly matchups'
+      });
+    }
+  }
+);
+
+/* =========================================================
+   DROP PLAYER TRANSACTION
+========================================================= */
+
+router.post(
+  '/team/:id/drop',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teamId = Number(req.params.id);
+      const teamPlayerId =
+        Number(req.body.teamPlayerId);
+
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: { id: teamId },
+          include: {
+            league: true
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
+
+      if (team.userId !== req.user.id) {
+        return res.status(403).json({
+          error: 'Not your team'
+        });
+      }
+
+      if (team.league.status !== 'SEASON') {
+        return res.status(400).json({
+          error: 'League is not in season'
+        });
+      }
+
+      const dropped =
+        await prisma.fantasyTeamPlayer.findUnique({
+          where: {
+            id: teamPlayerId
+          }
+        });
+
+      if (!dropped || dropped.teamId !== teamId) {
+        return res.status(404).json({
+          error: 'Player not found on your roster'
+        });
+      }
+
+      await prisma.$transaction([
+        prisma.fantasyTeamPlayer.delete({
+          where: {
+            id: teamPlayerId
+          }
+        }),
+
+        prisma.fantasyTransaction.create({
+          data: {
+            leagueId: team.leagueId,
+            teamId,
+            playerId: dropped.playerId,
+            type: 'DROP'
+          }
+        })
+      ]);
+
+      res.json({
+        success: true,
+        playerId: dropped.playerId
+      });
+    } catch (err) {
+      console.error(
+        'Fantasy drop error:',
+        err
+      );
+
+      res.status(500).json({
+        error: 'Failed to drop player'
+      });
+    }
+  }
+);
+
+/* =========================================================
    WAIVERS
 ========================================================= */
 
