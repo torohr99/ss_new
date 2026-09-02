@@ -5,6 +5,9 @@ const prisma = new PrismaClient();
 const {
   generateWeeklyMatchups
 } = require('../services/fantasyMatchups');
+const {
+  validateStarterRoster
+} = require('../services/fantasyRoster');
 
 const { seedFantasyPlayers } = require('../services/fantasySeeder');
 const fantasyStats = require('../services/fantasyStats');
