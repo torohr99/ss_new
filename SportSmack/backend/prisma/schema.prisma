@@ -184,6 +184,7 @@ model FantasyTeam {
   name       String
   draftOrder Int?
   createdAt  DateTime @default(now())
+  faab       Int @default(100)
 
   league       FantasyLeague        @relation(fields: [leagueId], references: [id])
   user         User                 @relation(fields: [userId], references: [id])
