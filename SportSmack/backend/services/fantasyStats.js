@@ -279,10 +279,53 @@ async function scoreLeagueWeek(
         continue;
       }
 
-      total +=
-        calculatePlayerPoints(
-          playerStats
-        );
+      const playerPoints =
+        calculatePlayerPoints(playerStats);
+      
+      await prisma.fantasyPlayerWeeklyScore.upsert({
+        where: {
+          playerId_weekNumber: {
+            playerId: rosterPlayer.playerId,
+            weekNumber
+          }
+        },
+        update: {
+          points: playerPoints,
+          isLive,
+          statsJson: JSON.stringify(playerStats)
+        },
+        create: {
+          playerId: rosterPlayer.playerId,
+          weekNumber,
+          points: playerPoints,
+          isLive,
+          statsJson: JSON.stringify(playerStats)
+        }
+      });
+      
+      total += playerPoints;
+      const playerPoints =
+        calculatePlayerPoints(playerStats);
+      
+      await prisma.fantasyPlayerWeeklyScore.upsert({
+        where: {
+          playerId_weekNumber: {
+            playerId: rosterPlayer.playerId,
+            weekNumber
+          }
+        },
+        update: {
+          points: playerPoints,
+          isLive
+        },
+        create: {
+          playerId: rosterPlayer.playerId,
+          weekNumber,
+          points: playerPoints,
+          isLive,
+          statsJson: JSON.stringify(playerStats)
+        }
+      });
     }
 
     const score =
