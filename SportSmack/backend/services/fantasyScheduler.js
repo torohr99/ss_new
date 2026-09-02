@@ -41,10 +41,13 @@ async function scoreActiveLeagues() {
           week
         );
     
+        const weekComplete =
+          await fantasyStats.isWeekComplete(week);
+        
         await fantasyStats.scoreLeagueWeek(
           league.id,
           week,
-          true
+          !weekComplete
         );
       } catch (error) {
         console.error(
