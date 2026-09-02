@@ -28,27 +28,32 @@ const generateToken = (id, username) => {
 };
 
 // ------------------------------------------------------------
-// EMAIL
+// EMAIL VERIFICATION
 // ------------------------------------------------------------
 
 const sendVerificationEmail = async (email, verificationToken) => {
-  if (
-    !process.env.SMTP_HOST ||
-    !process.env.SMTP_USER ||
-    !process.env.SMTP_PASS
-  ) {
+  const requiredVariables = [
+    'SMTP_HOST',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+    'FRONTEND_URL'
+  ];
+
+  const missingVariables = requiredVariables.filter(
+    (variable) => !process.env[variable]
+  );
+
+  if (missingVariables.length > 0) {
     throw new Error(
-      'SMTP configuration is missing. SMTP_HOST, SMTP_USER, and SMTP_PASS are required.'
+      `Missing required email environment variables: ${missingVariables.join(', ')}`
     );
   }
 
-  const frontendUrl =
-    process.env.FRONTEND_URL ||
-    process.env.NEXT_PUBLIC_FRONTEND_URL ||
-    'http://localhost:3000';
+  const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, '');
 
   const verifyLink =
-    `${frontendUrl.replace(/\/$/, '')}/verify?token=${encodeURIComponent(verificationToken)}`;
+    `${frontendUrl}/verify?token=${encodeURIComponent(verificationToken)}`;
 
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -60,15 +65,16 @@ const sendVerificationEmail = async (email, verificationToken) => {
     }
   });
 
-  await transporter.sendMail({
-    from:
-      process.env.SMTP_FROM ||
-      `"SportSmack" <${process.env.SMTP_USER}>`,
+  // Verify SMTP connection before attempting to send.
+  await transporter.verify();
+
+  const info = await transporter.sendMail({
+    from: `"SportSmack" <${process.env.SMTP_FROM}>`,
     to: email,
     subject: 'Verify your SportSmack account',
     text:
       `Welcome to SportSmack!\n\n` +
-      `Please verify your email address by clicking the link below:\n\n` +
+      `Please verify your email address by clicking this link:\n\n` +
       `${verifyLink}\n\n` +
       `If you did not create a SportSmack account, you can ignore this email.`,
     html: `
@@ -86,8 +92,8 @@ const sendVerificationEmail = async (email, verificationToken) => {
             style="
               display: inline-block;
               padding: 12px 24px;
-              background: #2563eb;
-              color: white;
+              background-color: #2563eb;
+              color: #ffffff;
               text-decoration: none;
               border-radius: 6px;
               font-weight: bold;
@@ -111,36 +117,53 @@ const sendVerificationEmail = async (email, verificationToken) => {
       </div>
     `
   });
+
+  console.log(
+    `Verification email sent successfully to ${email}. Message ID: ${info.messageId}`
+  );
+
+  return info;
 };
 
 // ------------------------------------------------------------
 // REGISTER
 // ------------------------------------------------------------
 
-// @route POST /api/auth/register
-// @desc  Register a new user and send verification email
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
     let { username, email, password } = req.body;
 
-    username = typeof username === 'string' ? username.trim() : '';
-    email = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    password = typeof password === 'string' ? password : '';
+    username =
+      typeof username === 'string'
+        ? username.trim()
+        : '';
+
+    email =
+      typeof email === 'string'
+        ? email.trim().toLowerCase()
+        : '';
+
+    password =
+      typeof password === 'string'
+        ? password
+        : '';
 
     if (!username || !email || !password) {
       return res.status(400).json({
-        message: 'Please provide a username, email, and password.'
+        message:
+          'Please provide a username, email, and password.'
       });
     }
 
     if (password.length < 8) {
       return res.status(400).json({
-        message: 'Password must be at least 8 characters long.'
+        message:
+          'Password must be at least 8 characters long.'
       });
     }
 
-    // Check for an existing username OR email.
-    // The database also has UNIQUE constraints on both fields.
+    // Check for an existing email or username.
     const userExists = await prisma.user.findFirst({
       where: {
         OR: [
@@ -153,25 +176,27 @@ router.post('/register', async (req, res) => {
     if (userExists) {
       if (userExists.email === email) {
         return res.status(400).json({
-          message: 'An account with this email address already exists.'
+          message:
+            'An account with this email address already exists.'
         });
       }
 
       return res.status(400).json({
-        message: 'That username is already taken.'
+        message:
+          'That username is already taken.'
       });
     }
 
-    // Hash password
+    // Hash password.
     const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
+    const password_hash =
+      await bcrypt.hash(password, salt);
 
-    // Generate a cryptographically secure verification token
-    const verificationToken = crypto
-      .randomBytes(32)
-      .toString('hex');
+    // Generate a cryptographically secure token.
+    const verificationToken =
+      crypto.randomBytes(32).toString('hex');
 
-    // Create account as UNVERIFIED
+    // Create account as UNVERIFIED.
     const user = await prisma.user.create({
       data: {
         username,
@@ -182,27 +207,30 @@ router.post('/register', async (req, res) => {
       }
     });
 
-    // Send verification email.
-    // If email delivery fails, remove the unverified account so
-    // the user is not left with an unusable account.
     try {
+      // Send verification email.
       await sendVerificationEmail(
         user.email,
         verificationToken
       );
     } catch (emailError) {
       console.error(
-        'Verification email failed:',
+        'EMAIL VERIFICATION ERROR:',
         emailError
       );
 
+      // Remove the account if the verification email could
+      // not be sent. This prevents an unusable account from
+      // occupying the email address.
       try {
         await prisma.user.delete({
-          where: { id: user.id }
+          where: {
+            id: user.id
+          }
         });
       } catch (deleteError) {
         console.error(
-          'Failed to remove user after email failure:',
+          'Failed to delete user after email failure:',
           deleteError
         );
       }
@@ -225,8 +253,8 @@ router.post('/register', async (req, res) => {
       error
     );
 
-    // Prisma unique constraint protection in case two
-    // registration requests arrive simultaneously.
+    // Protect against simultaneous duplicate registrations
+    // despite the application-level check above.
     if (error.code === 'P2002') {
       return res.status(400).json({
         message:
@@ -245,15 +273,15 @@ router.post('/register', async (req, res) => {
 // VERIFY EMAIL
 // ------------------------------------------------------------
 
-// @route GET /api/auth/verify/:token
-// @desc  Verify email using a verification token
+// GET /api/auth/verify/:token
 router.get('/verify/:token', async (req, res) => {
   try {
     const { token } = req.params;
 
     if (!token || token.length !== 64) {
       return res.status(400).json({
-        message: 'Invalid verification link.'
+        message:
+          'Invalid verification link.'
       });
     }
 
@@ -273,7 +301,8 @@ router.get('/verify/:token', async (req, res) => {
     if (user.isVerified) {
       return res.json({
         success: true,
-        message: 'Your email is already verified.'
+        message:
+          'Your email is already verified.'
       });
     }
 
@@ -310,35 +339,42 @@ router.get('/verify/:token', async (req, res) => {
 // LOGIN
 // ------------------------------------------------------------
 
-// @route POST /api/auth/login
-// @desc  Authenticate a verified user
+// POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
     let { email, password } = req.body;
 
-    email = typeof email === 'string'
-      ? email.trim().toLowerCase()
-      : '';
+    email =
+      typeof email === 'string'
+        ? email.trim().toLowerCase()
+        : '';
 
-    password = typeof password === 'string'
-      ? password
-      : '';
+    password =
+      typeof password === 'string'
+        ? password
+        : '';
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: {
+        email
+      }
     });
 
     if (
       !user ||
-      !(await bcrypt.compare(password, user.password_hash))
+      !(await bcrypt.compare(
+        password,
+        user.password_hash
+      ))
     ) {
       return res.status(401).json({
-        message: 'Invalid email or password.'
+        message:
+          'Invalid email or password.'
       });
     }
 
-    // CRITICAL:
-    // Do NOT allow an unverified account to log in.
+    // IMPORTANT:
+    // Users must verify their email before they can log in.
     if (!user.isVerified) {
       return res.status(403).json({
         message:
@@ -347,10 +383,11 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const token = generateToken(
-      user.id,
-      user.username
-    );
+    const token =
+      generateToken(
+        user.id,
+        user.username
+      );
 
     return res.json({
       id: user.id,
@@ -376,15 +413,16 @@ router.post('/login', async (req, res) => {
 // LOGOUT
 // ------------------------------------------------------------
 
-// @route POST /api/auth/logout
+// POST /api/auth/logout
 router.post('/logout', (req, res) => {
   res.cookie('token', '', {
     httpOnly: true,
     expires: new Date(0)
   });
 
-  res.status(200).json({
-    message: 'Logged out successfully'
+  return res.status(200).json({
+    message:
+      'Logged out successfully'
   });
 });
 
@@ -392,56 +430,44 @@ router.post('/logout', (req, res) => {
 // CURRENT USER
 // ------------------------------------------------------------
 
-// @route GET /api/auth/me
+// GET /api/auth/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: {
-        id: req.user.id
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        created_at: true,
-        profile_pic: true,
-        isVerified: true
-      }
-    });
+    const user =
+      await prisma.user.findUnique({
+        where: {
+          id: req.user.id
+        },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          created_at: true,
+          profile_pic: true,
+          isVerified: true
+        }
+      });
 
     if (!user) {
       return res.status(404).json({
-        message: 'User not found'
+        message:
+          'User not found'
       });
     }
 
-    res.json(user);
+    return res.json(user);
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      'Current-user error:',
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       message:
         'Server error fetching profile.'
     });
   }
-});
-
-// ------------------------------------------------------------
-// OLD OTP VERIFICATION ENDPOINT
-// ------------------------------------------------------------
-//
-// The application now uses emailed verification links.
-// This endpoint is intentionally retained so that removing it
-// does not unexpectedly break any old frontend code.
-//
-// It is no longer used by the registration flow.
-
-router.post('/verify', async (req, res) => {
-  return res.status(410).json({
-    message:
-      'OTP verification is no longer used. Please use the verification link sent to your email.'
-  });
 });
 
 module.exports = router;
