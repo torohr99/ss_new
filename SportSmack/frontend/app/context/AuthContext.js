@@ -1,137 +1,296 @@
 'use client';
 
-import { createContext, useState, useEffect, useContext } from 'react';
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext
+} from 'react';
+
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
 const AuthContext = createContext();
 
-// Synchronously initialize axios default header if token exists to prevent race conditions on initial component mounts
+// Synchronously initialize axios default header if token exists
+// to prevent race conditions on initial component mounts.
 if (typeof window !== 'undefined') {
   const token = localStorage.getItem('smack_token');
+
   if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    axios.defaults.headers.common['Authorization'] =
+      `Bearer ${token}`;
   }
 
-  // Global fetch interceptor to automatically inject Bearer tokens into all legacy fetch() calls
+  // Global fetch interceptor for legacy fetch() calls.
   const originalFetch = window.fetch;
+
   window.fetch = async function (...args) {
     let [resource, config] = args;
-    const currentToken = localStorage.getItem('smack_token');
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    
-    if (currentToken && typeof resource === 'string' && resource.startsWith(apiUrl)) {
+
+    const currentToken =
+      localStorage.getItem('smack_token');
+
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+
+    if (
+      currentToken &&
+      typeof resource === 'string' &&
+      resource.startsWith(apiUrl)
+    ) {
       config = config || {};
+
       config.headers = {
         ...config.headers,
-        'Authorization': `Bearer ${currentToken}`
+        Authorization:
+          `Bearer ${currentToken}`
       };
+
       args[1] = config;
     }
-    return originalFetch.apply(this, args);
+
+    return originalFetch.apply(
+      this,
+      args
+    );
   };
 }
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({
+  children
+}) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
+
   const router = useRouter();
 
+  // ----------------------------------------------------------
+  // CHECK LOGIN STATUS
+  // ----------------------------------------------------------
+
   useEffect(() => {
-    // Check if user is logged in
     checkUserLoggedIn();
   }, []);
 
   const checkUserLoggedIn = async () => {
     try {
-      const token = localStorage.getItem('smack_token');
+      const token =
+        localStorage.getItem('smack_token');
+
       if (!token) {
         setUser(null);
         setLoading(false);
         return;
       }
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-      const res = await fetch(baseUrl + '/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
+      axios.defaults.headers.common[
+        'Authorization'
+      ] = `Bearer ${token}`;
+
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+
+      const res = await fetch(
+        baseUrl + '/api/auth/me',
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`
+          }
+        }
+      );
+
       if (res.ok) {
         const data = await res.json();
+
+        // Never keep an unverified user logged in.
+        if (data.isVerified === false) {
+          localStorage.removeItem(
+            'smack_token'
+          );
+
+          delete axios.defaults.headers
+            .common['Authorization'];
+
+          setUser(null);
+          return;
+        }
+
         setUser(data);
+
       } else {
-        localStorage.removeItem('smack_token');
-        delete axios.defaults.headers.common['Authorization'];
+        localStorage.removeItem(
+          'smack_token'
+        );
+
+        delete axios.defaults.headers
+          .common['Authorization'];
+
         setUser(null);
       }
+
     } catch (error) {
-      console.error('Failed to check auth status', error);
-      localStorage.removeItem('smack_token');
-      delete axios.defaults.headers.common['Authorization'];
+      console.error(
+        'Failed to check auth status',
+        error
+      );
+
+      localStorage.removeItem(
+        'smack_token'
+      );
+
+      delete axios.defaults.headers
+        .common['Authorization'];
+
       setUser(null);
+
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async ({ email, password }) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(baseUrl + '/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password })
-    });
+  // ----------------------------------------------------------
+  // LOGIN
+  // ----------------------------------------------------------
 
-    const data = await res.json();
+  const login = async ({
+    email,
+    password
+  }) => {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
 
-    if (res.ok) {
-      localStorage.setItem('smack_token', data.token);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-      setUser(data);
-      router.push('/');
-    } else {
-      if (res.status === 403 && data.unverified) {
-        router.push(`/verify?userId=${data.userId}`);
+    const res = await fetch(
+      baseUrl + '/api/auth/login',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
       }
-      throw new Error(data.message || 'Login failed');
-    }
-  };
-
-  const register = async ({ username, email, password }) => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-    const res = await fetch(baseUrl + '/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, email, password })
-    });
+    );
 
     const data = await res.json();
 
     if (res.ok) {
-      router.push(`/verify?userId=${data.userId}`);
-    } else {
-      throw new Error(data.message || 'Registration failed');
+      localStorage.setItem(
+        'smack_token',
+        data.token
+      );
+
+      axios.defaults.headers.common[
+        'Authorization'
+      ] = `Bearer ${data.token}`;
+
+      setUser(data);
+
+      router.push('/');
+
+      return;
     }
+
+    // If the backend says the email is not verified,
+    // send the user to the verification page.
+    if (
+      res.status === 403 &&
+      data.unverified
+    ) {
+      router.push('/verify');
+    }
+
+    throw new Error(
+      data.message ||
+      'Login failed'
+    );
   };
+
+  // ----------------------------------------------------------
+  // REGISTER
+  // ----------------------------------------------------------
+
+  const register = async ({
+    username,
+    email,
+    password
+  }) => {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+
+    const res = await fetch(
+      baseUrl + '/api/auth/register',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type':
+            'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          email,
+          password
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (res.ok) {
+      // Do NOT log the user in.
+      // They must first verify their email.
+      router.push('/verify');
+
+      return data;
+    }
+
+    throw new Error(
+      data.message ||
+      'Registration failed'
+    );
+  };
+
+  // ----------------------------------------------------------
+  // LOGOUT
+  // ----------------------------------------------------------
 
   const logout = async () => {
-    localStorage.removeItem('smack_token');
-    delete axios.defaults.headers.common['Authorization'];
+    localStorage.removeItem(
+      'smack_token'
+    );
+
+    delete axios.defaults.headers
+      .common['Authorization'];
+
     setUser(null);
+
     router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () =>
+  useContext(AuthContext);
+```
