@@ -7,6 +7,7 @@ import axios from 'axios';
 export default function FantasyDashboard() {
   const router = useRouter();
   const [leagues, setLeagues] = useState([]);
+  const [playerCount, setPlayerCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isOffseason, setIsOffseason] = useState(true); // Default to true since it's May
   const [devOverride, setDevOverride] = useState(false);
@@ -71,10 +72,41 @@ export default function FantasyDashboard() {
   const seedPlayers = async () => {
     try {
       alert('Seeding started. This will take a moment.');
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/seed`, {}, { withCredentials: true });
-      alert(`Seeding complete. Added ${res.data.total} players.`);
+  
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const res = await axios.post(
+        `${apiUrl}/api/fantasy/seed`,
+        {},
+        { withCredentials: true }
+      );
+  
+      const playersRes = await axios.get(
+        `${apiUrl}/api/fantasy/players`,
+        { withCredentials: true }
+      );
+  
+      const players = Array.isArray(playersRes.data)
+        ? playersRes.data
+        : [];
+  
+      setPlayerCount(players.length);
+  
+      alert(
+        `Seeding complete. ${players.length} NFL players are now available.`
+      );
     } catch (err) {
-      alert('Seeding failed');
+      console.error(
+        'Fantasy player seeding failed:',
+        err.response?.data || err.message || err
+      );
+  
+      alert(
+        err.response?.data?.error ||
+        'Seeding failed. Check the Render logs.'
+      );
     }
   };
 
@@ -99,6 +131,16 @@ export default function FantasyDashboard() {
           <button className="btn-primary" onClick={seedPlayers}>
             Seed NFL Players
           </button>
+          {playerCount !== null && (
+            <span
+              style={{
+                color: 'var(--text-secondary)',
+                fontSize: '0.85rem'
+              }}
+            >
+              Player Pool: {playerCount}
+            </span>
+          )}
         </div>
       </div>
 
