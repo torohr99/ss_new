@@ -891,35 +891,30 @@ router.post(
     try {
       const leagueId = Number(req.params.id);
       const playerId = Number(req.body.playerId);
-      const bidAmount = Math.max(
-        0,
-        Number(req.body.bidAmount || 0)
-      );
+      const bidAmount = Number(req.body.bidAmount);
 
-      if (!Number.isInteger(leagueId) ||
-          !Number.isInteger(playerId)) {
+      if (!Number.isInteger(leagueId) || !Number.isInteger(playerId)) {
         return res.status(400).json({
           error: 'Invalid league or player ID'
         });
       }
 
-      if (!Number.isFinite(bidAmount)) {
+      if (!Number.isInteger(bidAmount) || bidAmount < 0) {
         return res.status(400).json({
-          error: 'Invalid bid amount'
+          error: 'FAAB bid must be a non-negative whole number.'
         });
       }
 
-      const team =
-        await prisma.fantasyTeam.findFirst({
-          where: {
-            leagueId,
-            userId: req.user.id
-          },
-          include: {
-            league: true,
-            players: true
-          }
-        });
+      const team = await prisma.fantasyTeam.findFirst({
+        where: {
+          leagueId,
+          userId: req.user.id
+        },
+        include: {
+          league: true,
+          players: true
+        }
+      });
 
       if (!team) {
         return res.status(404).json({
@@ -939,12 +934,17 @@ router.post(
         });
       }
 
-      const player =
-        await prisma.fantasyPlayer.findUnique({
-          where: {
-            id: playerId
-          }
+      if (bidAmount > team.faab) {
+        return res.status(400).json({
+          error: `Bid exceeds your remaining FAAB (${team.faab}).`
         });
+      }
+
+      const player = await prisma.fantasyPlayer.findUnique({
+        where: {
+          id: playerId
+        }
+      });
 
       if (!player) {
         return res.status(404).json({
@@ -998,32 +998,17 @@ router.post(
           }
         });
 
-      res.json(claim);
+      res.json({
+        success: true,
+        claim,
+        remainingFaab: team.faab - bidAmount
+      });
     } catch (err) {
-      console.error(
-        'Waiver claim error:',
-        err
-      );
+      console.error('Waiver claim error:', err);
 
       res.status(500).json({
         error: 'Failed to submit waiver claim'
       });
-      const bidAmount = Math.max(
-        0,
-        Number(req.body.bidAmount || 0)
-      );
-      
-      if (!Number.isInteger(bidAmount)) {
-        return res.status(400).json({
-          error: 'FAAB bid must be a whole number.'
-        });
-      }
-      
-      if (bidAmount > team.faab) {
-        return res.status(400).json({
-          error: 'Bid exceeds your remaining FAAB.'
-        });
-      }
     }
   }
 );
