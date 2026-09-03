@@ -149,10 +149,10 @@ router.get('/players', authenticateToken, async (req, res) => {
       }
     });
 
-    // Automatically seed the player database if it is empty.
+    // If the database has not been seeded yet, seed it automatically.
     if (players.length === 0) {
-      console.log('Fantasy player database is empty. Starting automatic seed...');
-
+      console.log('FantasyPlayer table is empty. Seeding NFL players...');
+      
       await seedFantasyPlayers();
 
       players = await prisma.fantasyPlayer.findMany({
@@ -163,11 +163,13 @@ router.get('/players', authenticateToken, async (req, res) => {
     }
 
     res.json(players);
+
   } catch (err) {
-    console.error('Fantasy players error:', err);
+    console.error('Fantasy players fetch/seed error:', err);
 
     res.status(500).json({
-      error: 'Failed to fetch fantasy players'
+      error: 'Failed to load fantasy players',
+      details: err.message
     });
   }
 });
