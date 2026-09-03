@@ -175,6 +175,7 @@ model FantasyLeague {
   matchups      FantasyMatchup[]
   transactions  FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
+  trades       FantasyTrade[]
 }
 
 model FantasyTeam {
@@ -194,6 +195,9 @@ model FantasyTeam {
   awayMatchups FantasyMatchup[] @relation("AwayMatchups")
   transactions FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
+  tradesProposed FantasyTrade[] @relation("TradeProposer")
+  tradesReceived FantasyTrade[] @relation("TradeRecipient")
+  tradeItems FantasyTradeItem[]
 
   @@index([leagueId])
   @@index([userId])
@@ -214,6 +218,7 @@ model FantasyPlayer {
   transactions FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
   weeklyScores FantasyPlayerWeeklyScore[]
+  tradeItems FantasyTradeItem[]
 }
 
 model FantasyDraftPick {
@@ -343,4 +348,42 @@ model FantasyWaiverClaim {
   @@index([leagueId, status])
   @@index([teamId])
   @@index([playerId])
+}
+
+model FantasyTrade {
+  id           Int      @id @default(autoincrement())
+  leagueId     Int
+  proposerTeamId Int
+  recipientTeamId Int
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+  respondedAt  DateTime?
+  expiresAt    DateTime?
+
+  league         FantasyLeague @relation(fields: [leagueId], references: [id])
+  proposerTeam   FantasyTeam   @relation("TradeProposer", fields: [proposerTeamId], references: [id])
+  recipientTeam  FantasyTeam   @relation("TradeRecipient", fields: [recipientTeamId], references: [id])
+  items          FantasyTradeItem[]
+
+  @@index([leagueId, status])
+  @@index([proposerTeamId])
+  @@index([recipientTeamId])
+}
+
+model FantasyTradeItem {
+  id         Int @id @default(autoincrement())
+  tradeId    Int
+  playerId   Int
+  fromTeamId Int
+  toTeamId   Int
+
+  trade       FantasyTrade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  player      FantasyPlayer @relation(fields: [playerId], references: [id])
+  fromTeam    FantasyTeam @relation(fields: [fromTeamId], references: [id])
+  toTeam      FantasyTeam @relation(fields: [toTeamId], references: [id])
+
+  @@index([tradeId])
+  @@index([playerId])
+  @@index([fromTeamId])
+  @@index([toTeamId])
 }
