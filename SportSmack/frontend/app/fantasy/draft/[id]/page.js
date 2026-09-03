@@ -64,11 +64,26 @@ export default function DraftRoom({ params }) {
         const leagueRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/league/${id}`, { withCredentials: true });
         setLeague(leagueRes.data);
 
-        const playersRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/players`, { withCredentials: true });
-        setAvailablePlayers(playersRes.data);
-      } catch (err) {
-        console.error(err);
-      }
+        const playersRes = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/players`,
+          { withCredentials: true }
+        );
+        
+        const players = Array.isArray(playersRes.data)
+          ? playersRes.data
+          : [];
+        
+        console.log('Fantasy players loaded:', players.length);
+        
+        setAvailablePlayers(players);
+        
+        } catch (err) {
+        
+        console.error('Failed to load fantasy draft data:', err);
+        
+        setAvailablePlayers([]);
+        
+        }
     };
     fetchData();
   }, [id]);
@@ -372,7 +387,29 @@ export default function DraftRoom({ params }) {
                       <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody>                  
+                    {undraftedPlayers.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          style={{
+                            padding: '3rem',
+                            textAlign: 'center',
+                            color: 'var(--text-secondary)'
+                          }}
+                        >
+                          <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                            No available players found.
+                          </div>
+                    
+                          <div style={{ fontSize: '0.9rem' }}>
+                            Players are loading from the NFL player database.
+                            If this message remains, refresh the Draft Room.
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    
                     {undraftedPlayers.slice(0, 100).map(p => {
                       const colors = NFL_COLORS[p.team] || { primary: '#333', secondary: '#111' };
                       return (
@@ -404,6 +441,7 @@ export default function DraftRoom({ params }) {
                                   width: '48px',
                                   height: '48px',
                                   borderRadius: '50%',
+                                  overflow: 'hidden',
                                   background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
                                   display: 'flex',
                                   alignItems: 'center',
@@ -414,34 +452,52 @@ export default function DraftRoom({ params }) {
                                   flexShrink: 0
                                 }}
                               >
-                                {p.name
-                                  .split(' ')
-                                  .map(n => n[0])
-                                  .join('')}
+                                {p.imageUrl ? (
+                                  <img
+                                    src={p.imageUrl}
+                                    alt={p.name}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  p.name.split(' ').map(n => n[0]).join('')
+                                )}
                               </div>
-                            )}
-                          
-                            <div>
-                              <div
-                                style={{
-                                  fontWeight: 'bold',
-                                  fontSize: '1.05rem'
-                                }}
-                              >
-                                {p.name}
-                              </div>
-                          
-                              <div
-                                style={{
-                                  fontSize: '0.8rem',
-                                  color: 'var(--text-secondary)'
-                                }}
-                              >
+                              
+                              <div>
+                                <div
+                                  style={{
+                                    fontWeight: 'bold',
+                                    fontSize: '1.05rem'
+                                  }}
+                                >
+                                  {p.name}
+                                </div>
+                              
+                                <div
+                                  style={{
+                                    fontSize: '0.8rem',
+                                    color: 'var(--text-secondary)'
+                                  }}
+                                >
                                 {p.team}
                                 {' • '}
                                 {p.position}
                                 {' • '}
                                 #{p.jerseyNumber || '—'}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                {p.byeWeek
+                                  ? `Bye Week ${p.byeWeek}`
+                                  : 'Bye Week —'}
                               </div>
                             </div>
                           </td>
