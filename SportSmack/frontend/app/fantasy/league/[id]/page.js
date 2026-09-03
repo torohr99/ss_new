@@ -53,6 +53,25 @@ export default function LeaguePage({ params }) {
   const [tradeRecipient, setTradeRecipient] = useState('');
   const [offeredPlayers, setOfferedPlayers] = useState([]);
   const [requestedPlayers, setRequestedPlayers] = useState([]);
+  const [waiverClaims, setWaiverClaims] = useState([]);
+
+  const fetchWaiverClaims = async () => {
+    try {
+      const res = await axios.get(
+        `${API}/api/fantasy/league/${id}/waivers`,
+        {
+          withCredentials: true
+        }
+      );
+  
+      setWaiverClaims(res.data || []);
+    } catch (err) {
+      console.error(
+        'Failed to load waiver claims:',
+        err
+      );
+    }
+  };
 
   const fetchLeague = async () => {
     const res = await axios.get(
@@ -148,6 +167,10 @@ export default function LeaguePage({ params }) {
 
     if (activeTab === 'trades') {
       fetchTrades();
+    }
+
+    if (activeTab === 'waivers') {
+      fetchWaiverClaims();
     }
   }, [activeTab, week]);
 
@@ -354,7 +377,8 @@ export default function LeaguePage({ params }) {
     ['standings', 'Standings'],
     ['players', 'Players'],
     ['transactions', 'Transactions'],
-    ['trades', 'Trades']
+    ['trades', 'Trades'],
+    ['waivers', 'Waivers']
   ];
 
   return (
@@ -1037,7 +1061,42 @@ export default function LeaguePage({ params }) {
             </div>
           )}
         </div>
-      )}  
+      )}
+
+      {activeTab === 'waivers' && (
+        <div className="profile-section">
+          <h2 className="section-title">
+            Pending Waiver Claims
+          </h2>
+      
+          {waiverClaims.length === 0 ? (
+            <p>No pending waiver claims.</p>
+          ) : (
+            waiverClaims.map(claim => (
+              <div
+                key={claim.id}
+                style={{
+                  padding: '1rem',
+                  borderBottom:
+                    '1px solid var(--border)'
+                }}
+              >
+                <strong>
+                  {claim.player?.name}
+                </strong>
+      
+                <div>
+                  {claim.team?.name}
+                </div>
+      
+                <div>
+                  Bid: {claim.bidAmount} FAAB
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
     </div>
   );
