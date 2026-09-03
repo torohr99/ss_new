@@ -20,105 +20,164 @@ function getTeamName(competitor) {
   );
 }
 
-function buildPrompt(gameState) {
+function buildPrompt(gameState, previousQuestions = []) {
+  const previousText = previousQuestions.length
+    ? `
+PREVIOUS POLLS ALREADY USED FOR THIS GAME:
+${previousQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+
+DO NOT repeat or closely rephrase any of these questions.
+`
+    : '';
+
   return `
 You generate interactive polls for SportSmack.
 
-Create ONE poll for THIS EXACT GAME.
+Create ONE highly specific poll for THIS EXACT GAME.
 
-GAME:
+GAME STATE:
 ${JSON.stringify(gameState, null, 2)}
 
-The poll must be specific to this matchup.
+${previousText}
 
-If the game has NOT started:
-- Ask about a meaningful matchup, player, strategy,
-  or outcome.
-- Do not use a generic "Who will win?" question
-  unless no better information exists.
+ABSOLUTE REQUIREMENTS:
 
-If the game IS LIVE:
-- Use the current score.
-- Use the inning/quarter/period.
-- Use recent plays.
-- Use player/game situation information.
-- Ask something fans could realistically debate RIGHT NOW.
+1. The poll MUST refer to information from this exact game.
+2. Use the actual teams, players, score, period/inning/quarter,
+   game clock, recent play, leaders, and situation when available.
+3. The question must be something fans could realistically debate
+   RIGHT NOW.
+4. Do NOT create generic polls such as:
+   - "Who will win?"
+   - "Who is the better team?"
+   - "Who will score next?"
+   unless the supplied game state makes that question uniquely
+   relevant and there is no more specific alternative.
+5. Prefer a question about a specific player, play, matchup,
+   decision, possession, drive, inning, quarter, period,
+   score situation, or strategic decision.
+6. If the game has not started, create a matchup-specific
+   pregame question using the actual teams, players, records,
+   leaders, injuries, odds, or other supplied information.
+7. If the game is live, prioritize the CURRENT situation.
+8. If the game is finished, create a postgame question based
+   on the actual result and supplied player/game information.
+9. NEVER invent a player, statistic, injury, play, score,
+   situation, or event.
+10. NEVER use information not contained in GAME STATE.
+11. Make the poll different from previous polls.
 
 SPORT-SPECIFIC GUIDANCE:
 
 MLB:
-Focus on pitcher/batter matchups, next at-bat,
-runs, bullpen decisions, inning strategy, steals,
-hits, strikeouts, etc.
+- pitcher/batter matchups
+- next at-bat
+- runners/base situation
+- bullpen decisions
+- pitch count
+- inning strategy
+- strikeouts/hits/runs
+- stolen-base situations
 
 NFL:
-Focus on drives, fourth downs, play calling,
-QB decisions, touchdowns, field goals, defensive
-matchups, etc.
+- current drive
+- fourth-down decision
+- red-zone situation
+- QB decision
+- play calling
+- defensive matchup
+- touchdown/field-goal decision
+- specific player performance
+- time/score situation
 
 NBA:
-Focus on possessions, player matchups, three-point
-attempts, fouls, defensive assignments, scoring runs,
-timeouts, etc.
+- current possession
+- player matchup
+- shot selection
+- foul trouble
+- defensive assignment
+- scoring run
+- timeout
+- late-game situation
 
 NHL:
-Focus on power plays, goalie decisions, shots,
-scoring chances, empty-net situations, etc.
+- power play
+- goalie decision
+- shots/chances
+- defensive matchup
+- empty-net situation
+- scoring chance
 
 NCAAF:
-Focus on drives, fourth downs, QB decisions,
-scoring, matchups and game situation.
+- drive
+- fourth down
+- quarterback decision
+- matchup
+- scoring situation
+- clock management
 
 NCAAB:
-Focus on possessions, shooting, foul trouble,
-defensive matchups and scoring runs.
+- possession
+- shooting
+- foul trouble
+- defensive matchup
+- scoring run
+- late-game situation
 
-Never invent:
-- players
-- statistics
-- injuries
-- plays
-- scores
-- game events
-
-Only use supplied information.
-
-Return ONLY JSON:
+Return ONLY valid JSON:
 
 {
-  "question": "specific question",
+  "question": "specific game-dependent question",
   "options": ["Option 1", "Option 2"],
-  "reason": "why this poll is relevant"
+  "reason": "specific reason this poll is relevant to this game"
 }
-`;
+`.trim();
 }
 
 async function generateGamePoll(
   summary,
   league,
-  gameId
+  gameId,
+  previousQuestions = []
 ) {
   const gameState = sportsApi.buildSportSpecificState(
-  summary,
-  league
-);
+    summary,
+    league,
+    gameId
+  );
 
   if (!gameState) {
-    throw new Error(
-      'Game state unavailable'
-    );
+    throw new Error('Game state unavailable');
   }
 
-  const cacheKey =
-  `${String(league).toLowerCase()}:${gameId}:${gameState.status}:${gameState.statusDetail}:${gameState.homeTeam.score}:${gameState.awayTeam.score}`;
+  /*
+   * Include the actual game situation in the cache key.
+   * This prevents a new situation from incorrectly returning
+   * an older poll.
+   */
+  const latestPlay =
+    gameState.plays?.[
+      gameState.plays.length - 1
+    ] || null;
 
-  const cached =
-    pollCache.get(cacheKey);
+  const cacheKey = [
+    String(league).toLowerCase(),
+    String(gameId),
+    gameState.status?.state || '',
+    gameState.status?.period || '',
+    gameState.status?.clock || '',
+    gameState.teams?.home?.score ?? '',
+    gameState.teams?.away?.score ?? '',
+    JSON.stringify(gameState.situation || {}),
+    JSON.stringify(gameState.sportSituation || {}),
+    JSON.stringify(latestPlay || {})
+  ].join(':');
+
+  const cached = pollCache.get(cacheKey);
 
   if (
     cached &&
-    Date.now() - cached.timestamp <
-      POLL_CACHE_TTL
+    Date.now() - cached.timestamp < POLL_CACHE_TTL
   ) {
     return cached.data;
   }
@@ -129,31 +188,31 @@ async function generateGamePoll(
     );
   }
 
-  const response =
-    await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        contents: [
-          {
-            parts: [
-              {
-                text: buildPrompt(gameState)
-              }
-            ]
-          }
-        ],
-
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 300,
-          responseMimeType:
-            'application/json'
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      contents: [
+        {
+          parts: [
+            {
+              text: buildPrompt(
+                gameState,
+                previousQuestions
+              )
+            }
+          ]
         }
-      },
-      {
-        timeout: 20000
+      ],
+      generationConfig: {
+        temperature: 0.9,
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json'
       }
-    );
+    },
+    {
+      timeout: 20000
+    }
+  );
 
   const raw =
     response.data?.candidates?.[0]
@@ -165,8 +224,13 @@ async function generateGamePoll(
     );
   }
 
-  const poll =
-    JSON.parse(raw);
+  const poll = JSON.parse(
+    raw
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim()
+  );
 
   if (
     !poll.question ||
