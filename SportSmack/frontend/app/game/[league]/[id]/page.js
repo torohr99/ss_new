@@ -399,7 +399,8 @@ export default function GameHubPage({ params }) {
             body: JSON.stringify({
               prompt: memeInput,
               league,
-              gameId
+              gameId,
+              gameContext
             })
           }
         );
