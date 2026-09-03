@@ -113,17 +113,67 @@ export default function DraftRoom({ params }) {
     return () => newSocket.close();
   }, [id]);
 
-  if (!currentUser || !league) return <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.5rem' }}>Loading Draft Room...</div>;
+  const numTeams = teams.length;
 
+  // Draft Board Matrix
+  // IMPORTANT: This hook must run on EVERY render.
+  // Do not place it below the loading return.
+  const draftBoard = useMemo(() => {
+    if (numTeams === 0) return [];
+  
+    const board = Array(15)
+      .fill(null)
+      .map(() => Array(numTeams).fill(null));
+  
+    picks.forEach(p => {
+      const pIdx = p.pickNumber - 1;
+      const r = Math.floor(pIdx / numTeams);
+  
+      if (r >= 0 && r < 15) {
+        const c =
+          r % 2 === 0
+            ? pIdx % numTeams
+            : numTeams - 1 - (pIdx % numTeams);
+  
+        if (c >= 0 && c < numTeams) {
+          board[r][c] = p;
+        }
+      }
+    });
+  
+    return board;
+  }, [picks, numTeams]);
+  
+  // Loading state must come AFTER all hooks.
+  if (!currentUser || !league) {
+    return (
+      <div
+        className="page-container"
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          fontSize: '1.5rem'
+        }}
+      >
+        Loading Draft Room...
+      </div>
+    );
+  }
+  
   const myTeam = teams.find(t => t.userId === currentUser.id);
   const isOwner = league.ownerId === currentUser.id;
-
+  
   const startDraft = () => {
-    if (socket) socket.emit('start_draft', { leagueId: id });
+    if (socket) {
+      socket.emit('start_draft', { leagueId: id });
+    }
   };
-
+  
   const draftPlayer = (playerId) => {
     if (!myTeam) return;
+  
     if (socket) {
       socket.emit('draft_pick', {
         leagueId: id,
@@ -132,8 +182,7 @@ export default function DraftRoom({ params }) {
       });
     }
   };
-
-  const numTeams = teams.length;
+  
   let currentTeamTurn = null;
   let round = 1;
   let pickInRound = 0;
@@ -141,30 +190,46 @@ export default function DraftRoom({ params }) {
   if (status === 'DRAFTING' && numTeams > 0) {
     round = Math.floor(currentPickIndex / numTeams) + 1;
     pickInRound = currentPickIndex % numTeams;
-    const expectedDraftOrder = (round % 2 !== 0) ? (pickInRound + 1) : (numTeams - pickInRound);
-    currentTeamTurn = teams.find(t => t.draftOrder === expectedDraftOrder);
+  
+    const expectedDraftOrder =
+      round % 2 !== 0
+        ? pickInRound + 1
+        : numTeams - pickInRound;
+  
+    currentTeamTurn = teams.find(
+      t => t.draftOrder === expectedDraftOrder
+    );
   }
-
-  const isMyTurn = currentTeamTurn && myTeam && currentTeamTurn.id === myTeam.id;
-  const sortedTeams = [...teams].sort((a, b) => (a.draftOrder || 99) - (b.draftOrder || 99));
-
-  const draftedPlayerIds = new Set(picks.map(p => p.playerId));
+  
+  const isMyTurn =
+    currentTeamTurn &&
+    myTeam &&
+    currentTeamTurn.id === myTeam.id;
+  
+  const sortedTeams = [...teams].sort(
+    (a, b) =>
+      (a.draftOrder || 99) -
+      (b.draftOrder || 99)
+  );
+  
+  const draftedPlayerIds = new Set(
+    picks.map(p => p.playerId)
+  );
+  
   const undraftedPlayers = availablePlayers
     .filter(p => !draftedPlayerIds.has(p.id))
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.position.toLowerCase().includes(searchQuery.toLowerCase()) || p.team.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  // Draft Board Matrix
-  const draftBoard = useMemo(() => {
-    if (numTeams === 0) return [];
-    const board = Array(15).fill(null).map(() => Array(numTeams).fill(null));
-    picks.forEach(p => {
-      const pIdx = p.pickNumber - 1;
-      const r = Math.floor(pIdx / numTeams);
-      const c = (r % 2 === 0) ? (pIdx % numTeams) : (numTeams - 1 - (pIdx % numTeams));
-      board[r][c] = p;
-    });
-    return board;
-  }, [picks, numTeams]);
+    .filter(
+      p =>
+        p.name
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        p.position
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        p.team
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+    );
 
   return (
     <div className="page-container" style={{ maxWidth: '1600px', padding: '0 1rem' }}>
