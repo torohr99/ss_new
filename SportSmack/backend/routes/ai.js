@@ -144,11 +144,61 @@ router.post('/meme', authMiddleware, async (req, res) => {
     const entities =
       await entityDb.identifyEntities(prompt);
 
+    let enrichedGameContext =
+      gameContext || null;
+    
+    if (league && gameId) {
+      try {
+        const mapping =
+          sportsApi.LEAGUE_MAP?.[
+            String(league).toLowerCase()
+          ];
+    
+        if (mapping) {
+          const summary =
+            await sportsApi.getGameSummary(
+              mapping.sport,
+              league,
+              gameId
+            );
+    
+          const liveState =
+            sportsApi.buildSportSpecificState(
+              summary,
+              league,
+              gameId
+            );
+    
+          if (liveState) {
+            enrichedGameContext = {
+              ...(gameContext || {}),
+              league,
+              gameId,
+              teams: liveState.teams,
+              status: liveState.status,
+              situation: liveState.situation,
+              sportSituation:
+                liveState.sportSituation,
+              leaders: liveState.leaders,
+              recentPlays: liveState.plays,
+              venue: liveState.venue,
+              odds: liveState.odds
+            };
+          }
+        }
+      } catch (contextError) {
+        console.error(
+          'Could not enrich meme game context:',
+          contextError.message
+        );
+      }
+    }
+    
     const basePrompt =
       buildMemePrompt(
         prompt,
         entities,
-        gameContext
+        enrichedGameContext
       );
 
     const seeds = [
