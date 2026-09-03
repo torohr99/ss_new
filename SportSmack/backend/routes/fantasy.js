@@ -13,13 +13,14 @@ const {
 } = require('../services/fantasyWaivers');
 
 const { seedFantasyPlayers } = require('../services/fantasySeeder');
+
+const fantasyStats = require('../services/fantasyStats');
 const {
   createTrade,
   acceptTrade,
   rejectTrade,
   cancelTrade
 } = require('../services/fantasyTrades');
-const fantasyStats = require('../services/fantasyStats');
 
 const authenticateToken = require('../middleware/auth');
 
