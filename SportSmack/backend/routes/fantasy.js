@@ -13,6 +13,12 @@ const {
 } = require('../services/fantasyWaivers');
 
 const { seedFantasyPlayers } = require('../services/fantasySeeder');
+const {
+  createTrade,
+  acceptTrade,
+  rejectTrade,
+  cancelTrade
+} = require('../services/fantasyTrades');
 const fantasyStats = require('../services/fantasyStats');
 
 const authenticateToken = require('../middleware/auth');
@@ -1625,4 +1631,205 @@ function validateCompleteStartingLineup(players) {
   return null;
 }
 
+router.post(
+  '/league/:id/trades',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+
+      const {
+        recipientTeamId,
+        offeredPlayerIds,
+        requestedPlayerIds
+      } = req.body;
+
+      const proposerTeam =
+        await prisma.fantasyTeam.findFirst({
+          where: {
+            leagueId,
+            userId: req.user.id
+          }
+        });
+
+      if (!proposerTeam) {
+        return res.status(404).json({
+          error: 'Your fantasy team was not found.'
+        });
+      }
+
+      const trade = await createTrade({
+        leagueId,
+        proposerTeamId: proposerTeam.id,
+        recipientTeamId,
+        offeredPlayerIds,
+        requestedPlayerIds
+      });
+
+      res.status(201).json({
+        success: true,
+        trade
+      });
+    } catch (err) {
+      console.error('Create trade error:', err);
+
+      res.status(400).json({
+        error: err.message || 'Failed to create trade.'
+      });
+    }
+  }
+);
+
+router.get(
+  '/league/:id/trades',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+
+      const team =
+        await prisma.fantasyTeam.findFirst({
+          where: {
+            leagueId,
+            userId: req.user.id
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Your fantasy team was not found.'
+        });
+      }
+
+      const trades =
+        await prisma.fantasyTrade.findMany({
+          where: {
+            leagueId,
+            OR: [
+              {
+                proposerTeamId: team.id
+              },
+              {
+                recipientTeamId: team.id
+              }
+            ]
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          include: {
+            proposerTeam: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                }
+              }
+            },
+            recipientTeam: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    username: true
+                  }
+                }
+              }
+            },
+            items: {
+              include: {
+                player: true
+              }
+            }
+          }
+        });
+
+      res.json(trades);
+    } catch (err) {
+      console.error('Get trades error:', err);
+
+      res.status(500).json({
+        error: 'Failed to fetch trades.'
+      });
+    }
+  }
+);
+
+router.post(
+  '/trades/:id/accept',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const trade =
+        await acceptTrade(
+          Number(req.params.id),
+          req.user.id
+        );
+
+      res.json({
+        success: true,
+        trade
+      });
+    } catch (err) {
+      console.error('Accept trade error:', err);
+
+      res.status(400).json({
+        error: err.message || 'Failed to accept trade.'
+      });
+    }
+  }
+);
+
+router.post(
+  '/trades/:id/reject',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const trade =
+        await rejectTrade(
+          Number(req.params.id),
+          req.user.id
+        );
+
+      res.json({
+        success: true,
+        trade
+      });
+    } catch (err) {
+      console.error('Reject trade error:', err);
+
+      res.status(400).json({
+        error: err.message || 'Failed to reject trade.'
+      });
+    }
+  }
+);
+
+router.post(
+  '/trades/:id/cancel',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const trade =
+        await cancelTrade(
+          Number(req.params.id),
+          req.user.id
+        );
+
+      res.json({
+        success: true,
+        trade
+      });
+    } catch (err) {
+      console.error('Cancel trade error:', err);
+
+      res.status(400).json({
+        error: err.message || 'Failed to cancel trade.'
+      });
+    }
+  }
+);
+  
 module.exports = router;
