@@ -143,17 +143,31 @@ router.post('/seed', authenticateToken, async (req, res) => {
 
 router.get('/players', authenticateToken, async (req, res) => {
   try {
-    const players = await prisma.fantasyPlayer.findMany({
+    let players = await prisma.fantasyPlayer.findMany({
       orderBy: {
         name: 'asc'
       }
     });
 
+    // Automatically seed the player database if it is empty.
+    if (players.length === 0) {
+      console.log('Fantasy player database is empty. Starting automatic seed...');
+
+      await seedFantasyPlayers();
+
+      players = await prisma.fantasyPlayer.findMany({
+        orderBy: {
+          name: 'asc'
+        }
+      });
+    }
+
     res.json(players);
   } catch (err) {
-    console.error(err);
+    console.error('Fantasy players error:', err);
+
     res.status(500).json({
-      error: 'Failed to fetch players'
+      error: 'Failed to fetch fantasy players'
     });
   }
 });
