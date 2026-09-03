@@ -385,13 +385,7 @@ async function updateMatchups(
           away?.points || 0,
         status:
           home && away
-            ? (
-                home.points > away.points
-                  ? 'FINAL_HOME'
-                  : away.points > home.points
-                    ? 'FINAL_AWAY'
-                    : 'FINAL_TIE'
-              )
+            ? 'FINAL'
             : 'LIVE'
       }
     });
