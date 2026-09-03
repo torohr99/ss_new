@@ -466,7 +466,8 @@ export default function DraftRoom({ params }) {
                                   p.name.split(' ').map(n => n[0]).join('')
                                 )}
                               </div>
-                              
+                              )}
+                                  
                               <div>
                                 <div
                                   style={{
