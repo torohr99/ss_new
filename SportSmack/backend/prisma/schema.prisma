@@ -365,8 +365,6 @@ model FantasyTrade {
   proposerTeam   FantasyTeam   @relation("TradeProposer", fields: [proposerTeamId], references: [id])
   recipientTeam  FantasyTeam   @relation("TradeRecipient", fields: [recipientTeamId], references: [id])
   items          FantasyTradeItem[]
-  tradeItemsSent     FantasyTradeItem[] @relation("TradeItemsFromTeam")
-  tradeItemsReceived FantasyTradeItem[] @relation("TradeItemsToTeam")
 
   @@index([leagueId, status])
   @@index([proposerTeamId])
