@@ -358,6 +358,139 @@ router.get('/leagues', authenticateToken, async (req, res) => {
   }
 });
 
+router.delete(
+  '/league/:id',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const leagueId = Number(req.params.id);
+
+      if (!Number.isInteger(leagueId)) {
+        return res.status(400).json({
+          error: 'Invalid league ID'
+        });
+      }
+
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          }
+        });
+
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found'
+        });
+      }
+
+      // Only the league owner can delete it.
+      if (league.ownerId !== req.user.id) {
+        return res.status(403).json({
+          error:
+            'Only the league owner can delete this league.'
+        });
+      }
+
+      await prisma.$transaction(async tx => {
+        // Trade items reference teams and trades.
+        await tx.fantasyTradeItem.deleteMany({
+          where: {
+            trade: {
+              leagueId
+            }
+          }
+        });
+
+        // Trades reference the league and teams.
+        await tx.fantasyTrade.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Waiver claims reference the league and teams.
+        await tx.fantasyWaiverClaim.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Transactions reference the league and teams.
+        await tx.fantasyTransaction.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Weekly team scores reference teams.
+        await tx.fantasyWeeklyScore.deleteMany({
+          where: {
+            team: {
+              leagueId
+            }
+          }
+        });
+
+        // Player weekly scores are global player data,
+        // so DO NOT delete them here.
+
+        // Matchups reference teams and the league.
+        await tx.fantasyMatchup.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Draft picks reference teams and the league.
+        await tx.fantasyDraftPick.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Roster entries reference teams.
+        await tx.fantasyTeamPlayer.deleteMany({
+          where: {
+            team: {
+              leagueId
+            }
+          }
+        });
+
+        // Finally remove the league's teams.
+        await tx.fantasyTeam.deleteMany({
+          where: {
+            leagueId
+          }
+        });
+
+        // Finally remove the league itself.
+        await tx.fantasyLeague.delete({
+          where: {
+            id: leagueId
+          }
+        });
+      });
+
+      res.json({
+        success: true,
+        message: 'Fantasy league deleted'
+      });
+    } catch (err) {
+      console.error(
+        'Delete fantasy league error:',
+        err
+      );
+
+      res.status(500).json({
+        error: 'Failed to delete fantasy league',
+        details: err.message
+      });
+    }
+  }
+);
+
 router.post(
   '/league/:id/join',
   authenticateToken,
