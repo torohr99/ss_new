@@ -48,6 +48,8 @@ export default function LeaguePage({ params }) {
   const [loading, setLoading] =
     useState(true);
 
+  const [trades, setTrades] = useState([]);
+
   const fetchLeague = async () => {
     const res = await axios.get(
       `${API}/api/fantasy/league/${id}`,
@@ -55,6 +57,21 @@ export default function LeaguePage({ params }) {
     );
 
     setLeague(res.data);
+  };
+
+  const fetchTrades = async () => {
+    try {
+      const response = await axios.get(
+        `${API}/api/fantasy/league/${id}/trades`,
+        {
+          withCredentials: true
+        }
+      );
+  
+      setTrades(response.data || []);
+    } catch (err) {
+      console.error('Failed to load trades:', err);
+    }
   };
 
   const fetchUser = async () => {
@@ -123,6 +140,10 @@ export default function LeaguePage({ params }) {
 
     if (activeTab === 'matchup') {
       fetchMatchups();
+    }
+
+    if (activeTab === 'trades') {
+      fetchTrades();
     }
   }, [activeTab, week]);
 
@@ -286,7 +307,8 @@ export default function LeaguePage({ params }) {
     ['matchup', 'Matchup'],
     ['standings', 'Standings'],
     ['players', 'Players'],
-    ['transactions', 'Transactions']
+    ['transactions', 'Transactions'],
+    ['trades', 'Trades']
   ];
 
   return (
@@ -731,6 +753,113 @@ export default function LeaguePage({ params }) {
 
         </div>
       )}
+
+      {activeTab === 'trades' && (
+        <div className="space-y-6">
+      
+          <h2 className="text-xl font-bold">
+            Trades
+          </h2>
+      
+          {trades.length === 0 ? (
+            <div className="rounded-lg border p-6">
+              <p>No trades yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {trades.map(trade => (
+                <div
+                  key={trade.id}
+                  className="rounded-lg border p-4"
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <strong>
+                        {trade.proposerTeam?.name}
+                      </strong>
+      
+                      <span className="mx-2">
+                        →
+                      </span>
+      
+                      <strong>
+                        {trade.recipientTeam?.name}
+                      </strong>
+                    </div>
+      
+                    <span className="font-semibold">
+                      {trade.status}
+                    </span>
+                  </div>
+      
+                  <div className="space-y-2">
+                    {trade.items?.map(item => (
+                      <div
+                        key={item.id}
+                        className="flex justify-between"
+                      >
+                        <span>
+                          {item.player?.name}
+                        </span>
+      
+                        <span className="text-sm">
+                          {item.fromTeamId ===
+                          trade.proposerTeamId
+                            ? '→ Receiving team'
+                            : '→ Proposing team'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+      
+                  {trade.status === 'PENDING' &&
+                    trade.recipientTeam?.userId ===
+                      league?.teams?.find(
+                        t => t.userId === currentUser?.id
+                      )?.userId && (
+                      <div className="flex gap-2 mt-4">
+                        <button
+                          onClick={async () => {
+                            await axios.post(
+                              `${API}/api/fantasy/trades/${trade.id}/accept`,
+                              {},
+                              {
+                                withCredentials: true
+                              }
+                            );
+      
+                            await fetchTrades();
+                            await fetchLeague();
+                          }}
+                          className="px-4 py-2 rounded"
+                        >
+                          Accept
+                        </button>
+      
+                        <button
+                          onClick={async () => {
+                            await axios.post(
+                              `${API}/api/fantasy/trades/${trade.id}/reject`,
+                              {},
+                              {
+                                withCredentials: true
+                              }
+                            );
+      
+                            await fetchTrades();
+                          }}
+                          className="px-4 py-2 rounded"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}  
 
     </div>
   );
