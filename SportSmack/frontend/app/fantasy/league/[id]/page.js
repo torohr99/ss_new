@@ -50,6 +50,10 @@ export default function LeaguePage({ params }) {
 
   const [trades, setTrades] = useState([]);
 
+  const [tradeRecipient, setTradeRecipient] = useState('');
+  const [offeredPlayers, setOfferedPlayers] = useState([]);
+  const [requestedPlayers, setRequestedPlayers] = useState([]);
+
   const fetchLeague = async () => {
     const res = await axios.get(
       `${API}/api/fantasy/league/${id}`,
@@ -302,6 +306,48 @@ export default function LeaguePage({ params }) {
     }
   };
 
+  const proposeTrade = async () => {
+    if (!tradeRecipient) {
+      alert('Select a team.');
+      return;
+    }
+  
+    if (
+      offeredPlayers.length === 0 &&
+      requestedPlayers.length === 0
+    ) {
+      alert('Select at least one player.');
+      return;
+    }
+  
+    try {
+      await axios.post(
+        `${API}/api/fantasy/league/${id}/trades`,
+        {
+          recipientTeamId: Number(tradeRecipient),
+          offeredPlayerIds: offeredPlayers,
+          requestedPlayerIds: requestedPlayers
+        },
+        {
+          withCredentials: true
+        }
+      );
+  
+      alert('Trade proposal sent.');
+  
+      setTradeRecipient('');
+      setOfferedPlayers([]);
+      setRequestedPlayers([]);
+  
+      await fetchTrades();
+    } catch (err) {
+      alert(
+        err.response?.data?.error ||
+        'Failed to propose trade.'
+      );
+    }
+  };
+  
   const tabs = [
     ['team', 'My Team'],
     ['matchup', 'Matchup'],
@@ -760,6 +806,115 @@ export default function LeaguePage({ params }) {
           <h2 className="text-xl font-bold">
             Trades
           </h2>
+
+          <div className="rounded-lg border p-4 space-y-4">
+            <h3 className="font-semibold">
+              Propose a Trade
+            </h3>
+          
+            <select
+              className="auth-input"
+              value={tradeRecipient}
+              onChange={e =>
+                setTradeRecipient(e.target.value)
+              }
+            >
+              <option value="">
+                Select another team
+              </option>
+          
+              {(league.teams || [])
+                .filter(team => team.id !== myTeam.id)
+                .map(team => (
+                  <option
+                    key={team.id}
+                    value={team.id}
+                  >
+                    {team.name}
+                  </option>
+                ))}
+            </select>
+          
+            <div>
+              <strong>
+                Players You Give
+              </strong>
+          
+              {myPlayers.map(tp => (
+                <label
+                  key={tp.id}
+                  style={{
+                    display: 'block',
+                    marginTop: '0.5rem'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={offeredPlayers.includes(
+                      tp.player.id
+                    )}
+                    onChange={e => {
+                      setOfferedPlayers(prev =>
+                        e.target.checked
+                          ? [...prev, tp.player.id]
+                          : prev.filter(
+                              id => id !== tp.player.id
+                            )
+                      );
+                    }}
+                  />{' '}
+                  {tp.player.name} ({tp.player.position})
+                </label>
+              ))}
+            </div>
+          
+            {tradeRecipient && (
+              <div>
+                <strong>
+                  Players You Want
+                </strong>
+          
+                {(
+                  league.teams.find(
+                    team =>
+                      team.id === Number(tradeRecipient)
+                  )?.players || []
+                ).map(tp => (
+                  <label
+                    key={tp.id}
+                    style={{
+                      display: 'block',
+                      marginTop: '0.5rem'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={requestedPlayers.includes(
+                        tp.player.id
+                      )}
+                      onChange={e => {
+                        setRequestedPlayers(prev =>
+                          e.target.checked
+                            ? [...prev, tp.player.id]
+                            : prev.filter(
+                                id => id !== tp.player.id
+                              )
+                        );
+                      }}
+                    />{' '}
+                    {tp.player.name} ({tp.player.position})
+                  </label>
+                ))}
+              </div>
+            )}
+          
+            <button
+              className="btn-primary"
+              onClick={proposeTrade}
+            >
+              Send Trade Proposal
+            </button>
+          </div>
       
           {trades.length === 0 ? (
             <div className="rounded-lg border p-6">
@@ -813,10 +968,7 @@ export default function LeaguePage({ params }) {
                   </div>
       
                   {trade.status === 'PENDING' &&
-                    trade.recipientTeam?.userId ===
-                      league?.teams?.find(
-                        t => t.userId === currentUser?.id
-                      )?.userId && (
+                    trade.recipientTeam?.id === myTeam.id && (
                       <div className="flex gap-2 mt-4">
                         <button
                           onClick={async () => {
@@ -852,6 +1004,32 @@ export default function LeaguePage({ params }) {
                         >
                           Reject
                         </button>
+                        {trade.status === 'PENDING' &&
+                          trade.proposerTeam?.id === myTeam.id && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await axios.post(
+                                    `${API}/api/fantasy/trades/${trade.id}/cancel`,
+                                    {},
+                                    {
+                                      withCredentials: true
+                                    }
+                                  );
+                        
+                                  await fetchTrades();
+                                } catch (err) {
+                                  alert(
+                                    err.response?.data?.error ||
+                                    'Failed to cancel trade.'
+                                  );
+                                }
+                              }}
+                              className="px-4 py-2 rounded"
+                            >
+                              Cancel
+                            </button>
+                          )}
                       </div>
                     )}
                 </div>
