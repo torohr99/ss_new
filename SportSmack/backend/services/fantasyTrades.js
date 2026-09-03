@@ -203,6 +203,7 @@ async function acceptTrade(tradeId, userId) {
         data: {
           leagueId: trade.leagueId,
           teamId: item.toTeamId,
+          relatedTeamId: item.fromTeamId,
           playerId: item.playerId,
           type: 'TRADE'
         }
