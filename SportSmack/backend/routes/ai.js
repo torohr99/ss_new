@@ -5,42 +5,68 @@ const entityDb = require('../services/entityDb');
 const sportsApi = require('../services/sportsApi');
 
 // Build a highly constrained sports meme prompt.
-function buildMemePrompt(userInput, entities, gameContext = null) {
+function buildMemePrompt(
+  userInput,
+  entities,
+  gameContext = null
+) {
   const prompt = String(userInput || '').trim();
 
-  const entityText = entities.length
-    ? entities.map(entity => {
-        const parts = [
-          `${entity.type}: ${entity.name}`
-        ];
+  const verifiedEntities = Array.isArray(entities)
+    ? entities
+    : [];
 
-        if (entity.team) {
-          parts.push(`team: ${entity.team}`);
-        }
-
-        if (entity.sport) {
-          parts.push(`sport: ${entity.sport}`);
-        }
-
-        return parts.join(', ');
-      }).join('\n')
-    : 'No verified sports entity was identified.';
+  const entityText = verifiedEntities.length
+    ? verifiedEntities
+        .map((entity, index) => {
+          return `
+ENTITY ${index + 1}:
+Type: ${entity.type || 'unknown'}
+Name: ${entity.name || 'unknown'}
+Team: ${entity.team || 'unknown'}
+Sport: ${entity.sport || 'unknown'}
+Verified image: ${entity.image || 'none'}
+Confidence: ${entity.score || 0}
+`;
+        })
+        .join('\n')
+    : 'No verified sports entities were identified.';
 
   const contextText = gameContext
     ? `
-GAME CONTEXT:
-League: ${gameContext.league || 'unknown'}
-Game: ${gameContext.gameId || 'unknown'}
-Home Team: ${gameContext.homeTeam || 'unknown'}
-Away Team: ${gameContext.awayTeam || 'unknown'}
-Status: ${gameContext.status || 'unknown'}
+CURRENT GAME CONTEXT:
+
+League:
+${gameContext.league || 'unknown'}
+
+Game ID:
+${gameContext.gameId || 'unknown'}
+
+Home Team:
+${gameContext.homeTeam || 'unknown'}
+
+Away Team:
+${gameContext.awayTeam || 'unknown'}
+
+Score:
+${gameContext.score || 'unknown'}
+
+Status:
+${gameContext.status || 'unknown'}
+
+Situation:
+${JSON.stringify(
+  gameContext.situation || null,
+  null,
+  2
+)}
 `
-    : '';
+    : 'No game context was supplied.';
 
   return `
-Create a sports meme image based on the user's exact idea.
+You are generating a highly accurate sports meme image for SportSmack.
 
-USER IDEA:
+USER'S EXACT REQUEST:
 ${prompt}
 
 VERIFIED SPORTS ENTITIES:
@@ -48,41 +74,54 @@ ${entityText}
 
 ${contextText}
 
-ENTITY ACCURACY RULES:
-- Use the verified player/team identities when provided.
-- Do NOT substitute another athlete.
-- Do NOT invent a different team.
-- Do NOT combine two unrelated athletes.
-- If a player is identified, depict that specific player rather than a generic athlete.
-- If a team is identified, use that team's actual colors, uniforms and visual identity.
-- If the prompt describes a game situation, visually depict that situation.
-- Preserve the emotional meaning of the user's request.
+IDENTITY REQUIREMENTS:
 
-COMPOSITION:
-- One clear central sports subject.
-- Strong facial expression or body language when appropriate.
-- Authentic professional sports photography appearance.
-- Correct sport-specific equipment.
-- Correct uniforms for identified teams.
-- Dynamic but understandable composition.
-- Leave appropriate negative space for meme text.
-- No random unrelated people.
-- No random logos from other teams.
-- No extra limbs, duplicated players or distorted equipment.
+- If the user names a specific athlete, depict THAT athlete.
+- Never replace a named athlete with a generic athlete.
+- If multiple athletes are named, depict the correct athletes
+  interacting in the requested way.
+- If a team is named, use that exact team's identity.
+- Use the team's actual uniform colors and design.
+- Do not invent another team's uniform.
+- Do not use unrelated logos.
+- Do not substitute another player with a similar-looking athlete.
 
-STYLE:
-photorealistic professional sports photography,
-high detail,
-realistic anatomy,
-realistic stadium lighting,
-sharp subject,
-natural depth of field,
-dramatic but believable,
-meme-worthy,
-800x500 landscape composition.
+GAME-SITUATION REQUIREMENTS:
 
-Do not render written meme text inside the image.
-The frontend will add the meme text.
+- If this is a game-specific meme, reproduce the supplied
+  game situation.
+- Use the actual score when supplied.
+- Use the actual teams.
+- Use the actual period/inning/quarter when supplied.
+- Use the supplied situation when available.
+- Do not invent a play or statistic.
+
+VISUAL REQUIREMENTS:
+
+- Photorealistic professional sports photography.
+- Accurate human anatomy.
+- Accurate sport-specific equipment.
+- Accurate uniforms.
+- Correct number of players.
+- Natural facial expressions and body language.
+- Realistic stadium/environment appropriate to the sport.
+- Clearly communicate the user's requested action.
+- Make the composition visually humorous when the request
+  is humorous.
+- Do not create a generic "sports player" image.
+- Do not add unrelated people.
+- Do not add unrelated teams.
+- Do not add unrelated objects.
+
+IMPORTANT:
+
+The image itself should visually communicate the exact event
+described by the user.
+
+Do NOT render meme text inside the image.
+SportSmack will add the text separately.
+
+Return only the image-generation prompt.
 `.trim();
 }
 
