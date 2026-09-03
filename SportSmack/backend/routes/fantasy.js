@@ -53,13 +53,6 @@ function isFlexEligible(position) {
   return ['RB', 'WR', 'TE'].includes(position);
 }
 
-/*This function is already defined in fantasyRoster.js as validateStarterRoster() and is called at top of this document so consider deleting this*/
-function validateStarterRosterTwo(players) {
-  const starters =
-    players.filter(
-      p => p.status === 'STARTER'
-    );
-
   const counts = {
     QB: 0,
     RB: 0,
@@ -632,7 +625,7 @@ router.post(
         );
 
       const validationError =
-        validateStarterRosterTwo(
+        validateStarterRoster(
           updatedPlayers
         );
 
