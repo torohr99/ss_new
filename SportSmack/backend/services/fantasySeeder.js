@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
+
 const prisma = new PrismaClient();
 
 const VALID_POSITIONS = new Set([
@@ -12,92 +13,168 @@ const VALID_POSITIONS = new Set([
 ]);
 
 async function seedFantasyPlayers() {
-  try {
-    console.log('Starting NFL Fantasy Player Seeding...');
-    
-    // 1. Fetch all 32 NFL teams
-    const teamsRes = await axios.get('http://site.api.espn.com/apis/site/v2/sports/football/nfl/teams');
-    const teams = teamsRes.data.sports[0].leagues[0].teams;
-    
-    let totalAdded = 0;
+  console.log('Starting NFL Fantasy Player Seeding...');
 
-    // 2. Iterate through teams and fetch their rosters
-    for (const t of teams) {
-      const teamId = t.team.id;
-      const teamAbbrev = t.team.abbreviation;
-      
-      console.log(`Fetching roster for ${teamAbbrev}...`);
-      try {
-        const rosterRes = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}/roster`);
-        const athletes = rosterRes.data.athletes;
-        
-        // athletes usually contains arrays for offense, defense, special teams
-        for (const group of athletes) {
-          for (const item of group.items) {
-            const position = item.position.abbreviation;
-            const jerseyNumber =
-              item.jersey
-                ? String(item.jersey)
-                : null;
-            
-            if (VALID_POSITIONS.has(position)) {
-              // Upsert the player
-              await prisma.fantasyPlayer.upsert({
-                where: { espnId: String(item.id) },
-                update: {
-                  name: item.fullName,
-                  position: position,
-                  team: teamAbbrev,
-                  jerseyNumber: jerseyNumber,
-                  imageUrl:
-                    item.headshot
-                      ? item.headshot.href
-                      : null,
-                  byeWeek:
-                    item.byeWeek
-                      ? Number(item.byeWeek)
-                      : null,
-                  projectedPoints:
-                    item.projectedPoints
-                      ? Number(item.projectedPoints)
-                      : null
-                },
-                create: {
-                  espnId: String(item.id),
-                  name: item.fullName,
-                  position: position,
-                  team: teamAbbrev,
-                  jerseyNumber: jerseyNumber,
-                  imageUrl:
-                    item.headshot
-                      ? item.headshot.href
-                      : null,
-                  byeWeek:
-                    item.byeWeek
-                      ? Number(item.byeWeek)
-                      : null,
-                  projectedPoints:
-                    item.projectedPoints
-                      ? Number(item.projectedPoints)
-                      : null
-                },
-              });
-              totalAdded++;
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`Error fetching roster for team ${teamAbbrev}:`, err.message);
+  let totalAdded = 0;
+
+  try {
+    const teamsRes = await axios.get(
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams',
+      {
+        timeout: 15000
       }
-      
-      // Delay to respect API rate limits
-      await new Promise(resolve => setTimeout(resolve, 500));
+    );
+
+    const teams =
+      teamsRes.data?.sports?.[0]?.leagues?.[0]?.teams || [];
+
+    if (!teams.length) {
+      throw new Error('ESPN returned no NFL teams.');
     }
 
-    console.log(`Successfully seeded/updated ${totalAdded} fantasy players.`);
+    console.log(`Found ${teams.length} NFL teams.`);
+
+    for (const teamWrapper of teams) {
+      const team = teamWrapper?.team;
+
+      if (!team?.id || !team?.abbreviation) {
+        continue;
+      }
+
+      const teamId = team.id;
+      const teamAbbrev = String(team.abbreviation).toUpperCase();
+
+      try {
+        const rosterRes = await axios.get(
+          `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/${teamId}/roster`,
+          {
+            timeout: 15000
+          }
+        );
+
+        const rawAthletes = rosterRes.data?.athletes || [];
+
+        // ESPN normally returns groups such as offense/defense.
+        // Flatten both grouped and already-flat responses.
+        const athletes = rawAthletes.flatMap(group => {
+          if (Array.isArray(group?.items)) {
+            return group.items;
+          }
+
+          if (group?.id || group?.fullName) {
+            return [group];
+          }
+
+          return [];
+        });
+
+        console.log(
+          `${teamAbbrev}: found ${athletes.length} roster entries.`
+        );
+
+        for (const item of athletes) {
+          const position =
+            typeof item.position === 'string'
+              ? item.position
+              : item.position?.abbreviation;
+
+          if (!VALID_POSITIONS.has(position)) {
+            continue;
+          }
+
+          if (!item.id || !item.fullName) {
+            continue;
+          }
+
+          const jerseyNumber =
+            item.jersey !== undefined &&
+            item.jersey !== null &&
+            String(item.jersey).trim() !== ''
+              ? String(item.jersey)
+              : null;
+
+          const imageUrl =
+            item.headshot?.href ||
+            item.headshot?.url ||
+            null;
+
+          const byeWeek =
+            item.byeWeek !== undefined &&
+            item.byeWeek !== null
+              ? Number(item.byeWeek)
+              : null;
+
+          const projectedPoints =
+            item.projectedPoints !== undefined &&
+            item.projectedPoints !== null
+              ? Number(item.projectedPoints)
+              : null;
+
+          await prisma.fantasyPlayer.upsert({
+            where: {
+              espnId: String(item.id)
+            },
+            update: {
+              name: item.fullName,
+              position,
+              team: teamAbbrev,
+              jerseyNumber,
+              imageUrl,
+              byeWeek: Number.isFinite(byeWeek)
+                ? byeWeek
+                : null,
+              projectedPoints: Number.isFinite(projectedPoints)
+                ? projectedPoints
+                : null
+            },
+            create: {
+              espnId: String(item.id),
+              name: item.fullName,
+              position,
+              team: teamAbbrev,
+              jerseyNumber,
+              imageUrl,
+              byeWeek: Number.isFinite(byeWeek)
+                ? byeWeek
+                : null,
+              projectedPoints: Number.isFinite(projectedPoints)
+                ? projectedPoints
+                : null
+            }
+          });
+
+          totalAdded++;
+        }
+      } catch (teamError) {
+        console.error(
+          `Error fetching roster for ${teamAbbrev}:`,
+          teamError.message
+        );
+      }
+
+      // Small delay between ESPN requests.
+      await new Promise(resolve =>
+        setTimeout(resolve, 300)
+      );
+    }
+
+    console.log(
+      `Successfully seeded/updated ${totalAdded} fantasy players.`
+    );
+
+    if (totalAdded === 0) {
+      throw new Error(
+        'ESPN returned no usable fantasy players.'
+      );
+    }
+
     return totalAdded;
   } catch (error) {
-    console.error('Error seeding fantasy players:', error);
+    console.error(
+      'Error seeding fantasy players:',
+      error.message
+    );
+
     throw error;
   }
 }
