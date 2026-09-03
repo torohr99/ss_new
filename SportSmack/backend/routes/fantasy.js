@@ -115,7 +115,7 @@ function isFlexEligible(position) {
   }
 
   return null;
-}
+
 
 /* =========================================================
    PLAYERS
