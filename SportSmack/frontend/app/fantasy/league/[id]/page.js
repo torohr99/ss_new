@@ -523,6 +523,9 @@ export default function LeaguePage({ params }) {
               marginTop: '1.5rem'
             }}>
               Roster: {myPlayers.length}/15
+              <div>
+                FAAB: {myTeam.faab ?? 100}
+              </div>
             </div>
 
             <div>
