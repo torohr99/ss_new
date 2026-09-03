@@ -366,8 +366,8 @@ export default function DraftRoom({ params }) {
                   <thead style={{ position: 'sticky', top: 0, background: 'var(--glass-bg)', zIndex: 1, backdropFilter: 'blur(10px)' }}>
                     <tr style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase' }}>
                       <th style={{ padding: '1rem', textAlign: 'left' }}>Player</th>
-                      <th style={{ padding: '1rem', textAlign: 'center' }}>Pos</th>
-                      <th style={{ padding: '1rem', textAlign: 'center' }}>Team</th>
+                      <th style={{ padding: '1rem', textAlign: 'center' }}>Position</th>
+                      <th style={{ padding: '1rem', textAlign: 'center' }}>NFL Team</th>
                       <th style={{ padding: '1rem', textAlign: 'center' }}>Proj</th>
                       <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
                     </tr>
@@ -377,19 +377,71 @@ export default function DraftRoom({ params }) {
                       const colors = NFL_COLORS[p.team] || { primary: '#333', secondary: '#111' };
                       return (
                         <tr key={p.id} className="player-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
-                          <td style={{ padding: '0.8rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '0.8rem', border: '2px solid rgba(255,255,255,0.1)' }}>
-                              {p.name.split(' ').map(n=>n[0]).join('')}
-                            </div>
+                          <td
+                            style={{
+                              padding: '0.8rem 1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '1rem'
+                            }}
+                          >
+                            {p.imageUrl ? (
+                              <img
+                                src={p.imageUrl}
+                                alt={p.name}
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  background: 'rgba(255,255,255,0.1)',
+                                  border: '2px solid rgba(255,255,255,0.1)'
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '48px',
+                                  height: '48px',
+                                  borderRadius: '50%',
+                                  background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 'bold',
+                                  fontSize: '0.8rem',
+                                  border: '2px solid rgba(255,255,255,0.1)',
+                                  flexShrink: 0
+                                }}
+                              >
+                                {p.name
+                                  .split(' ')
+                                  .map(n => n[0])
+                                  .join('')}
+                              </div>
+                            )}
+                          
                             <div>
-                              <div style={{ fontWeight: 'bold', fontSize: '1.05rem' }}>{p.name}</div>
-                              <div style={{
-                                fontSize: '0.8rem',
-                                color: 'var(--text-secondary)'
-                              }}>
-                                {p.byeWeek
-                                  ? `Bye Week ${p.byeWeek}`
-                                  : 'Bye Week —'}
+                              <div
+                                style={{
+                                  fontWeight: 'bold',
+                                  fontSize: '1.05rem'
+                                }}
+                              >
+                                {p.name}
+                              </div>
+                          
+                              <div
+                                style={{
+                                  fontSize: '0.8rem',
+                                  color: 'var(--text-secondary)'
+                                }}
+                              >
+                                {p.team}
+                                {' • '}
+                                {p.position}
+                                {' • '}
+                                #{p.jerseyNumber || '—'}
                               </div>
                             </div>
                           </td>
