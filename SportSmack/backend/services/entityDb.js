@@ -327,50 +327,6 @@ class EntityDb {
       }));
   }
 
-    // Deduplicate entities.
-    const unique = new Map();
-
-    for (const candidate of candidates) {
-      const id = String(candidate.id || '');
-
-      if (!id) continue;
-
-      const existing = unique.get(id);
-
-      if (!existing || candidate.score > existing.score) {
-        unique.set(id, candidate);
-      }
-    }
-
-    const ranked = [...unique.values()]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-
-    return ranked.map(entity => ({
-      id: entity.id,
-      type: entity.type || entity.resultType,
-      name:
-        entity.displayName ||
-        entity.fullName ||
-        entity.name ||
-        'Unknown',
-      team:
-        entity.subtitle ||
-        entity.team?.displayName ||
-        entity.team?.name ||
-        null,
-      sport:
-        entity.sport ||
-        entity.sportType ||
-        null,
-      image:
-        entity.image?.default ||
-        entity.headshot?.href ||
-        null,
-      score: entity.score
-    }));
-  }
-
   async identifyEntity(prompt) {
     const entities = await this.identifyEntities(prompt);
 
