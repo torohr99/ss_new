@@ -8,6 +8,9 @@ const {
 const {
   validateStarterRoster
 } = require('../services/fantasyRoster');
+const {
+  processLeagueWaivers
+} = require('../services/fantasyWaivers');
 
 const { seedFantasyPlayers } = require('../services/fantasySeeder');
 const fantasyStats = require('../services/fantasyStats');
@@ -1106,140 +1109,12 @@ router.post(
         });
       }
 
-      const claims =
-        await prisma.fantasyWaiverClaim.findMany({
-          where: {
-            leagueId,
-            status: 'PENDING'
-          },
-          orderBy: [
-            {
-              bidAmount: 'desc'
-            },
-            {
-              createdAt: 'asc'
-            }
-          ],
-          include: {
-            player: true,
-            team: {
-              include: {
-                players: true
-              }
-            }
-          }
-        });
-
-      /*
-       * Process one player at a time.
-       * Highest FAAB bid wins.
-       * Earliest claim breaks ties.
-       */
-      const processedPlayers = new Set();
-      const results = [];
-
-      for (const claim of claims) {
-        if (processedPlayers.has(claim.playerId)) {
-          continue;
-        }
-
-        const stillRostered =
-          await prisma.fantasyTeamPlayer.findFirst({
-            where: {
-              playerId: claim.playerId,
-              team: {
-                leagueId
-              }
-            }
-          });
-
-        if (stillRostered) {
-          await prisma.fantasyWaiverClaim.updateMany({
-            where: {
-              leagueId,
-              playerId: claim.playerId,
-              status: 'PENDING'
-            },
-            data: {
-              status: 'REJECTED'
-            }
-          });
-
-          processedPlayers.add(claim.playerId);
-
-          continue;
-        }
-
-        if (
-          claim.team.players.length >=
-          MAX_ROSTER_SIZE
-        ) {
-          await prisma.fantasyWaiverClaim.update({
-            where: {
-              id: claim.id
-            },
-            data: {
-              status: 'REJECTED'
-            }
-          });
-
-          continue;
-        }
-
-        await prisma.$transaction(async tx => {
-          await tx.fantasyTeamPlayer.create({
-            data: {
-              teamId: claim.teamId,
-              playerId: claim.playerId,
-              status: 'BENCH'
-            }
-          });
-        
-          await tx.fantasyTeam.update({
-            where: {
-              id: claim.teamId
-            },
-            data: {
-              faab: {
-                decrement: claim.bidAmount
-              }
-            }
-          });
-        
-          await tx.fantasyTransaction.create({
-            data: {
-              leagueId,
-              teamId: claim.teamId,
-              playerId: claim.playerId,
-              type: 'WAIVER_ADD'
-            }
-          });
-        
-          await tx.fantasyWaiverClaim.update({
-            where: {
-              id: claim.id
-            },
-            data: {
-              status: 'APPROVED'
-            }
-          });
-        });
-
-        processedPlayers.add(claim.playerId);
-
-        results.push({
-          playerId: claim.playerId,
-          playerName: claim.player.name,
-          teamId: claim.teamId,
-          teamName: claim.team.name,
-          bidAmount: claim.bidAmount,
-          status: 'APPROVED'
-        });
-      }
+      const processed =
+        await processLeagueWaivers(leagueId);
 
       res.json({
         success: true,
-        processed: results
+        processed
       });
     } catch (err) {
       console.error(
@@ -1253,7 +1128,6 @@ router.post(
     }
   }
 );
-
 /* =========================================================
    ADD PLAYER
 ========================================================= */
