@@ -50,22 +50,45 @@ function setupFantasySockets(io) {
     console.log(`User ${socket.user.username} connected to fantasy sockets`);
 
     socket.on('join_draft', async ({ leagueId }) => {
-      const room = `fantasy_draft_${leagueId}`;
-      socket.join(room);
-      
-      const league = await prisma.fantasyLeague.findUnique({
-        where: { id: parseInt(leagueId) },
-        include: { teams: true, draftPicks: { include: { player: true } } }
-      });
-      
-      socket.emit('draft_state', {
-        status: league.status,
-        currentPickIndex: league.currentPickIndex,
-        teams: league.teams,
-        picks: league.draftPicks
-      });
+      try {
+        const room = `fantasy_draft_${leagueId}`;
+        socket.join(room);
+    
+        const league = await prisma.fantasyLeague.findUnique({
+          where: { id: parseInt(leagueId) },
+          include: {
+            teams: { include: { user: true } },
+            draftPicks: { include: { player: true } }
+          }
+        });
+    
+        if (!league) {
+          socket.emit('draft_error', {
+            message: 'League not found.'
+          });
+          return;
+        }
+    
+        socket.emit('draft_state', {
+          status: league.status,
+          currentPickIndex: league.currentPickIndex,
+          teams: league.teams,
+          picks: league.draftPicks
+        });
+    
+        // If this league is already drafting, immediately
+        // start the bot engine if the current pick belongs to a bot.
+        if (league.status === 'DRAFTING') {
+          processBotTurn(leagueId);
+        }
+      } catch (err) {
+        console.error('Error joining fantasy draft:', err);
+    
+        socket.emit('draft_error', {
+          message: 'Failed to join draft.'
+        });
+      }
     });
-
     // Helper to process bot turn
     const processBotTurn = async (leagueId) => {
       try {
