@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const sportsApi = require('../services/sportsApi');
 const gameAI = require('../services/gameAI');
+const liveGameEngine = require('../services/liveGameEngine');
 
 const prisma = new PrismaClient();
 
@@ -234,6 +235,23 @@ module.exports = function(io) {
             competitors: comp.competitors,
             readOnly: false
           };
+
+          // Make sure the game gets an AI-generated poll when a user
+          // enters the room, rather than waiting for the background
+          // polling cycle.
+          if (!readOnly && state === 'in') {
+            try {
+              await liveGameEngine.processGame(
+                league,
+                gameId
+              );
+            } catch (pollError) {
+              console.error(
+                `Unable to generate initial game poll for ${league}/${gameId}:`,
+                pollError.message
+              );
+            }
+          }
 
           if (state === 'post') {
             const homeWinner = comp.competitors.find(c => c.homeAway === 'home').winner;
