@@ -35,6 +35,10 @@ async function seedFantasyPlayers() {
         for (const group of athletes) {
           for (const item of group.items) {
             const position = item.position.abbreviation;
+            const jerseyNumber =
+              item.jersey
+                ? String(item.jersey)
+                : null;
             
             if (VALID_POSITIONS.has(position)) {
               // Upsert the player
@@ -44,6 +48,7 @@ async function seedFantasyPlayers() {
                   name: item.fullName,
                   position: position,
                   team: teamAbbrev,
+                  jerseyNumber: jerseyNumber,
                   imageUrl:
                     item.headshot
                       ? item.headshot.href
@@ -62,6 +67,7 @@ async function seedFantasyPlayers() {
                   name: item.fullName,
                   position: position,
                   team: teamAbbrev,
+                  jerseyNumber: jerseyNumber,
                   imageUrl:
                     item.headshot
                       ? item.headshot.href
