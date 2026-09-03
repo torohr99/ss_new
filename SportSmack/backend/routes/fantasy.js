@@ -53,6 +53,11 @@ function isFlexEligible(position) {
   return ['RB', 'WR', 'TE'].includes(position);
 }
 
+function validateStarterRosterTwo(players) {
+  const starters = players.filter(
+    p => p.status === 'STARTER'
+  );
+
   const counts = {
     QB: 0,
     RB: 0,
@@ -116,7 +121,7 @@ function isFlexEligible(position) {
 
   return null;
 
-
+}
 /* =========================================================
    PLAYERS
 ========================================================= */
