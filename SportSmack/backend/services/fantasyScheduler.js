@@ -5,6 +5,9 @@ const {
 const prisma = new PrismaClient();
 const fantasyStats =
   require('./fantasyStats');
+const {
+  processAllDueWaivers
+} = require('./fantasyWaivers');
 
 let intervalId = null;
 
@@ -69,10 +72,14 @@ function startFantasyScheduler() {
 
   // Run immediately.
   scoreActiveLeagues();
+  processDueWaivers();
 
   // Then every 5 minutes.
   intervalId = setInterval(
-    scoreActiveLeagues,
+    async () => {
+      await scoreActiveLeagues();
+      await processDueWaivers();
+    },
     5 * 60 * 1000
   );
 
@@ -115,38 +122,32 @@ async function generateMissingMatchups(
 }
 
 async function processDueWaivers() {
-  const leagues =
-    await prisma.fantasyLeague.findMany({
-      where: {
-        status: 'SEASON'
-      }
-    });
+  const now = new Date();
 
-  for (const league of leagues) {
-    try {
-      const claims =
-        await prisma.fantasyWaiverClaim.count({
-          where: {
-            leagueId: league.id,
-            status: 'PENDING'
-          }
-        });
+  // Tuesday = 2
+  // Process at/after 9:00 AM UTC on Tuesday.
+  const day = now.getUTCDay();
+  const hour = now.getUTCHours();
 
-      if (claims === 0) continue;
+  if (day !== 2 || hour < 9) {
+    return;
+  }
 
-      // For now, process once every Tuesday.
-      const day = new Date().getUTCDay();
+  try {
+    const results =
+      await processAllDueWaivers();
 
-      if (day !== 2) continue;
-
-      // Reuse the same processing logic through a
-      // service function in the next cleanup step.
-    } catch (err) {
-      console.error(
-        `Waiver processing failed for league ${league.id}:`,
-        err.message
+    if (results.length > 0) {
+      console.log(
+        'Automatic fantasy waiver processing completed:',
+        JSON.stringify(results)
       );
     }
+  } catch (err) {
+    console.error(
+      'Automatic waiver processing failed:',
+      err.message
+    );
   }
 }
 
