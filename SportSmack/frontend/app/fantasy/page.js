@@ -44,6 +44,41 @@ export default function FantasyDashboard() {
     }
   };
 
+  const deleteLeague = async (leagueId, leagueName) => {
+  const confirmed = window.confirm(
+    `Delete "${leagueName}"?\n\nThis permanently deletes the league, teams, draft picks, rosters, matchups, transactions, waivers, and trades.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+
+    await axios.delete(
+      `${apiUrl}/api/fantasy/league/${leagueId}`,
+      {
+        withCredentials: true
+      }
+    );
+
+    setLeagues(prev =>
+      prev.filter(league => league.id !== leagueId)
+    );
+  } catch (err) {
+    console.error(
+      'Delete league failed:',
+      err.response?.data || err.message || err
+    );
+
+    alert(
+      err.response?.data?.error ||
+      'Failed to delete league.'
+    );
+  }
+};
+
   const createLeague = async (e) => {
     e.preventDefault();
     if (!newLeagueName) return;
@@ -192,21 +227,37 @@ export default function FantasyDashboard() {
                       {l.status}
                     </div>
             
-                    <button
-                      className="btn-primary"
+                    <div
                       style={{
+                        display: 'flex',
+                        gap: '0.75rem',
                         marginTop: '0.75rem'
                       }}
-                      onClick={e => {
-                        e.stopPropagation();
-            
-                        router.push(
-                          `/fantasy/league/${l.id}`
-                        );
-                      }}
                     >
-                      Enter League
-                    </button>
+                      <button
+                        className="btn-primary"
+                        onClick={e => {
+                          e.stopPropagation();
+                    
+                          router.push(
+                            `/fantasy/league/${l.id}`
+                          );
+                        }}
+                      >
+                        Enter League
+                      </button>
+                    
+                      <button
+                        className="btn-secondary"
+                        onClick={e => {
+                          e.stopPropagation();
+                    
+                          deleteLeague(l.id, l.name);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
