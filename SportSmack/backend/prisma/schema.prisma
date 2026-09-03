@@ -364,6 +364,8 @@ model FantasyTrade {
   proposerTeam   FantasyTeam   @relation("TradeProposer", fields: [proposerTeamId], references: [id])
   recipientTeam  FantasyTeam   @relation("TradeRecipient", fields: [recipientTeamId], references: [id])
   items          FantasyTradeItem[]
+  tradeItemsSent     FantasyTradeItem[] @relation("TradeItemsFromTeam")
+  tradeItemsReceived FantasyTradeItem[] @relation("TradeItemsToTeam")
 
   @@index([leagueId, status])
   @@index([proposerTeamId])
@@ -379,8 +381,8 @@ model FantasyTradeItem {
 
   trade       FantasyTrade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   player      FantasyPlayer @relation(fields: [playerId], references: [id])
-  fromTeam    FantasyTeam @relation(fields: [fromTeamId], references: [id])
-  toTeam      FantasyTeam @relation(fields: [toTeamId], references: [id])
+  fromTeam FantasyTeam @relation("TradeItemsFromTeam", fields: [fromTeamId], references: [id])
+  toTeam   FantasyTeam @relation("TradeItemsToTeam", fields: [toTeamId], references: [id])
 
   @@index([tradeId])
   @@index([playerId])
