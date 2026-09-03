@@ -253,6 +253,19 @@ router.post('/league', authenticateToken, async (req, res) => {
 
 router.post('/league/test-bots', authenticateToken, async (req, res) => {
   try {
+    const existingTestLeague =
+      await prisma.fantasyLeague.findFirst({
+        where: {
+          ownerId: req.user.id,
+          name: 'Test League with Bots',
+          status: 'DRAFTING'
+        }
+      });
+
+    if (existingTestLeague) {
+      return res.json(existingTestLeague);
+    }
+
     const league = await prisma.fantasyLeague.create({
       data: {
         name: 'Test League with Bots',
