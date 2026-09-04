@@ -130,12 +130,23 @@ export default function LeaguePage({ params }) {
   };
 
   const fetchMatchups = async () => {
-    const res = await axios.get(
-      `${API}/api/fantasy/league/${id}/matchups/${week}`,
-      { withCredentials: true }
-    );
+    try {
+      const res = await axios.get(
+        `${API}/api/fantasy/league/${id}/week/${week}`,
+        {
+          withCredentials: true
+        }
+      );
   
-    setMatchups(res.data);
+      setMatchups(res.data?.matchups || []);
+    } catch (err) {
+      console.error(
+        'Failed to load matchups:',
+        err
+      );
+  
+      setMatchups([]);
+    }
   };
 
   useEffect(() => {
@@ -704,7 +715,7 @@ export default function LeaguePage({ params }) {
       )}
 
       {activeTab === 'players' && (
-        <div className="profile-section">
+        <div className="fantasy-card fantasy-section">
 
           <h2 className="section-title">
             Free Agents
@@ -716,7 +727,7 @@ export default function LeaguePage({ params }) {
             marginBottom: '1rem'
           }}>
             <input
-              className="auth-input"
+              className="fantasy-search"
               placeholder="Search players..."
               value={search}
               onChange={e =>
@@ -725,7 +736,7 @@ export default function LeaguePage({ params }) {
             />
 
             <select
-              className="auth-input"
+              className="fantasy-search"
               value={position}
               onChange={e =>
                 setPosition(e.target.value)
@@ -770,7 +781,7 @@ export default function LeaguePage({ params }) {
               </div>
 
               <button
-                className="btn-primary"
+                className="fantasy-button fantasy-button-primary"
                 onClick={() => {
                   const bid = window.prompt(
                     `FAAB bid for ${player.name}:`,
@@ -794,14 +805,26 @@ export default function LeaguePage({ params }) {
       )}
 
       {activeTab === 'standings' && (
-        <div className="profile-section">
-          <h2 className="section-title">
-            Standings
-          </h2>
+        <div className="fantasy-card fantasy-section fantasy-standings-card">
+          <div className="fantasy-section-title">
+            <div>
+              <h2>Standings</h2>
+              <span>League record and total fantasy points</span>
+            </div>
+          </div>
+      
+          <div className="fantasy-standings-header">
+            <span>#</span>
+            <span>Team</span>
+            <span>W</span>
+            <span>L</span>
+            <span>T</span>
+            <span>Points</span>
+          </div>
       
           {[...(league.teams || [])]
             .map(team => {
-              const matchups = [
+              const teamMatchups = [
                 ...(team.homeMatchups || []),
                 ...(team.awayMatchups || [])
               ];
@@ -810,7 +833,7 @@ export default function LeaguePage({ params }) {
               let losses = 0;
               let ties = 0;
       
-              for (const matchup of matchups) {
+              for (const matchup of teamMatchups) {
                 if (matchup.status !== 'FINAL') continue;
       
                 const isHome =
@@ -862,26 +885,29 @@ export default function LeaguePage({ params }) {
             .map((team, index) => (
               <div
                 key={team.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    '50px 1fr repeat(3, 70px) 100px',
-                  gap: '1rem',
-                  alignItems: 'center',
-                  padding: '1rem',
-                  borderBottom:
-                    '1px solid var(--border)'
-                }}
+                className="fantasy-standings-row"
               >
-                <strong>{index + 1}</strong>
+                <span className="fantasy-rank">
+                  {index + 1}
+                </span>
       
-                <strong>{team.name}</strong>
+                <span className="fantasy-team-cell">
+                  {team.name}
+                </span>
       
-                <span>{team.wins}</span>
-                <span>{team.losses}</span>
-                <span>{team.ties}</span>
+                <span className="fantasy-record">
+                  {team.wins}
+                </span>
       
-                <span>
+                <span className="fantasy-record">
+                  {team.losses}
+                </span>
+      
+                <span className="fantasy-record">
+                  {team.ties}
+                </span>
+      
+                <span className="fantasy-points">
                   {team.totalPoints.toFixed(1)}
                 </span>
               </div>
@@ -890,23 +916,23 @@ export default function LeaguePage({ params }) {
       )}
 
       {activeTab === 'matchup' && (
-        <div className="profile-section">
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1rem'
-          }}>
-            <h2 className="section-title">
-              Week {week} Matchups
-            </h2>
-          
+        <div className="fantasy-card fantasy-section">
+          <div className="fantasy-section-title">
+            <div>
+              <h2>Week {week} Matchups</h2>
+              <span>League schedule and scores</span>
+            </div>
+      
             <select
-              className="auth-input"
+              className="fantasy-search"
               value={week}
               onChange={e =>
                 setWeek(Number(e.target.value))
               }
+              style={{
+                width: 'auto',
+                minWidth: '120px'
+              }}
             >
               {Array.from(
                 { length: 18 },
@@ -918,40 +944,47 @@ export default function LeaguePage({ params }) {
               ))}
             </select>
           </div>
-
+      
           {matchups.length === 0 ? (
-            <p>
+            <div
+              style={{
+                padding: '3rem 1rem',
+                textAlign: 'center',
+                color: 'var(--text-secondary)'
+              }}
+            >
               Matchups have not been generated yet.
-            </p>
+            </div>
           ) : (
             matchups.map(matchup => (
               <div
                 key={matchup.id}
-                style={{
-                  padding: '1rem',
-                  marginBottom: '1rem',
-                  border:
-                    '1px solid var(--border)',
-                  borderRadius: '10px'
-                }}
+                className="fantasy-matchup-card"
               >
-                <strong>
-                  {matchup.homeTeam.name}
-                </strong>
-
-                {' '}vs{' '}
-
-                <strong>
-                  {matchup.awayTeam.name}
-                </strong>
-
-                <div style={{
-                  marginTop: '0.5rem',
-                  color:
-                    'var(--text-secondary)'
-                }}>
-                  {matchup.homeScore} -{' '}
-                  {matchup.awayScore}
+                <div className="fantasy-matchup-teams">
+                  <div className="fantasy-matchup-team">
+                    <div className="fantasy-matchup-team-name">
+                      {matchup.homeTeam.name}
+                    </div>
+      
+                    <div className="fantasy-matchup-score">
+                      {matchup.homeScore ?? 0}
+                    </div>
+                  </div>
+      
+                  <div className="fantasy-vs">
+                    VS
+                  </div>
+      
+                  <div className="fantasy-matchup-team">
+                    <div className="fantasy-matchup-team-name">
+                      {matchup.awayTeam.name}
+                    </div>
+      
+                    <div className="fantasy-matchup-score">
+                      {matchup.awayScore ?? 0}
+                    </div>
+                  </div>
                 </div>
               </div>
             ))
@@ -960,38 +993,58 @@ export default function LeaguePage({ params }) {
       )}
 
       {activeTab === 'transactions' && (
-        <div className="profile-section">
-
-          <h2 className="section-title">
-            Transactions
-          </h2>
-
-          {transactions.map(tx => (
+        <div className="fantasy-card fantasy-section">
+          <div className="fantasy-section-title">
+            <div>
+              <h2>Transactions</h2>
+              <span>Recent roster activity</span>
+            </div>
+          </div>
+      
+          {transactions.length === 0 ? (
             <div
-              key={tx.id}
               style={{
-                padding: '0.8rem',
-                borderBottom:
-                  '1px solid var(--border)'
+                padding: '3rem 1rem',
+                textAlign: 'center',
+                color: 'var(--text-secondary)'
               }}
             >
-              <strong>
-                {tx.type}
-              </strong>{' '}
-
-              {tx.player?.name ||
-                'Unknown player'}
-
-              <div style={{
-                fontSize: '0.8rem',
-                color:
-                  'var(--text-secondary)'
-              }}>
-                {tx.team?.name}
-              </div>
+              No transactions yet.
             </div>
-          ))}
-
+          ) : (
+            transactions.map(tx => (
+              <div
+                key={tx.id}
+                className="fantasy-transaction-row"
+              >
+                <div>
+                  <span className="fantasy-transaction-type">
+                    {tx.type}
+                  </span>
+      
+                  <div
+                    style={{
+                      marginTop: '0.5rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    {tx.player?.name ||
+                      'Unknown player'}
+                  </div>
+      
+                  <div
+                    style={{
+                      marginTop: '0.2rem',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    {tx.team?.name}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -1002,7 +1055,7 @@ export default function LeaguePage({ params }) {
             Trades
           </h2>
 
-          <div className="rounded-lg border p-4 space-y-4">
+          <div className="fantasy-trade-card">
             <h3 className="font-semibold">
               Propose a Trade
             </h3>
@@ -1104,7 +1157,7 @@ export default function LeaguePage({ params }) {
             )}
           
             <button
-              className="btn-primary"
+              className="fantasy-button fantasy-button-primary"
               onClick={proposeTrade}
             >
               Send Trade Proposal
@@ -1178,7 +1231,7 @@ export default function LeaguePage({ params }) {
                             await fetchTrades();
                             await fetchLeague();
                           }}
-                          className="px-4 py-2 rounded"
+                          className="fantasy-button fantasy-button-secondary"
                         >
                           Accept
                         </button>
@@ -1195,7 +1248,7 @@ export default function LeaguePage({ params }) {
       
                             await fetchTrades();
                           }}
-                          className="px-4 py-2 rounded"
+                          className="fantasy-button fantasy-button-secondary"
                         >
                           Reject
                         </button>
@@ -1220,7 +1273,7 @@ export default function LeaguePage({ params }) {
                                   );
                                 }
                               }}
-                              className="px-4 py-2 rounded"
+                              className="fantasy-button fantasy-button-secondary"
                             >
                               Cancel
                             </button>
@@ -1235,7 +1288,7 @@ export default function LeaguePage({ params }) {
       )}
 
       {activeTab === 'waivers' && (
-        <div className="profile-section">
+        <div className="fantasy-card fantasy-section">
           <h2 className="section-title">
             Pending Waiver Claims
           </h2>
@@ -1246,21 +1299,17 @@ export default function LeaguePage({ params }) {
             waiverClaims.map(claim => (
               <div
                 key={claim.id}
-                style={{
-                  padding: '1rem',
-                  borderBottom:
-                    '1px solid var(--border)'
-                }}
+                className="fantasy-waiver-row"
               >
-                <strong>
+                <div className="fantasy-waiver-player">
                   {claim.player?.name}
-                </strong>
-      
-                <div>
+                </div>
+              
+                <div className="fantasy-waiver-meta">
                   {claim.team?.name}
                 </div>
-      
-                <div>
+              
+                <div className="fantasy-waiver-meta">
                   Bid: {claim.bidAmount} FAAB
                 </div>
               </div>
