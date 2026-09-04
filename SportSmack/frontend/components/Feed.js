@@ -30,20 +30,18 @@ export default function Feed() {
   
       const token =
         typeof window !== 'undefined'
-          ? localStorage.getItem(
-              'smack_token'
-            )
+          ? localStorage.getItem('smack_token')
           : null;
-  
-      const url = cursor
-        ? `${apiUrl}/api/posts?cursor=${cursor}`
-        : `${apiUrl}/api/posts`;
   
       const authHeaders = token
         ? {
             Authorization: `Bearer ${token}`
           }
         : {};
+  
+      const url = cursor
+        ? `${apiUrl}/api/posts?cursor=${cursor}`
+        : `${apiUrl}/api/posts`;
   
       const [postsRes, newsRes] =
         await Promise.all([
@@ -71,8 +69,7 @@ export default function Feed() {
       let news = [];
   
       if (postsRes.ok) {
-        postsData =
-          await postsRes.json();
+        postsData = await postsRes.json();
       } else {
         console.error(
           'Failed to fetch posts:',
@@ -89,32 +86,23 @@ export default function Feed() {
           ...p,
           feedType: 'post',
           sortDate: new Date(
-            p.created_at ||
-              p.createdAt
+            p.created_at || p.createdAt
           )
         }));
   
       const formattedNews =
-        news.map(n => ({
+        (news || []).map(n => ({
           ...n,
           feedType: 'news',
-          sortDate: new Date(
-            n.published
-          )
+          sortDate: new Date(n.published)
         }));
   
-      setNextCursor(
-        postsData.nextCursor
-      );
+      setNextCursor(postsData.nextCursor);
   
       if (cursor) {
         setFeedItems(prev =>
-          [
-            ...prev,
-            ...formattedPosts
-          ].sort(
-            (a, b) =>
-              b.sortDate - a.sortDate
+          [...prev, ...formattedPosts].sort(
+            (a, b) => b.sortDate - a.sortDate
           )
         );
       } else {
@@ -122,15 +110,14 @@ export default function Feed() {
           ...formattedPosts,
           ...formattedNews
         ].sort(
-          (a, b) =>
-            b.sortDate - a.sortDate
+          (a, b) => b.sortDate - a.sortDate
         );
   
         setFeedItems(combined);
       }
     } catch (err) {
       console.error(
-        'Failed to fetch feed',
+        'Failed to fetch feed:',
         err
       );
     } finally {
