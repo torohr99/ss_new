@@ -273,6 +273,43 @@ export default function LeaguePage({ params }) {
     }
   };
 
+  const saveTeamName = async () => {
+    const name = teamNameDraft.trim();
+  
+    if (
+      name.length < 2 ||
+      name.length > 40
+    ) {
+      alert(
+        'Team name must be between 2 and 40 characters.'
+      );
+      return;
+    }
+  
+    setSavingTeamName(true);
+  
+    try {
+      await axios.patch(
+        `${API}/api/fantasy/team/${myTeam.id}/name`,
+        { name },
+        {
+          withCredentials: true
+        }
+      );
+  
+      await fetchLeague();
+  
+      setEditingTeamName(false);
+    } catch (err) {
+      alert(
+        err.response?.data?.error ||
+        'Unable to update team name.'
+      );
+    } finally {
+      setSavingTeamName(false);
+    }
+  };
+  
   const addPlayer = async playerId => {
     try {
       await axios.post(
@@ -389,45 +426,53 @@ export default function LeaguePage({ params }) {
   return (
     <div className="page-container">
 
-      <div className="feed-header">
-        <div>
-          <h1>{league.name}</h1>
-          <p style={{
-            color: 'var(--text-secondary)'
-          }}>
-            {myTeam.name}
-          </p>
+      <div className="fantasy-hero">
+        <div className="fantasy-eyebrow">
+          SportSmack Fantasy Football
         </div>
-
-        {(league.status === 'PREDRAFT' ||
-          league.status === 'DRAFTING') && (
+      
+        <h1>{league.name}</h1>
+      
+        <div className="fantasy-hero-subtitle">
+          {myTeam.name}
+        </div>
+      
+        <div className="fantasy-action-row">
+          {(league.status === 'PREDRAFT' ||
+            league.status === 'DRAFTING') && (
+            <button
+              className="fantasy-button fantasy-button-primary"
+              onClick={() =>
+                router.push(
+                  `/fantasy/draft/${league.id}`
+                )
+              }
+            >
+              🏈 Enter Draft Room
+            </button>
+          )}
+      
           <button
-            className="btn-primary"
+            className="fantasy-button fantasy-button-secondary"
             onClick={() =>
-              router.push(
-                `/fantasy/draft/${league.id}`
-              )
+              router.push('/fantasy')
             }
           >
-            Draft Room
+            ← All Leagues
           </button>
-        )}
+        </div>
+      
       </div>
 
-      <div style={{
-        display: 'flex',
-        gap: '0.5rem',
-        overflowX: 'auto',
-        marginBottom: '1.5rem'
-      }}>
+      <div className="fantasy-tabs">
         {tabs.map(([key, label]) => (
           <button
             key={key}
-            className={
+            className={`fantasy-tab ${
               activeTab === key
-                ? 'btn-primary'
-                : 'btn-secondary'
-            }
+                ? 'active'
+                : ''
+            }`}
             onClick={() =>
               setActiveTab(key)
             }
@@ -438,104 +483,222 @@ export default function LeaguePage({ params }) {
       </div>
 
       {activeTab === 'team' && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns:
-            '2fr 1fr',
-          gap: '1.5rem'
-        }}>
-
-          <div className="profile-section">
-            <h2 className="section-title">
-              Starting Lineup
-            </h2>
-
-            {starters.length === 0 && (
-              <p>
-                Set your starting lineup.
-              </p>
-            )}
-
-            {starters.map(tp => (
-              <PlayerRow
-                key={tp.id}
-                tp={tp}
-                action={
-                  <button
-                    className="btn-secondary"
-                    onClick={() =>
-                      setRosterStatus(
-                        tp.id,
-                        'BENCH'
-                      )
-                    }
-                  >
-                    Bench
-                  </button>
-                }
-              />
-            ))}
-
-            <h2
-              className="section-title"
-              style={{
-                marginTop: '2rem'
-              }}
-            >
-              Bench
-            </h2>
-
-            {bench.map(tp => (
-              <PlayerRow
-                key={tp.id}
-                tp={tp}
-                action={
-                  <button
-                    className="btn-primary"
-                    onClick={() =>
-                      setRosterStatus(
-                        tp.id,
-                        'STARTER'
-                      )
-                    }
-                  >
-                    Start
-                  </button>
-                }
-              />
-            ))}
-          </div>
-
-          <div className="profile-section">
-            <h2 className="section-title">
-              Team Summary
-            </h2>
-
-            <div style={{
-              fontSize: '2rem',
-              fontWeight: 'bold'
-            }}>
-              {totalPoints.toFixed(1)}
-            </div>
-
-            <div style={{
-              color: 'var(--text-secondary)'
-            }}>
-              Total fantasy points
-            </div>
-
-            <div style={{
-              marginTop: '1.5rem'
-            }}>
-              Roster: {myPlayers.length}/15
+        <div className="fantasy-team-layout">
+      
+          <div className="fantasy-card fantasy-section">
+      
+            <div className="fantasy-section-title">
               <div>
-                FAAB: {myTeam.faab ?? 100}
+                <h2>My Roster</h2>
+                <span>
+                  {myPlayers.length}/15 players
+                </span>
+              </div>
+      
+              <span className="fantasy-status">
+                {starters.length} Starters
+              </span>
+            </div>
+      
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div className="fantasy-roster-label">
+                Starting Lineup
+              </div>
+      
+              {starters.length === 0 ? (
+                <div
+                  style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    border:
+                      '1px dashed rgba(255,255,255,0.1)',
+                    borderRadius: '14px'
+                  }}
+                >
+                  No starters configured yet.
+                </div>
+              ) : (
+                <div className="fantasy-roster-grid">
+                  {starters.map(tp => (
+                    <FantasyPlayerCard
+                      key={tp.id}
+                      tp={tp}
+                      status="STARTER"
+                      action={
+                        <button
+                          className="fantasy-button fantasy-button-secondary"
+                          onClick={() =>
+                            setRosterStatus(
+                              tp.id,
+                              'BENCH'
+                            )
+                          }
+                        >
+                          Move to Bench
+                        </button>
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+      
+            <div>
+              <div className="fantasy-roster-label bench">
+                Bench
+              </div>
+      
+              {bench.length === 0 ? (
+                <div
+                  style={{
+                    padding: '2rem',
+                    textAlign: 'center',
+                    color: 'var(--text-secondary)',
+                    border:
+                      '1px dashed rgba(255,255,255,0.1)',
+                    borderRadius: '14px'
+                  }}
+                >
+                  No bench players yet.
+                </div>
+              ) : (
+                <div className="fantasy-roster-grid">
+                  {bench.map(tp => (
+                    <FantasyPlayerCard
+                      key={tp.id}
+                      tp={tp}
+                      status="BENCH"
+                      action={
+                        <button
+                          className="fantasy-button fantasy-button-primary"
+                          onClick={() =>
+                            setRosterStatus(
+                              tp.id,
+                              'STARTER'
+                            )
+                          }
+                        >
+                          Start Player
+                        </button>
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+      
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.5rem'
+            }}
+          >
+      
+            <div className="fantasy-card fantasy-section">
+              <div className="fantasy-section-title">
+                <div>
+                  <h2>{myTeam.name}</h2>
+                  <span>Fantasy Team</span>
+                </div>
+              </div>
+      
+              {!editingTeamName ? (
+                <button
+                  className="fantasy-button fantasy-button-secondary"
+                  onClick={() => {
+                    setTeamNameDraft(
+                      myTeam.name
+                    );
+                    setEditingTeamName(true);
+                  }}
+                >
+                  ✎ Change Team Name
+                </button>
+              ) : (
+                <div className="fantasy-team-name-editor">
+                  <input
+                    className="fantasy-team-name-input"
+                    value={teamNameDraft}
+                    maxLength={40}
+                    onChange={e =>
+                      setTeamNameDraft(
+                        e.target.value
+                      )
+                    }
+                    autoFocus
+                  />
+      
+                  <button
+                    className="fantasy-button fantasy-button-primary"
+                    onClick={saveTeamName}
+                    disabled={savingTeamName}
+                  >
+                    {savingTeamName
+                      ? 'Saving...'
+                      : 'Save'}
+                  </button>
+      
+                  <button
+                    className="fantasy-button fantasy-button-secondary"
+                    onClick={() =>
+                      setEditingTeamName(false)
+                    }
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+      
+            <div className="fantasy-card fantasy-section">
+              <div className="fantasy-section-title">
+                <h2>Team Summary</h2>
+              </div>
+      
+              <div className="fantasy-stat-grid">
+      
+                <div className="fantasy-stat">
+                  <div className="fantasy-stat-label">
+                    Points
+                  </div>
+                  <div className="fantasy-stat-value">
+                    {totalPoints.toFixed(1)}
+                  </div>
+                </div>
+      
+                <div className="fantasy-stat">
+                  <div className="fantasy-stat-label">
+                    Roster
+                  </div>
+                  <div className="fantasy-stat-value">
+                    {myPlayers.length}/15
+                  </div>
+                </div>
+      
+                <div className="fantasy-stat">
+                  <div className="fantasy-stat-label">
+                    Starters
+                  </div>
+                  <div className="fantasy-stat-value">
+                    {starters.length}
+                  </div>
+                </div>
+      
+                <div className="fantasy-stat">
+                  <div className="fantasy-stat-label">
+                    FAAB
+                  </div>
+                  <div className="fantasy-stat-value">
+                    {myTeam.faab ?? 100}
+                  </div>
+                </div>
+      
               </div>
             </div>
-
-            <div>
-              Starters: {starters.length}
-            </div>
+      
           </div>
         </div>
       )}
@@ -1110,37 +1273,98 @@ export default function LeaguePage({ params }) {
   );
 }
 
-function PlayerRow({ tp, action }) {
+function FantasyPlayerCard({
+  tp,
+  status,
+  action
+}) {
+  const player = tp.player;
+
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent:
-        'space-between',
-      alignItems: 'center',
-      padding: '0.8rem',
-      marginBottom: '0.5rem',
-      background:
-        'var(--bg-secondary)',
-      borderRadius: '8px'
-    }}>
+    <div className="fantasy-player-card">
 
-      <div>
-        <strong>
-          {tp.player.name}
-        </strong>
-
-        <div style={{
-          fontSize: '0.8rem',
-          color:
-            'var(--text-secondary)'
-        }}>
-          {tp.player.position} •{' '}
-          {tp.player.team}
+      {player.imageUrl ? (
+        <img
+          src={player.imageUrl}
+          alt={player.name}
+          className="fantasy-player-image"
+          loading="lazy"
+        />
+      ) : (
+        <div
+          className="fantasy-player-image"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2.5rem',
+            fontWeight: 900,
+            color: '#fff',
+            background:
+              'linear-gradient(135deg, #27272a, #09090b)'
+          }}
+        >
+          {player.name
+            .split(' ')
+            .map(word => word[0])
+            .join('')
+            .slice(0, 2)
+            .toUpperCase()}
         </div>
+      )}
+
+      <div className="fantasy-player-info">
+
+        <div
+          className="fantasy-player-name"
+        >
+          {player.name}
+        </div>
+
+        <div className="fantasy-player-meta">
+          <span>
+            {player.position} • {player.team}
+          </span>
+
+          <span>
+            #{player.jerseyNumber || '—'}
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginTop: '0.75rem'
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)'
+            }}
+          >
+            {player.projectedPoints != null
+              ? `${Number(
+                  player.projectedPoints
+                ).toFixed(1)} projected`
+              : 'Projection unavailable'}
+          </span>
+
+          <span
+            className="fantasy-player-badge"
+          >
+            {status}
+          </span>
+        </div>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          {action}
+        </div>
+
       </div>
-
-      {action}
-
     </div>
   );
 }
