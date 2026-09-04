@@ -54,6 +54,11 @@ export default function LeaguePage({ params }) {
   const [offeredPlayers, setOfferedPlayers] = useState([]);
   const [requestedPlayers, setRequestedPlayers] = useState([]);
   const [waiverClaims, setWaiverClaims] = useState([]);
+  const [editingTeamName, setEditingTeamName] = useState(false);
+
+  const [teamNameDraft, setTeamNameDraft] = useState('');
+
+  const [savingTeamName, setSavingTeamName] = useState(false);
 
   const fetchWaiverClaims = async () => {
     try {
