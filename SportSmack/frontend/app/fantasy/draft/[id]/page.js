@@ -76,49 +76,25 @@ export default function DraftRoom({ params }) {
   
           setLeague(leagueRes.data);
   
-          let playersRes = await axios.get(
-            `${apiUrl}/api/fantasy/players`,
-            { withCredentials: true }
-          );
-  
-          let players = Array.isArray(playersRes.data)
-            ? playersRes.data
-            : [];
-  
-          // If the player database is empty, seed it and try again.
-          if (players.length === 0) {
-            console.log(
-              'Fantasy player pool is empty. Starting seed...'
-            );
-  
-            await axios.post(
-              `${apiUrl}/api/fantasy/seed`,
-              {},
-              { withCredentials: true }
-            );
-  
-            playersRes = await axios.get(
-              `${apiUrl}/api/fantasy/players`,
-              { withCredentials: true }
-            );
-  
-            players = Array.isArray(playersRes.data)
-              ? playersRes.data
-              : [];
-          }
-  
-          console.log(
-            'Fantasy players loaded:',
-            players.length
-          );
-  
-          setAvailablePlayers(players);
-  
-                  if (players.length === 0) {
-                    throw new Error(
-                      'The NFL fantasy player pool is empty after seeding.'
+                    const playersRes = await axios.get(
+                      `${apiUrl}/api/fantasy/players`,
+                      {
+                        withCredentials: true
+                      }
                     );
-                  }
+          
+                    const players = Array.isArray(
+                      playersRes.data
+                    )
+                      ? playersRes.data
+                      : [];
+          
+                    console.log(
+                      'Fantasy players loaded:',
+                      players.length
+                    );
+          
+                    setAvailablePlayers(players);
                 } catch (err) {
                   console.error(
                     'Failed to load fantasy draft data:',
@@ -359,300 +335,681 @@ export default function DraftRoom({ params }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 300px', gap: '1.5rem', height: 'calc(100vh - 220px)' }}>
-        
-        {/* Left Sidebar: Teams / Draft Order */}
-        <div style={{ background: 'var(--glass-bg)', borderRadius: '16px', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: 0 }}>Draft Order</h3>
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {sortedTeams.length === 0 && <p style={{ padding: '1rem', color: 'var(--text-secondary)' }}>Waiting for teams...</p>}
-            {sortedTeams.map((t, idx) => (
-              <div key={t.id} style={{ 
-                padding: '1rem', 
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                background: currentTeamTurn?.id === t.id ? 'rgba(255,255,255,0.05)' : 'transparent',
-                borderLeft: currentTeamTurn?.id === t.id ? '4px solid #4ade80' : (t.id === myTeam?.id ? '4px solid var(--brand-red)' : '4px solid transparent'),
-                display: 'flex', alignItems: 'center', gap: '1rem',
-                transition: 'all 0.2s'
-              }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                  {idx + 1}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 'bold', color: t.id === myTeam?.id ? 'var(--brand-color)' : '#fff' }}>{t.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    {picks.filter(p => p.teamId === t.id).length} players
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Center: Players or Draft Board */}
-        <div style={{ background: 'var(--glass-bg)', borderRadius: '16px', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
-            <button 
-              onClick={() => setActiveTab('players')}
-              style={{ flex: 1, padding: '1rem', background: 'none', border: 'none', color: activeTab === 'players' ? '#fff' : 'var(--text-secondary)', borderBottom: activeTab === 'players' ? '2px solid var(--brand-red)' : '2px solid transparent', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns:
+                  '280px minmax(500px, 1fr) 280px',
+                gap: '1.5rem',
+                minHeight: 'calc(100vh - 220px)',
+                alignItems: 'stretch'
+              }}
             >
-              Available Players
-            </button>
-            <button 
-              onClick={() => setActiveTab('board')}
-              style={{ flex: 1, padding: '1rem', background: 'none', border: 'none', color: activeTab === 'board' ? '#fff' : 'var(--text-secondary)', borderBottom: activeTab === 'board' ? '2px solid var(--brand-red)' : '2px solid transparent', fontWeight: 'bold', cursor: 'pointer', transition: '0.2s' }}
-            >
-              Draft Board
-            </button>
-          </div>
-
-          {activeTab === 'players' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)' }}>
-                <input 
-                  type="text" 
-                  className="search-input" 
-                  placeholder="Search by name, position, or NFL team..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{ width: '100%', margin: 0, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                />
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead style={{ position: 'sticky', top: 0, background: 'var(--glass-bg)', zIndex: 1, backdropFilter: 'blur(10px)' }}>
-                    <tr style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase' }}>
-                      <th style={{ padding: '1rem', textAlign: 'left' }}>Player</th>
-                      <th style={{ padding: '1rem', textAlign: 'center' }}>Position</th>
-                      <th style={{ padding: '1rem', textAlign: 'center' }}>NFL Team</th>
-                      <th style={{ padding: '1rem', textAlign: 'center' }}>Proj</th>
-                      <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>                  
-                    {undraftedPlayers.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
+      
+              {/* LEFT: DRAFT ORDER */}
+              <div
+                style={{
+                  background: 'var(--glass-bg)',
+                  borderRadius: '16px',
+                  border: '1px solid var(--glass-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <div
+                  style={{
+                    padding: '1rem',
+                    borderBottom:
+                      '1px solid var(--glass-border)',
+                    background: 'rgba(0,0,0,0.2)'
+                  }}
+                >
+                  <h3 style={{ margin: 0 }}>
+                    Draft Order
+                  </h3>
+                </div>
+      
+                <div
+                  style={{
+                    overflowY: 'auto',
+                    flex: 1
+                  }}
+                >
+                  {sortedTeams.length === 0 && (
+                    <p
+                      style={{
+                        padding: '1rem',
+                        color:
+                          'var(--text-secondary)'
+                      }}
+                    >
+                      Waiting for teams...
+                    </p>
+                  )}
+      
+                  {sortedTeams.map((t, idx) => (
+                    <div
+                      key={t.id}
+                      style={{
+                        padding: '1rem',
+                        borderBottom:
+                          '1px solid rgba(255,255,255,0.05)',
+                        background:
+                          currentTeamTurn?.id === t.id
+                            ? 'rgba(255,255,255,0.05)'
+                            : 'transparent',
+                        borderLeft:
+                          currentTeamTurn?.id === t.id
+                            ? '4px solid #4ade80'
+                            : t.id === myTeam?.id
+                              ? '4px solid var(--brand-red)'
+                              : '4px solid transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background:
+                            'rgba(255,255,255,0.1)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.8rem',
+                          fontWeight: 'bold',
+                          flexShrink: 0
+                        }}
+                      >
+                        {idx + 1}
+                      </div>
+      
+                      <div>
+                        <div
                           style={{
-                            padding: '3rem',
-                            textAlign: 'center',
-                            color: 'var(--text-secondary)'
+                            fontWeight: 'bold',
+                            color:
+                              t.id === myTeam?.id
+                                ? 'var(--brand-color)'
+                                : '#fff'
                           }}
                         >
-                          <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-                            No available players found.
-                          </div>
-                    
-                          <div style={{ fontSize: '0.9rem' }}>
-                            Players are loading from the NFL player database.
-                            If this message remains, refresh the Draft Room.
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    
-                    {undraftedPlayers.slice(0, 100).map(p => {
-                      const colors = NFL_COLORS[p.team] || { primary: '#333', secondary: '#111' };
-                      return (
-                        <tr key={p.id} className="player-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
-                          <td
-                            style={{
-                              padding: '0.8rem 1rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '1rem'
-                            }}
-                          >
-                            {p.imageUrl ? (
-                              <img
-                                src={p.imageUrl}
-                                alt={p.name}
-                                style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: '50%',
-                                  objectFit: 'cover',
-                                  background: 'rgba(255,255,255,0.1)',
-                                  border: '2px solid rgba(255,255,255,0.1)'
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: '50%',
-                                  overflow: 'hidden',
-                                  background: `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 'bold',
-                                  fontSize: '0.8rem',
-                                  border: '2px solid rgba(255,255,255,0.1)',
-                                  flexShrink: 0
-                                }}
-                              >
-                                {p.imageUrl ? (
-                                  <img
-                                    src={p.imageUrl}
-                                    alt={p.name}
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover'
-                                    }}
-                                  />
-                                ) : (
-                                  p.name.split(' ').map(n => n[0]).join('')
-                                )}
-                              </div>
-                              )}
-                                  
-                              <div>
-                                <div
-                                  style={{
-                                    fontWeight: 'bold',
-                                    fontSize: '1.05rem'
-                                  }}
-                                >
-                                  {p.name}
-                                </div>
-                              
-                                <div
-                                  style={{
-                                    fontSize: '0.8rem',
-                                    color: 'var(--text-secondary)'
-                                  }}
-                                >
-                                {p.team}
-                                {' • '}
-                                {p.position}
-                                {' • '}
-                                #{p.jerseyNumber || '—'}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: '0.75rem',
-                                  color: 'var(--text-secondary)'
-                                }}
-                              >
-                                {p.byeWeek
-                                  ? `Bye Week ${p.byeWeek}`
-                                  : 'Bye Week —'}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center' }}>
-                            <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.85rem' }}>{p.position}</span>
-                          </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center', fontWeight: 'bold', color: colors.primary }}>
-                            {p.team}
-                          </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                            {p.projectedPoints != null
-                              ? `${Number(p.projectedPoints).toFixed(1)} pts`
-                              : '—'}
-                          </td>
-                          <td style={{ padding: '0.8rem 1rem', textAlign: 'right' }}>
-                            <button 
-                              className="btn-primary" 
-                              onClick={() => draftPlayer(p.id)}
-                              disabled={!isMyTurn || status !== 'DRAFTING'}
-                              style={{ 
-                                opacity: (!isMyTurn || status !== 'DRAFTING') ? 0.3 : 1,
-                                padding: '0.5rem 1.2rem',
-                                borderRadius: '20px'
-                              }}
-                            >
-                              DRAFT
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            <div style={{ flex: 1, overflow: 'auto', padding: '1rem' }}>
-              <div style={{ minWidth: `${numTeams * 150}px` }}>
-                {/* Board Header */}
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  {sortedTeams.map(t => (
-                    <div key={t.id} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', padding: '0.5rem', textAlign: 'center', borderRadius: '6px', fontWeight: 'bold', fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {t.name}
+                          {t.name}
+                        </div>
+      
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color:
+                              'var(--text-secondary)'
+                          }}
+                        >
+                          {
+                            picks.filter(
+                              p =>
+                                p.teamId === t.id
+                            ).length
+                          }{' '}
+                          players
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
-                {/* Board Matrix */}
-                {draftBoard.map((rowPicks, rIdx) => (
-                  <div key={rIdx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    {rowPicks.map((pick, cIdx) => {
-                      if (!pick) {
-                        return <div key={cIdx} style={{ flex: 1, height: '60px', background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '6px' }}></div>;
-                      }
-                      const colors = NFL_COLORS[pick.player.team] || { primary: '#333', secondary: '#111' };
-                      return (
-                        <div key={cIdx} style={{ 
-                          flex: 1, height: '60px', 
-                          background: `linear-gradient(135deg, ${colors.primary}dd, ${colors.secondary}dd)`, 
-                          border: '1px solid rgba(255,255,255,0.2)', 
-                          borderRadius: '6px',
-                          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-                          padding: '0.2rem', textShadow: '0 1px 2px rgba(0,0,0,0.8)'
-                        }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
-                            {pick.player.name}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{pick.player.position} - {pick.player.team}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Sidebar: My Team */}
-        <div style={{ background: 'var(--glass-bg)', borderRadius: '16px', border: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '1rem', borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0 }}>My Roster</h3>
-            {myTeam && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{picks.filter(p => p.teamId === myTeam.id).length}/15</span>}
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1, padding: '1rem' }}>
-            {!myTeam && <p style={{ color: 'var(--text-secondary)' }}>You are not in this league.</p>}
-            {myTeam && picks.filter(p => p.teamId === myTeam.id).map(p => (
-              <div key={p.id} style={{ 
-                background: 'rgba(255,255,255,0.05)', 
-                padding: '0.8rem', 
-                borderRadius: '8px', 
-                marginBottom: '0.5rem',
-                borderLeft: `3px solid ${NFL_COLORS[p.player.team]?.primary || '#888'}`
-              }}>
-                <div style={{ fontWeight: 'bold' }}>{p.player.name}</div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  {p.player.position} • {p.player.team} • Round {Math.floor((p.pickNumber - 1) / numTeams) + 1}
+      
+              {/* CENTER: AVAILABLE PLAYERS */}
+              <div
+                style={{
+                  background: 'var(--glass-bg)',
+                  borderRadius: '16px',
+                  border:
+                    '1px solid var(--glass-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                  minWidth: 0
+                }}
+              >
+                <div
+                  style={{
+                    padding: '1rem 1.25rem',
+                    borderBottom:
+                      '1px solid var(--glass-border)',
+                    background:
+                      'rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    alignItems: 'center',
+                    gap: '1rem'
+                  }}
+                >
+                  <div>
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontSize: '1.25rem'
+                      }}
+                    >
+                      Available Players
+                    </h2>
+      
+                    <div
+                      style={{
+                        color:
+                          'var(--text-secondary)',
+                        fontSize: '0.85rem',
+                        marginTop: '0.25rem'
+                      }}
+                    >
+                      {undraftedPlayers.length}{' '}
+                      players available
+                    </div>
+                  </div>
+      
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search players..."
+                    value={searchQuery}
+                    onChange={e =>
+                      setSearchQuery(
+                        e.target.value
+                      )
+                    }
+                    style={{
+                      width: '240px',
+                      margin: 0,
+                      background:
+                        'rgba(0,0,0,0.2)',
+                      border:
+                        '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px'
+                    }}
+                  />
+                </div>
+      
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'auto'
+                  }}
+                >
+                  {undraftedPlayers.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '4rem 2rem',
+                        textAlign: 'center',
+                        color:
+                          'var(--text-secondary)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '1.2rem',
+                          marginBottom:
+                            '0.75rem'
+                        }}
+                      >
+                        No available players found.
+                      </div>
+      
+                      <div
+                        style={{
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        The NFL player pool has not
+                        loaded yet. Try refreshing the
+                        Draft Room.
+                      </div>
+                    </div>
+                  ) : (
+                    <table
+                      style={{
+                        width: '100%',
+                        borderCollapse:
+                          'collapse'
+                      }}
+                    >
+                      <thead
+                        style={{
+                          position: 'sticky',
+                          top: 0,
+                          background:
+                            'var(--glass-bg)',
+                          zIndex: 2,
+                          backdropFilter:
+                            'blur(10px)'
+                        }}
+                      >
+                        <tr
+                          style={{
+                            color:
+                              'var(--text-secondary)',
+                            fontSize: '0.8rem',
+                            textTransform:
+                              'uppercase'
+                          }}
+                        >
+                          <th
+                            style={{
+                              padding:
+                                '0.9rem 1rem',
+                              textAlign: 'left'
+                            }}
+                          >
+                            Player
+                          </th>
+      
+                          <th
+                            style={{
+                              padding:
+                                '0.9rem',
+                              textAlign: 'center'
+                            }}
+                          >
+                            Pos
+                          </th>
+      
+                          <th
+                            style={{
+                              padding:
+                                '0.9rem',
+                              textAlign: 'center'
+                            }}
+                          >
+                            Team
+                          </th>
+      
+                          <th
+                            style={{
+                              padding:
+                                '0.9rem',
+                              textAlign: 'center'
+                            }}
+                          >
+                            Proj
+                          </th>
+      
+                          <th
+                            style={{
+                              padding:
+                                '0.9rem 1rem',
+                              textAlign: 'right'
+                            }}
+                          >
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+      
+                      <tbody>
+                        {undraftedPlayers
+                          .slice(0, 100)
+                          .map(p => {
+                            const colors =
+                              NFL_COLORS[p.team] ||
+                              {
+                                primary: '#333',
+                                secondary: '#111'
+                              };
+      
+                            return (
+                              <tr
+                                key={p.id}
+                                className="player-row"
+                                style={{
+                                  borderBottom:
+                                    '1px solid rgba(255,255,255,0.05)'
+                                }}
+                              >
+                                <td
+                                  style={{
+                                    padding:
+                                      '0.7rem 1rem'
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems:
+                                        'center',
+                                      gap: '0.75rem'
+                                    }}
+                                  >
+                                    {p.imageUrl ? (
+                                      <img
+                                        src={p.imageUrl}
+                                        alt={p.name}
+                                        style={{
+                                          width:
+                                            '42px',
+                                          height:
+                                            '42px',
+                                          borderRadius:
+                                            '50%',
+                                          objectFit:
+                                            'cover',
+                                          flexShrink: 0
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width:
+                                            '42px',
+                                          height:
+                                            '42px',
+                                          borderRadius:
+                                            '50%',
+                                          background:
+                                            `linear-gradient(135deg, ${colors.primary}, ${colors.secondary})`,
+                                          display:
+                                            'flex',
+                                          alignItems:
+                                            'center',
+                                          justifyContent:
+                                            'center',
+                                          fontWeight:
+                                            'bold',
+                                          fontSize:
+                                            '0.75rem',
+                                          flexShrink: 0
+                                        }}
+                                      >
+                                        {p.name
+                                          .split(
+                                            ' '
+                                          )
+                                          .map(
+                                            n =>
+                                              n[0]
+                                          )
+                                          .join('')}
+                                      </div>
+                                    )}
+      
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontWeight:
+                                            'bold'
+                                        }}
+                                      >
+                                        {p.name}
+                                      </div>
+      
+                                      <div
+                                        style={{
+                                          fontSize:
+                                            '0.75rem',
+                                          color:
+                                            'var(--text-secondary)'
+                                        }}
+                                      >
+                                        {p.team}
+                                        {' • '}
+                                        #
+                                        {p.jerseyNumber ||
+                                          '—'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+      
+                                <td
+                                  style={{
+                                    padding:
+                                      '0.7rem',
+                                    textAlign:
+                                      'center'
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      background:
+                                        'rgba(255,255,255,0.1)',
+                                      padding:
+                                        '0.3rem 0.5rem',
+                                      borderRadius:
+                                        '4px',
+                                      fontSize:
+                                        '0.8rem'
+                                    }}
+                                  >
+                                    {p.position}
+                                  </span>
+                                </td>
+      
+                                <td
+                                  style={{
+                                    padding:
+                                      '0.7rem',
+                                    textAlign:
+                                      'center',
+                                    fontWeight:
+                                      'bold'
+                                  }}
+                                >
+                                  {p.team}
+                                </td>
+      
+                                <td
+                                  style={{
+                                    padding:
+                                      '0.7rem',
+                                    textAlign:
+                                      'center',
+                                    color:
+                                      'var(--text-secondary)'
+                                  }}
+                                >
+                                  {p.projectedPoints !=
+                                  null
+                                    ? `${Number(
+                                        p.projectedPoints
+                                      ).toFixed(
+                                        1
+                                      )}`
+                                    : '—'}
+                                </td>
+      
+                                <td
+                                  style={{
+                                    padding:
+                                      '0.7rem 1rem',
+                                    textAlign:
+                                      'right'
+                                  }}
+                                >
+                                  <button
+                                    className="btn-primary"
+                                    onClick={() =>
+                                      draftPlayer(
+                                        p.id
+                                      )
+                                    }
+                                    disabled={
+                                      !isMyTurn ||
+                                      status !==
+                                        'DRAFTING'
+                                    }
+                                    style={{
+                                      opacity:
+                                        !isMyTurn ||
+                                        status !==
+                                          'DRAFTING'
+                                          ? 0.35
+                                          : 1,
+                                      padding:
+                                        '0.5rem 1rem',
+                                      borderRadius:
+                                        '20px',
+                                      whiteSpace:
+                                        'nowrap'
+                                    }}
+                                  >
+                                    {isMyTurn
+                                      ? 'DRAFT'
+                                      : 'WAIT'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
-            ))}
-            {myTeam && picks.filter(p => p.teamId === myTeam.id).length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '2rem' }}>
-                No players drafted yet.
+      
+              {/* RIGHT: MY ROSTER */}
+              <div
+                style={{
+                  background: 'var(--glass-bg)',
+                  borderRadius: '16px',
+                  border:
+                    '1px solid var(--glass-border)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                }}
+              >
+                <div
+                  style={{
+                    padding: '1rem',
+                    borderBottom:
+                      '1px solid var(--glass-border)',
+                    background:
+                      'rgba(0,0,0,0.2)',
+                    display: 'flex',
+                    justifyContent:
+                      'space-between',
+                    alignItems: 'center'
+                  }}
+                >
+                  <h3 style={{ margin: 0 }}>
+                    My Roster
+                  </h3>
+      
+                  {myTeam && (
+                    <span
+                      style={{
+                        fontSize: '0.8rem',
+                        color:
+                          'var(--text-secondary)'
+                      }}
+                    >
+                      {
+                        picks.filter(
+                          p =>
+                            p.teamId ===
+                            myTeam.id
+                        ).length
+                      }
+                      /15
+                    </span>
+                  )}
+                </div>
+      
+                <div
+                  style={{
+                    overflowY: 'auto',
+                    flex: 1,
+                    padding: '1rem'
+                  }}
+                >
+                  {!myTeam && (
+                    <p
+                      style={{
+                        color:
+                          'var(--text-secondary)'
+                      }}
+                    >
+                      You are not in this league.
+                    </p>
+                  )}
+      
+                  {myTeam &&
+                    picks
+                      .filter(
+                        p =>
+                          p.teamId ===
+                          myTeam.id
+                      )
+                      .map(p => (
+                        <div
+                          key={p.id}
+                          style={{
+                            background:
+                              'rgba(255,255,255,0.05)',
+                            padding: '0.8rem',
+                            borderRadius:
+                              '8px',
+                            marginBottom:
+                              '0.5rem',
+                            borderLeft:
+                              `3px solid ${
+                                NFL_COLORS[
+                                  p.player.team
+                                ]?.primary ||
+                                '#888'
+                              }`
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight:
+                                'bold'
+                            }}
+                          >
+                            {p.player.name}
+                          </div>
+      
+                          <div
+                            style={{
+                              fontSize:
+                                '0.8rem',
+                              color:
+                                'var(--text-secondary)'
+                            }}
+                          >
+                            {p.player.position}
+                            {' • '}
+                            {p.player.team}
+                          </div>
+                        </div>
+                      ))}
+      
+                  {myTeam &&
+                    picks.filter(
+                      p =>
+                        p.teamId ===
+                        myTeam.id
+                    ).length === 0 && (
+                      <div
+                        style={{
+                          textAlign:
+                            'center',
+                          color:
+                            'var(--text-secondary)',
+                          marginTop:
+                            '2rem'
+                        }}
+                      >
+                        No players drafted yet.
+                      </div>
+                    )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-
-      </div>
+            </div>
 
       <style jsx>{`
         .player-row:hover {
