@@ -1083,78 +1083,141 @@ export default function LeaguePage({ params }) {
                 ))}
             </select>
           
-            <div>
-              <strong>
-                Players You Give
-              </strong>
-          
-              {myPlayers.map(tp => (
-                <label
-                  key={tp.id}
-                  style={{
-                    display: 'block',
-                    marginTop: '0.5rem'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={offeredPlayers.includes(
-                      tp.player.id
-                    )}
-                    onChange={e => {
-                      setOfferedPlayers(prev =>
-                        e.target.checked
-                          ? [...prev, tp.player.id]
-                          : prev.filter(
-                              id => id !== tp.player.id
-                            )
-                      );
-                    }}
-                  />{' '}
-                  {tp.player.name} ({tp.player.position})
-                </label>
-              ))}
-            </div>
-          
-            {tradeRecipient && (
-              <div>
-                <strong>
-                  Players You Want
-                </strong>
-          
-                {(
-                  league.teams.find(
-                    team =>
-                      team.id === Number(tradeRecipient)
-                  )?.players || []
-                ).map(tp => (
-                  <label
-                    key={tp.id}
-                    style={{
-                      display: 'block',
-                      marginTop: '0.5rem'
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={requestedPlayers.includes(
-                        tp.player.id
-                      )}
-                      onChange={e => {
-                        setRequestedPlayers(prev =>
-                          e.target.checked
-                            ? [...prev, tp.player.id]
-                            : prev.filter(
-                                id => id !== tp.player.id
-                              )
-                        );
-                      }}
-                    />{' '}
-                    {tp.player.name} ({tp.player.position})
-                  </label>
-                ))}
+            <div
+              className="fantasy-trade-columns"
+            >
+              <div className="fantasy-trade-column">
+                <div className="fantasy-trade-column-title">
+                  Players You Give
+                </div>
+            
+                <div className="fantasy-trade-column-subtitle">
+                  Your players
+                </div>
+            
+                {myPlayers.length === 0 ? (
+                  <div className="fantasy-trade-empty">
+                    No players available.
+                  </div>
+                ) : (
+                  myPlayers.map(tp => (
+                    <label
+                      key={tp.id}
+                      className={
+                        `fantasy-trade-player-option ${
+                          offeredPlayers.includes(
+                            tp.player.id
+                          )
+                            ? 'selected'
+                            : ''
+                        }`
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={offeredPlayers.includes(
+                          tp.player.id
+                        )}
+                        onChange={e => {
+                          setOfferedPlayers(prev =>
+                            e.target.checked
+                              ? [
+                                  ...prev,
+                                  tp.player.id
+                                ]
+                              : prev.filter(
+                                  id =>
+                                    id !==
+                                    tp.player.id
+                                )
+                          );
+                        }}
+                      />
+            
+                      <span>
+                        <strong>
+                          {tp.player.name}
+                        </strong>
+            
+                        <small>
+                          {tp.player.position} •{' '}
+                          {tp.player.team}
+                        </small>
+                      </span>
+                    </label>
+                  ))
+                )}
               </div>
-            )}
+            
+              <div className="fantasy-trade-column">
+                <div className="fantasy-trade-column-title">
+                  Players You Want
+                </div>
+            
+                <div className="fantasy-trade-column-subtitle">
+                  Their players
+                </div>
+            
+                {!tradeRecipient ? (
+                  <div className="fantasy-trade-empty">
+                    Select a team above.
+                  </div>
+                ) : (
+                  (
+                    league.teams.find(
+                      team =>
+                        team.id ===
+                        Number(tradeRecipient)
+                    )?.players || []
+                  ).map(tp => (
+                    <label
+                      key={tp.id}
+                      className={
+                        `fantasy-trade-player-option ${
+                          requestedPlayers.includes(
+                            tp.player.id
+                          )
+                            ? 'selected'
+                            : ''
+                        }`
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={requestedPlayers.includes(
+                          tp.player.id
+                        )}
+                        onChange={e => {
+                          setRequestedPlayers(prev =>
+                            e.target.checked
+                              ? [
+                                  ...prev,
+                                  tp.player.id
+                                ]
+                              : prev.filter(
+                                  id =>
+                                    id !==
+                                    tp.player.id
+                                )
+                          );
+                        }}
+                      />
+            
+                      <span>
+                        <strong>
+                          {tp.player.name}
+                        </strong>
+            
+                        <small>
+                          {tp.player.position} •{' '}
+                          {tp.player.team}
+                        </small>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
           
             <button
               className="fantasy-button fantasy-button-primary"
