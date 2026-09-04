@@ -598,57 +598,57 @@ export default function LeaguePage({ params }) {
           >
       
             <div className="fantasy-card fantasy-section">
-              <div className="fantasy-section-title">
-                <div>
-                  <h2>{myTeam.name}</h2>
-                  <span>Fantasy Team</span>
-                </div>
-              </div>
-      
               {!editingTeamName ? (
-                <button
-                  className="fantasy-button fantasy-button-secondary"
-                  onClick={() => {
-                    setTeamNameDraft(
-                      myTeam.name
-                    );
-                    setEditingTeamName(true);
-                  }}
-                >
-                  ✎ Change Team Name
-                </button>
-              ) : (
-                <div className="fantasy-team-name-editor">
-                  <input
-                    className="fantasy-team-name-input"
-                    value={teamNameDraft}
-                    maxLength={40}
-                    onChange={e =>
-                      setTeamNameDraft(
-                        e.target.value
-                      )
-                    }
-                    autoFocus
-                  />
-      
-                  <button
-                    className="fantasy-button fantasy-button-primary"
-                    onClick={saveTeamName}
-                    disabled={savingTeamName}
-                  >
-                    {savingTeamName
-                      ? 'Saving...'
-                      : 'Save'}
-                  </button>
-      
+                <div className="fantasy-section-title fantasy-team-name-header">
+                  <div>
+                    <h2>{myTeam.name}</h2>
+                    <span>Fantasy Team</span>
+                  </div>
+            
                   <button
                     className="fantasy-button fantasy-button-secondary"
-                    onClick={() =>
-                      setEditingTeamName(false)
-                    }
+                    onClick={() => {
+                      setTeamNameDraft(myTeam.name);
+                      setEditingTeamName(true);
+                    }}
                   >
-                    Cancel
+                    ✎ Edit
                   </button>
+                </div>
+              ) : (
+                <div className="fantasy-team-name-editing">
+                  <div>
+                    <div className="fantasy-roster-label">
+                      Team Name
+                    </div>
+            
+                    <input
+                      className="fantasy-team-name-input"
+                      value={teamNameDraft}
+                      maxLength={40}
+                      onChange={e =>
+                        setTeamNameDraft(e.target.value)
+                      }
+                      autoFocus
+                    />
+                  </div>
+            
+                  <div className="fantasy-team-name-actions">
+                    <button
+                      className="fantasy-button fantasy-button-primary"
+                      onClick={saveTeamName}
+                      disabled={savingTeamName}
+                    >
+                      {savingTeamName ? 'Saving...' : 'Save'}
+                    </button>
+            
+                    <button
+                      className="fantasy-button fantasy-button-secondary"
+                      onClick={() => setEditingTeamName(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
