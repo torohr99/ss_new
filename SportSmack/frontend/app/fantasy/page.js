@@ -145,37 +145,74 @@ export default function FantasyDashboard() {
     }
   };
 
-  if (loading) return <div className="page-container">Loading...</div>;
+  if (loading) return <div className="fantasy-page">Loading...</div>;
 
   return (
-    <div className="page-container">
-      <div className="feed-header">
-        <h1>SportSmack Fantasy Football</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button className="btn-secondary" onClick={() => setDevOverride(!devOverride)}>
-            Dev Override: {devOverride ? 'ON' : 'OFF'}
+    <div className="fantasy-page">
+      <div className="fantasy-hero">
+        <div className="fantasy-eyebrow">
+          SportSmack Fantasy
+        </div>
+      
+        <h1>
+          Fantasy Football
+        </h1>
+      
+        <div className="fantasy-hero-subtitle">
+          Draft your squad. Manage your roster.
+          Talk your smack.
+        </div>
+      
+        <div className="fantasy-action-row">
+      
+          <button
+            className="fantasy-button fantasy-button-secondary"
+            onClick={() =>
+              setDevOverride(!devOverride)
+            }
+          >
+            🛠 Dev Override:{' '}
+            {devOverride ? 'ON' : 'OFF'}
           </button>
-          <button className="btn-secondary" onClick={async () => {
-            try {
-              await axios.post(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/league/test-bots`, {}, { withCredentials: true });
-              fetchLeagues();
-            } catch (err) { alert('Failed to create test league'); }
-          }}>
-            Create Test League (Bots)
+      
+          <button
+            className="fantasy-button fantasy-button-secondary"
+            onClick={async () => {
+              try {
+                await axios.post(
+                  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/league/test-bots`,
+                  {},
+                  {
+                    withCredentials: true
+                  }
+                );
+      
+                fetchLeagues();
+              } catch (err) {
+                alert(
+                  'Failed to create test league'
+                );
+              }
+            }}
+          >
+            🤖 Test League
           </button>
-          <button className="btn-primary" onClick={seedPlayers}>
-            Seed NFL Players
+      
+          <button
+            className="fantasy-button fantasy-button-primary"
+            onClick={seedPlayers}
+          >
+            🏈 Sync NFL Players
           </button>
+      
           {playerCount !== null && (
             <span
-              style={{
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem'
-              }}
+              className="fantasy-status"
             >
-              Player Pool: {playerCount}
+              {playerCount} Players
             </span>
           )}
+      
         </div>
       </div>
 
