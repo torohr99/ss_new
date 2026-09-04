@@ -254,7 +254,9 @@ export default function DraftRoom({ params }) {
   );
   
   const undraftedPlayers = availablePlayers
-    .filter(p => !draftedPlayerIds.has(p.id))
+    .filter(
+      p => !draftedPlayerIds.has(p.id)
+    )
     .filter(
       p =>
         p.name
@@ -266,6 +268,43 @@ export default function DraftRoom({ params }) {
         p.team
           .toLowerCase()
           .includes(searchQuery.toLowerCase())
+    )
+    .map(player => {
+      const projected =
+        Number(player.projectedPoints);
+  
+      const lastYear =
+        Number(player.lastYearPoints);
+  
+      const hasProjection =
+        Number.isFinite(projected);
+  
+      const hasLastYear =
+        Number.isFinite(lastYear);
+  
+      let bestAvailableScore = 0;
+  
+      if (hasProjection && hasLastYear) {
+        bestAvailableScore =
+          projected * 0.65 +
+          lastYear * 0.35;
+      } else if (hasProjection) {
+        bestAvailableScore =
+          projected;
+      } else if (hasLastYear) {
+        bestAvailableScore =
+          lastYear;
+      }
+  
+      return {
+        ...player,
+        bestAvailableScore
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.bestAvailableScore -
+        a.bestAvailableScore
     );
 
   return (
@@ -496,9 +535,18 @@ export default function DraftRoom({ params }) {
                         fontSize: '1.25rem'
                       }}
                     >
-                      Available Players
+                      Best Available Players
                     </h2>
-      
+                    <div
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.8rem',
+                        marginTop: '0.25rem'
+                      }}
+                    >
+                      Ranked using 65% projected 2026 points + 35% 2025 fantasy points
+                    </div>
+                          
                     <div
                       style={{
                         color:
@@ -631,12 +679,29 @@ export default function DraftRoom({ params }) {
       
                           <th
                             style={{
-                              padding:
-                                '0.9rem',
+                              padding: '0.9rem',
                               textAlign: 'center'
                             }}
                           >
                             Proj
+                          </th>
+                          
+                          <th
+                            style={{
+                              padding: '0.9rem',
+                              textAlign: 'center'
+                            }}
+                          >
+                            2025
+                          </th>
+                          
+                          <th
+                            style={{
+                              padding: '0.9rem',
+                              textAlign: 'center'
+                            }}
+                          >
+                            Best
                           </th>
       
                           <th
@@ -653,8 +718,7 @@ export default function DraftRoom({ params }) {
       
                       <tbody>
                         {undraftedPlayers
-                          .slice(0, 100)
-                          .map(p => {
+                          .map((p, playerIndex) => {
                             const colors =
                               NFL_COLORS[p.team] ||
                               {
@@ -819,6 +883,39 @@ export default function DraftRoom({ params }) {
                                       ).toFixed(
                                         1
                                       )}`
+                                    : '—'}
+                                </td>
+
+                                <td
+                                  style={{
+                                    padding: '0.7rem',
+                                    textAlign: 'center',
+                                    color: 'var(--text-secondary)'
+                                  }}
+                                >
+                                  {p.lastYearPoints != null
+                                    ? Number(
+                                        p.lastYearPoints
+                                      ).toFixed(1)
+                                    : '—'}
+                                </td>
+                                
+                                <td
+                                  style={{
+                                    padding: '0.7rem',
+                                    textAlign: 'center',
+                                    fontWeight:
+                                      playerIndex < 10
+                                        ? '900'
+                                        : '700',
+                                    color:
+                                      playerIndex < 10
+                                        ? '#4ade80'
+                                        : 'inherit'
+                                  }}
+                                >
+                                  {p.bestAvailableScore > 0
+                                    ? p.bestAvailableScore.toFixed(1)
                                     : '—'}
                                 </td>
       
