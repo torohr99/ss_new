@@ -718,6 +718,76 @@ router.get(
   }
 );
 
+router.patch(
+  '/team/:id/name',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const teamId = Number(req.params.id);
+      const name = String(
+        req.body.name || ''
+      ).trim();
+
+      if (!Number.isInteger(teamId)) {
+        return res.status(400).json({
+          error: 'Invalid team ID'
+        });
+      }
+
+      if (
+        !name ||
+        name.length < 2 ||
+        name.length > 40
+      ) {
+        return res.status(400).json({
+          error:
+            'Team name must be between 2 and 40 characters.'
+        });
+      }
+
+      const team =
+        await prisma.fantasyTeam.findUnique({
+          where: {
+            id: teamId
+          }
+        });
+
+      if (!team) {
+        return res.status(404).json({
+          error: 'Team not found'
+        });
+      }
+
+      if (team.userId !== req.user.id) {
+        return res.status(403).json({
+          error: 'Not your team'
+        });
+      }
+
+      const updated =
+        await prisma.fantasyTeam.update({
+          where: {
+            id: teamId
+          },
+          data: {
+            name
+          }
+        });
+
+      res.json(updated);
+    } catch (err) {
+      console.error(
+        'Fantasy team name update error:',
+        err
+      );
+
+      res.status(500).json({
+        error: 'Failed to update team name'
+      });
+    }
+  }
+);
+
 router.post(
   '/team/:id/roster',
   authenticateToken,
