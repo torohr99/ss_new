@@ -181,7 +181,7 @@ export default function LeaguePage({ params }) {
 
   if (loading) {
     return (
-      <div className="page-container">
+      <div className="page-container fantasy-page">
         Loading fantasy league...
       </div>
     );
@@ -189,7 +189,7 @@ export default function LeaguePage({ params }) {
 
   if (!league || !currentUser) {
     return (
-      <div className="page-container">
+      <div className="page-container fantasy-page">
         League not found.
       </div>
     );
@@ -203,7 +203,7 @@ export default function LeaguePage({ params }) {
 
   if (!myTeam) {
     return (
-      <div className="page-container">
+      <div className="page-container fantasy-page">
         You are not a member of this league.
       </div>
     );
@@ -424,7 +424,7 @@ export default function LeaguePage({ params }) {
   ];
 
   return (
-    <div className="page-container">
+    <div className="page-container fantasy-page">
 
       <div className="fantasy-hero">
         <div className="fantasy-eyebrow">
