@@ -202,7 +202,7 @@ export default function FantasyDashboard() {
             className="fantasy-button fantasy-button-primary"
             onClick={seedPlayers}
           >
-            🏈 Sync NFL Players
+            🔄 Refresh NFL Players
           </button>
       
           {playerCount !== null && (
@@ -224,10 +224,19 @@ export default function FantasyDashboard() {
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+        <div className="fantasy-dashboard-grid">
           
-          <div className="profile-section">
-            <h2 className="section-title">My Leagues</h2>
+          <div className="fantasy-card fantasy-section fantasy-dashboard-card">
+            <div className="fantasy-section-title">
+              <div>
+                <h2>My Leagues</h2>
+                <span>Your active fantasy leagues</span>
+              </div>
+          
+              <span className="fantasy-status">
+                {leagues.length} League{leagues.length === 1 ? '' : 's'}
+              </span>
+            </div>
             {leagues.length === 0 ? (
               <p style={{
                 color: 'var(--text-secondary)'
@@ -243,7 +252,7 @@ export default function FantasyDashboard() {
                 {leagues.map(l => (
                   <div
                     key={l.id}
-                    className="post-card"
+                    className="fantasy-league-card"
                     style={{
                       cursor: 'pointer'
                     }}
@@ -253,76 +262,83 @@ export default function FantasyDashboard() {
                       )
                     }
                   >
-                    <h3>
-                      {l.name}
-                    </h3>
-            
-                    <div style={{
-                      color:
-                        'var(--text-secondary)'
-                    }}>
-                      {l.status}
-                    </div>
-            
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: '0.75rem',
-                        marginTop: '0.75rem'
-                      }}
-                    >
-                      <button
-                        className="btn-primary"
-                        onClick={e => {
-                          e.stopPropagation();
-                    
-                          router.push(
-                            `/fantasy/league/${l.id}`
-                          );
-                        }}
-                      >
-                        Enter League
-                      </button>
-                    
-                      <button
-                        className="btn-secondary"
-                        onClick={e => {
-                          e.stopPropagation();
-                    
-                          deleteLeague(l.id, l.name);
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <h3>{l.name}</h3>
+
+                      <div className="fantasy-league-card-meta">
+                        {l.status}
+                      </div>
+                      
+                      <div className="fantasy-league-card-actions">
+                        <button
+                          className="fantasy-button fantasy-button-primary"
+                          onClick={e => {
+                            e.stopPropagation();
+                      
+                            router.push(
+                              `/fantasy/league/${l.id}`
+                            );
+                          }}
+                        >
+                          Enter League
+                        </button>
+                      
+                        <button
+                          className="fantasy-button fantasy-button-secondary"
+                          onClick={e => {
+                            e.stopPropagation();
+                      
+                            deleteLeague(l.id, l.name);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            <div className="profile-section">
-              <h2 className="section-title">Create League</h2>
-              <form onSubmit={createLeague} style={{ display: 'flex', gap: '1rem' }}>
+          <div className="fantasy-dashboard-column">
+            <div className="fantasy-card fantasy-section fantasy-dashboard-card">
+              <div className="fantasy-section-title">
+                <div>
+                  <h2>Create League</h2>
+                  <span>Start your own fantasy league</span>
+                </div>
+              </div>
+            
+              <form
+                onSubmit={createLeague}
+                className="fantasy-form"
+              >
                 <input 
                   type="text" 
-                  className="auth-input" 
+                  className="fantasy-search" 
                   placeholder="League Name" 
                   value={newLeagueName}
                   onChange={(e) => setNewLeagueName(e.target.value)}
                   style={{ flex: 1, margin: 0 }}
                 />
-                <button type="submit" className="btn-primary">Create</button>
+                <button type="submit" className="fantasy-button fantasy-button-primary">Create</button>
               </form>
             </div>
 
-            <div className="profile-section">
-              <h2 className="section-title">Join League</h2>
-              <form onSubmit={joinLeague} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="fantasy-card fantasy-section fantasy-dashboard-card">
+              <div className="fantasy-section-title">
+                <div>
+                  <h2>Join League</h2>
+                  <span>Enter a league using its ID</span>
+                </div>
+              </div>
+            
+              <form
+                onSubmit={joinLeague}
+                className="fantasy-form-column"
+              >
                 <input 
                   type="text" 
-                  className="auth-input" 
+                  className="fantasy-search" 
                   placeholder="League ID" 
                   value={joinLeagueId}
                   onChange={(e) => setJoinLeagueId(e.target.value)}
@@ -336,7 +352,7 @@ export default function FantasyDashboard() {
                   onChange={(e) => setJoinTeamName(e.target.value)}
                   style={{ margin: 0 }}
                 />
-                <button type="submit" className="btn-primary">Join</button>
+                <button type="submit" className="fantasy-button fantasy-button-primary">Join</button>
               </form>
             </div>
           </div>
