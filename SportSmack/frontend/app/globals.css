@@ -1594,3 +1594,459 @@ body {
   height: 48px;
   border-radius: 50%;
 }
+
+/* =========================================================
+   FANTASY FOOTBALL - MODERN UI
+========================================================= */
+
+.fantasy-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.fantasy-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 2rem 2.25rem;
+  margin-bottom: 1.5rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      circle at 85% 20%,
+      rgba(255, 51, 51, 0.25),
+      transparent 35%
+    ),
+    linear-gradient(
+      135deg,
+      #18181b,
+      #09090b
+    );
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.35);
+}
+
+.fantasy-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      120deg,
+      transparent 30%,
+      rgba(255,255,255,0.04),
+      transparent 70%
+    );
+}
+
+.fantasy-eyebrow {
+  color: #ff5555;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 0.5rem;
+}
+
+.fantasy-hero h1 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1;
+  margin: 0;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.fantasy-hero-subtitle {
+  margin-top: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.fantasy-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.fantasy-button {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 0.7rem 1.1rem;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.fantasy-button:hover {
+  transform: translateY(-2px);
+}
+
+.fantasy-button-primary {
+  background: linear-gradient(
+    135deg,
+    #ff3333,
+    #c90000
+  );
+  box-shadow:
+    0 8px 24px rgba(255,51,51,0.22);
+}
+
+.fantasy-button-primary:hover {
+  box-shadow:
+    0 12px 30px rgba(255,51,51,0.32);
+}
+
+.fantasy-button-secondary {
+  background: rgba(255,255,255,0.06);
+}
+
+.fantasy-button-secondary:hover {
+  background: rgba(255,255,255,0.11);
+}
+
+.fantasy-card {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.055),
+      rgba(255,255,255,0.025)
+    );
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  box-shadow:
+    0 12px 40px rgba(0,0,0,0.22);
+  backdrop-filter: blur(14px);
+}
+
+.fantasy-section {
+  padding: 1.5rem;
+}
+
+.fantasy-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.fantasy-section-title h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.fantasy-section-title span {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* League navigation */
+
+.fantasy-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.fantasy-tab {
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fantasy-tab:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+}
+
+.fantasy-tab.active {
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    rgba(255,51,51,0.95),
+    rgba(180,0,0,0.95)
+  );
+  box-shadow:
+    0 5px 18px rgba(255,51,51,0.2);
+}
+
+/* Team cards */
+
+.fantasy-league-card {
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.fantasy-league-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,51,51,0.35);
+  background: rgba(255,255,255,0.055);
+}
+
+.fantasy-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(74,222,128,0.1);
+  border: 1px solid rgba(74,222,128,0.25);
+  color: #4ade80;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* My Team */
+
+.fantasy-team-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 2fr)
+    minmax(260px, 0.85fr);
+  gap: 1.5rem;
+}
+
+.fantasy-roster-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.fantasy-player-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 220px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(
+      160deg,
+      rgba(255,255,255,0.07),
+      rgba(255,255,255,0.025)
+    );
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.fantasy-player-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255,51,51,0.35);
+  box-shadow:
+    0 16px 35px rgba(0,0,0,0.3);
+}
+
+.fantasy-player-image {
+  width: 100%;
+  height: 145px;
+  object-fit: contain;
+  object-position: center bottom;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,0.03),
+      rgba(0,0,0,0.35)
+    );
+}
+
+.fantasy-player-info {
+  padding: 0.9rem 1rem 1rem;
+}
+
+.fantasy-player-name {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.fantasy-player-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.fantasy-player-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.fantasy-roster-label {
+  display: inline-flex;
+  margin-bottom: 0.75rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(74,222,128,0.1);
+  color: #4ade80;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fantasy-roster-label.bench {
+  background: rgba(255,255,255,0.07);
+  color: var(--text-secondary);
+}
+
+/* Team summary */
+
+.fantasy-stat-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.fantasy-stat {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.fantasy-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fantasy-stat-value {
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+/* Team name editor */
+
+.fantasy-team-name-editor {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.fantasy-team-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.3);
+  color: #fff;
+  outline: none;
+}
+
+.fantasy-team-name-input:focus {
+  border-color: #ff3333;
+  box-shadow: 0 0 0 3px rgba(255,51,51,0.12);
+}
+
+/* Search fields */
+
+.fantasy-search {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.25);
+  color: #fff;
+  outline: none;
+}
+
+.fantasy-search::placeholder {
+  color: rgba(255,255,255,0.55);
+}
+
+.fantasy-search:focus {
+  border-color: #ff3333;
+  box-shadow: 0 0 0 3px rgba(255,51,51,0.1);
+}
+
+/* Generic fantasy list rows */
+
+.fantasy-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.fantasy-list-row:last-child {
+  border-bottom: none;
+}
+
+.fantasy-list-row:hover {
+  background: rgba(255,255,255,0.025);
+}
+
+/* Responsive */
+
+@media (max-width: 1000px) {
+  .fantasy-team-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .fantasy-page {
+    padding: 1rem;
+  }
+
+  .fantasy-hero {
+    padding: 1.5rem;
+  }
+
+  .fantasy-roster-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 500px) {
+  .fantasy-roster-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fantasy-action-row {
+    flex-direction: column;
+  }
+
+  .fantasy-button {
+    width: 100%;
+  }
+}
