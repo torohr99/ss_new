@@ -55,77 +55,84 @@ export default function DraftRoom({ params }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('players'); // 'players', 'board'
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const userRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/auth/me`, { withCredentials: true });
-        setCurrentUser(userRes.data);
-
-        const leagueRes = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/fantasy/league/${id}`, { withCredentials: true });
-        setLeague(leagueRes.data);
-
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL ||
-          'http://localhost:5000';
-        
-        let playersRes = await axios.get(
-          `${apiUrl}/api/fantasy/players`,
-          { withCredentials: true }
-        );
-        
-        let players = Array.isArray(playersRes.data)
-          ? playersRes.data
-          : [];
-        
-        // If the player pool is still empty, explicitly seed it
-        // and fetch it again.
-        if (players.length === 0) {
-          console.log(
-            'Fantasy player pool is empty. Starting seed...'
-          );
-        
-          await axios.post(
-            `${apiUrl}/api/fantasy/seed`,
-            {},
+    useEffect(() => {
+      const fetchData = async () => {
+        try {
+          const apiUrl =
+            process.env.NEXT_PUBLIC_API_URL ||
+            'http://localhost:5000';
+  
+          const userRes = await axios.get(
+            `${apiUrl}/api/auth/me`,
             { withCredentials: true }
           );
-        
-          playersRes = await axios.get(
+  
+          setCurrentUser(userRes.data);
+  
+          const leagueRes = await axios.get(
+            `${apiUrl}/api/fantasy/league/${id}`,
+            { withCredentials: true }
+          );
+  
+          setLeague(leagueRes.data);
+  
+          let playersRes = await axios.get(
             `${apiUrl}/api/fantasy/players`,
             { withCredentials: true }
           );
-        
-          players = Array.isArray(playersRes.data)
+  
+          let players = Array.isArray(playersRes.data)
             ? playersRes.data
             : [];
-        }
-        
-        console.log(
-          'Fantasy players loaded:',
-          players.length
-        );
-        
-        setAvailablePlayers(players);
-        
-        if (players.length === 0) {
-          throw new Error(
-            'The NFL fantasy player pool is empty after seeding.'
+  
+          // If the player database is empty, seed it and try again.
+          if (players.length === 0) {
+            console.log(
+              'Fantasy player pool is empty. Starting seed...'
+            );
+  
+            await axios.post(
+              `${apiUrl}/api/fantasy/seed`,
+              {},
+              { withCredentials: true }
+            );
+  
+            playersRes = await axios.get(
+              `${apiUrl}/api/fantasy/players`,
+              { withCredentials: true }
+            );
+  
+            players = Array.isArray(playersRes.data)
+              ? playersRes.data
+              : [];
+          }
+  
+          console.log(
+            'Fantasy players loaded:',
+            players.length
           );
-        }
-        
+  
+          setAvailablePlayers(players);
+  
+          if (players.length === 0) {
+            console.warn(
+              'Fantasy player pool is still empty after seeding.'
+            );
+          }
         } catch (err) {
           console.error(
             'Failed to load fantasy draft data:',
-            err.response?.data || err.message || err
+            err.response?.data ||
+              err.message ||
+              err
           );
-        
+  
           setAvailablePlayers([]);
         }
-        
-        }
-    };
-    fetchData();
-  }, [id]);
+      };
+  
+      fetchData();
+    }, [id]);
 
   useEffect(() => {
     const token = localStorage.getItem('smack_token');
