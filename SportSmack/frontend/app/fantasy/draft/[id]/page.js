@@ -114,25 +114,25 @@ export default function DraftRoom({ params }) {
   
           setAvailablePlayers(players);
   
-          if (players.length === 0) {
-            console.warn(
-              'Fantasy player pool is still empty after seeding.'
-            );
-          }
-        } catch (err) {
-          console.error(
-            'Failed to load fantasy draft data:',
-            err.response?.data ||
-              err.message ||
-              err
-          );
-  
-          setAvailablePlayers([]);
-        }
-      };
-  
-      fetchData();
-    }, [id]);
+                  if (players.length === 0) {
+                    throw new Error(
+                      'The NFL fantasy player pool is empty after seeding.'
+                    );
+                  }
+                } catch (err) {
+                  console.error(
+                    'Failed to load fantasy draft data:',
+                    err.response?.data ||
+                      err.message ||
+                      err
+                  );
+          
+                  setAvailablePlayers([]);
+                }
+              };
+          
+              fetchData();
+            }, [id]);
 
   useEffect(() => {
     const token = localStorage.getItem('smack_token');
