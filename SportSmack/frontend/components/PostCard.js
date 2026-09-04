@@ -3,6 +3,26 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+const getAuthHeaders = () => {
+  if (
+    typeof window === 'undefined'
+  ) {
+    return {};
+  }
+
+  const token =
+    localStorage.getItem(
+      'smack_token'
+    );
+
+  return token
+    ? {
+        Authorization:
+          `Bearer ${token}`
+      }
+    : {};
+};
+
 export default function PostCard({ post }) {
   const [isLiked, setIsLiked] = useState(post.hasLiked);
   const [likesCount, setLikesCount] = useState(post._count.likes);
@@ -37,9 +57,14 @@ export default function PostCard({ post }) {
   const fetchComments = async () => {
     setLoadingComments(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/comments`, {
-        credentials: 'include'
-      });
+      const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/like`,
+  {
+    method: 'POST',
+    credentials: 'include',
+    headers: getAuthHeaders()
+  }
+);
       if (res.ok) {
         setComments(await res.json());
       }
@@ -64,9 +89,14 @@ export default function PostCard({ post }) {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/comment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type':
+            'application/json',
+          ...getAuthHeaders()
+        },
         body: JSON.stringify({ content: newComment }),
-        credentials: 'include'
+        credentials: 'include',
+        headers: getAuthHeaders()
       });
 
       if (res.ok) {
