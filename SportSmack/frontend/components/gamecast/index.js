@@ -127,7 +127,7 @@ export function LiveStats({ statsData }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {statCategory.athletes && statCategory.athletes.slice(0, 5).map((athleteData, aIdx) => (
+                        {statCategory.athletes && statCategory.athletes.map((athleteData, aIdx) => (
                           <tr key={aIdx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                             <td style={{ padding: '0.4rem 0.2rem', fontWeight: 'bold' }}>{athleteData.athlete?.displayName}</td>
                             {athleteData.stats && athleteData.stats.map((statVal, sIdx) => (
