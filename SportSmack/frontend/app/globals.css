@@ -2050,3 +2050,461 @@ body {
     width: 100%;
   }
 }
+
+/* =========================================================
+   FANTASY FOOTBALL - GLOBAL MODERNIZATION
+========================================================= */
+
+.fantasy-page .profile-section,
+.page-container .fantasy-hero ~ .profile-section {
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.055),
+      rgba(255,255,255,0.025)
+    );
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+  backdrop-filter: blur(14px);
+  padding: 1.5rem;
+}
+
+.fantasy-page .section-title,
+.page-container .fantasy-hero ~ .profile-section .section-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-bottom: 1.25rem;
+}
+
+/* Fantasy inputs */
+
+.fantasy-page .auth-input,
+.page-container .fantasy-hero ~ .profile-section .auth-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.28);
+  color: #fff;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.fantasy-page .auth-input::placeholder,
+.page-container .fantasy-hero ~ .profile-section .auth-input::placeholder {
+  color: rgba(255,255,255,0.5);
+}
+
+.fantasy-page .auth-input:focus,
+.page-container .fantasy-hero ~ .profile-section .auth-input:focus {
+  border-color: #ff3333;
+  box-shadow: 0 0 0 3px rgba(255,51,51,0.12);
+  background: rgba(0,0,0,0.38);
+}
+
+/* Fantasy generic buttons */
+
+.fantasy-page .btn-primary,
+.fantasy-page .btn-secondary,
+.page-container .fantasy-hero ~ .btn-primary,
+.page-container .fantasy-hero ~ .btn-secondary {
+  border-radius: 12px;
+  padding: 0.7rem 1.1rem;
+  font-weight: 800;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.fantasy-page .btn-primary,
+.page-container .fantasy-hero ~ .btn-primary {
+  background: linear-gradient(
+    135deg,
+    #ff3333,
+    #c90000
+  );
+  color: #fff;
+  box-shadow:
+    0 8px 24px rgba(255,51,51,0.2);
+}
+
+.fantasy-page .btn-primary:hover,
+.page-container .fantasy-hero ~ .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 30px rgba(255,51,51,0.32);
+}
+
+.fantasy-page .btn-secondary,
+.page-container .fantasy-hero ~ .btn-secondary {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+}
+
+.fantasy-page .btn-secondary:hover,
+.page-container .fantasy-hero ~ .btn-secondary:hover {
+  transform: translateY(-2px);
+  background: rgba(255,255,255,0.11);
+}
+
+/* Fantasy tables / list rows */
+
+.fantasy-page .fantasy-list-row,
+.fantasy-page .profile-section > div[style*="borderBottom"] {
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.fantasy-page .fantasy-list-row:hover,
+.fantasy-page .profile-section > div[style*="borderBottom"]:hover {
+  background: rgba(255,255,255,0.035);
+}
+
+/* Standings */
+
+.fantasy-standings-card {
+  overflow: hidden;
+}
+
+.fantasy-standings-header,
+.fantasy-standings-row {
+  display: grid;
+  grid-template-columns:
+    50px
+    minmax(180px, 1fr)
+    70px
+    70px
+    70px
+    100px;
+  gap: 1rem;
+  align-items: center;
+}
+
+.fantasy-standings-header {
+  padding: 0.8rem 1rem;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fantasy-standings-row {
+  padding: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.2s ease;
+}
+
+.fantasy-standings-row:hover {
+  background: rgba(255,255,255,0.035);
+}
+
+.fantasy-rank {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--text-secondary);
+}
+
+.fantasy-team-cell {
+  font-weight: 800;
+}
+
+.fantasy-record {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.fantasy-points {
+  text-align: right;
+  font-weight: 900;
+}
+
+/* Matchups */
+
+.fantasy-matchup-card {
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.055),
+      rgba(255,255,255,0.02)
+    );
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.fantasy-matchup-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,51,51,0.3);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+}
+
+.fantasy-matchup-teams {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fantasy-matchup-team {
+  padding: 1rem;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.fantasy-matchup-team:last-child {
+  text-align: right;
+}
+
+.fantasy-matchup-team-name {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.fantasy-matchup-score {
+  margin-top: 0.3rem;
+  font-size: 1.6rem;
+  font-weight: 900;
+}
+
+.fantasy-vs {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+/* Transactions */
+
+.fantasy-transaction-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.fantasy-transaction-row:last-child {
+  border-bottom: none;
+}
+
+.fantasy-transaction-type {
+  display: inline-flex;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255,51,51,0.1);
+  border: 1px solid rgba(255,51,51,0.2);
+  color: #ff7777;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+/* Trades */
+
+.fantasy-trade-card {
+  padding: 1.25rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(255,255,255,0.055),
+      rgba(255,255,255,0.02)
+    );
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+.fantasy-trade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fantasy-trade-player {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.035);
+}
+
+.fantasy-trade-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Waivers */
+
+.fantasy-waiver-row {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.fantasy-waiver-row:hover {
+  background: rgba(255,255,255,0.035);
+}
+
+.fantasy-waiver-player {
+  font-weight: 800;
+}
+
+.fantasy-waiver-meta {
+  margin-top: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+/* Team name editor */
+
+.fantasy-team-name-header {
+  margin-bottom: 0;
+}
+
+.fantasy-team-name-editing {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.fantasy-team-name-editing > div:first-child {
+  flex: 1;
+}
+
+.fantasy-team-name-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.fantasy-team-name-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Dashboard */
+
+.fantasy-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.fantasy-dashboard-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.fantasy-dashboard-card {
+  padding: 1.5rem;
+}
+
+.fantasy-dashboard-card h2 {
+  margin-top: 0;
+}
+
+.fantasy-league-card {
+  cursor: pointer;
+}
+
+.fantasy-league-card h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.fantasy-league-card-meta {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.fantasy-league-card-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.fantasy-form {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.fantasy-form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.fantasy-instructions {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.fantasy-instructions-title {
+  font-weight: 800;
+  margin-bottom: 0.35rem;
+}
+
+.fantasy-instructions-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 800px) {
+  .fantasy-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fantasy-matchup-teams {
+    grid-template-columns: 1fr;
+  }
+
+  .fantasy-matchup-team:last-child {
+    text-align: left;
+  }
+
+  .fantasy-vs {
+    text-align: center;
+  }
+
+  .fantasy-team-name-editing {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fantasy-team-name-actions {
+    width: 100%;
+  }
+
+  .fantasy-team-name-actions .fantasy-button {
+    flex: 1;
+  }
+}
