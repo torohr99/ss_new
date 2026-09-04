@@ -121,7 +121,9 @@ export default function ForumsPage() {
                     style={{
                       padding: '0.75rem 1.5rem',
                       background: activeCategory.id === cat.id ? 'var(--text-primary)' : 'var(--glass-bg)',
-                      color: activeCategory.id === cat.id ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                      color: activeCategory.id === cat.id
+                        ? '#000000'
+                        : 'var(--text-secondary)',
                       border: '1px solid var(--border-color)',
                       borderRadius: '50px',
                       cursor: 'pointer',
