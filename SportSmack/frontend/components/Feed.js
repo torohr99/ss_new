@@ -18,37 +18,121 @@ export default function Feed() {
 
   const fetchFeed = async (cursor = null) => {
     try {
-      if (cursor) setLoadingMore(true);
-      else setLoading(true);
-
-      const url = cursor 
-        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts?cursor=${cursor}`
-        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts`;
-
-      const [postsRes, newsRes] = await Promise.all([
-        fetch(url, { credentials: 'include' }),
-        !cursor ? fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/users/feed/news`, { credentials: 'include' }) : Promise.resolve(null)
-      ]);
-
-      let postsData = { posts: [], nextCursor: null };
-      let news = [];
-
-      if (postsRes.ok) postsData = await postsRes.json();
-      if (newsRes && newsRes.ok) news = await newsRes.json();
-
-      const formattedPosts = postsData.posts.map(p => ({ ...p, feedType: 'post', sortDate: new Date(p.created_at || p.createdAt) }));
-      const formattedNews = news.map(n => ({ ...n, feedType: 'news', sortDate: new Date(n.published) }));
-
-      setNextCursor(postsData.nextCursor);
-
       if (cursor) {
-        setFeedItems(prev => [...prev, ...formattedPosts].sort((a, b) => b.sortDate - a.sortDate));
+        setLoadingMore(true);
       } else {
-        const combined = [...formattedPosts, ...formattedNews].sort((a, b) => b.sortDate - a.sortDate);
+        setLoading(true);
+      }
+  
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem(
+              'smack_token'
+            )
+          : null;
+  
+      const url = cursor
+        ? `${apiUrl}/api/posts?cursor=${cursor}`
+        : `${apiUrl}/api/posts`;
+  
+      const authHeaders = token
+        ? {
+            Authorization: `Bearer ${token}`
+          }
+        : {};
+  
+      const [postsRes, newsRes] =
+        await Promise.all([
+          fetch(url, {
+            credentials: 'include',
+            headers: authHeaders
+          }),
+  
+          !cursor
+            ? fetch(
+                `${apiUrl}/api/users/feed/news`,
+                {
+                  credentials: 'include',
+                  headers: authHeaders
+                }
+              )
+            : Promise.resolve(null)
+        ]);
+  
+      let postsData = {
+        posts: [],
+        nextCursor: null
+      };
+  
+      let news = [];
+  
+      if (postsRes.ok) {
+        postsData =
+          await postsRes.json();
+      } else {
+        console.error(
+          'Failed to fetch posts:',
+          postsRes.status
+        );
+      }
+  
+      if (newsRes && newsRes.ok) {
+        news = await newsRes.json();
+      }
+  
+      const formattedPosts =
+        (postsData.posts || []).map(p => ({
+          ...p,
+          feedType: 'post',
+          sortDate: new Date(
+            p.created_at ||
+              p.createdAt
+          )
+        }));
+  
+      const formattedNews =
+        news.map(n => ({
+          ...n,
+          feedType: 'news',
+          sortDate: new Date(
+            n.published
+          )
+        }));
+  
+      setNextCursor(
+        postsData.nextCursor
+      );
+  
+      if (cursor) {
+        setFeedItems(prev =>
+          [
+            ...prev,
+            ...formattedPosts
+          ].sort(
+            (a, b) =>
+              b.sortDate - a.sortDate
+          )
+        );
+      } else {
+        const combined = [
+          ...formattedPosts,
+          ...formattedNews
+        ].sort(
+          (a, b) =>
+            b.sortDate - a.sortDate
+        );
+  
         setFeedItems(combined);
       }
     } catch (err) {
-      console.error('Failed to fetch feed', err);
+      console.error(
+        'Failed to fetch feed',
+        err
+      );
     } finally {
       setLoading(false);
       setLoadingMore(false);
