@@ -132,10 +132,20 @@ export default function Feed() {
   };
 
   const filteredItems = feedItems.filter(item => {
-    if (filterType === 'all') return true;
-    return item.feedType === filterType;
+    if (filterType === 'all') {
+      return true;
+    }
+  
+    if (filterType === 'posts') {
+      return item.feedType === 'post';
+    }
+  
+    if (filterType === 'news') {
+      return item.feedType === 'news';
+    }
+  
+    return false;
   });
-
   return (
     <div className="feed-container">
       <h2 className="feed-header">Latest Smack</h2>
