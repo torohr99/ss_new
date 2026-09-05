@@ -125,6 +125,121 @@ const sendVerificationEmail = async (email, verificationToken) => {
   return info;
 };
 
+const sendPasswordResetEmail = async (
+  email,
+  resetToken
+) => {
+  const requiredVariables = [
+    'SMTP_HOST',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+    'FRONTEND_URL'
+  ];
+
+  const missingVariables =
+    requiredVariables.filter(
+      variable => !process.env[variable]
+    );
+
+  if (missingVariables.length > 0) {
+    throw new Error(
+      `Missing required email environment variables: ${missingVariables.join(', ')}`
+    );
+  }
+
+  const frontendUrl =
+    process.env.FRONTEND_URL.replace(
+      /\/$/,
+      ''
+    );
+
+  const resetLink =
+    `${frontendUrl}/reset-password?token=` +
+    encodeURIComponent(resetToken);
+
+  const transporter =
+    nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(
+        process.env.SMTP_PORT || 587
+      ),
+      secure:
+        process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+  await transporter.verify();
+
+  const info =
+    await transporter.sendMail({
+      from:
+        `"SportSmack" <${process.env.SMTP_FROM}>`,
+      to: email,
+      subject:
+        'Reset your SportSmack password',
+
+      text:
+        `We received a request to reset your SportSmack password.\n\n` +
+        `Reset your password here:\n\n` +
+        `${resetLink}\n\n` +
+        `This link expires in 1 hour.\n\n` +
+        `If you did not request a password reset, you can ignore this email.`,
+
+      html: `
+        <div
+          style="
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+          "
+        >
+          <h2>Reset Your SportSmack Password</h2>
+
+          <p>
+            We received a request to reset your
+            SportSmack password.
+          </p>
+
+          <p style="margin: 30px 0;">
+            <a
+              href="${resetLink}"
+              style="
+                display: inline-block;
+                padding: 12px 24px;
+                background-color: #2563eb;
+                color: #ffffff;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: bold;
+              "
+            >
+              Reset My Password
+            </a>
+          </p>
+
+          <p>
+            This link expires in 1 hour.
+          </p>
+
+          <p>
+            If you did not request a password reset,
+            you can safely ignore this email.
+          </p>
+        </div>
+      `
+    });
+
+  console.log(
+    `Password reset email sent to ${email}.`
+  );
+
+  return info;
+};
+
 // ------------------------------------------------------------
 // REGISTER
 // ------------------------------------------------------------
@@ -408,6 +523,224 @@ router.post('/login', async (req, res) => {
     });
   }
 });
+
+// ------------------------------------------------------------
+// FORGOT PASSWORD
+// ------------------------------------------------------------
+
+router.post(
+  '/forgot-password',
+  async (req, res) => {
+    try {
+      const email =
+        typeof req.body.email === 'string'
+          ? req.body.email
+              .trim()
+              .toLowerCase()
+          : '';
+
+      /*
+       * Always return the same message whether or not
+       * the account exists. This prevents account
+       * enumeration.
+       */
+      const genericResponse = {
+        success: true,
+        message:
+          'If an account exists for that email, a password reset link has been sent.'
+      };
+
+      if (!email) {
+        return res.json(
+          genericResponse
+        );
+      }
+
+      const user =
+        await prisma.user.findUnique({
+          where: { email }
+        });
+
+      if (!user) {
+        return res.json(
+          genericResponse
+        );
+      }
+
+      const resetToken =
+        crypto
+          .randomBytes(32)
+          .toString('hex');
+
+      const resetExpires =
+        new Date(
+          Date.now() +
+            60 * 60 * 1000
+        );
+
+      await prisma.user.update({
+        where: {
+          id: user.id
+        },
+
+        data: {
+          resetPasswordToken:
+            resetToken,
+
+          resetPasswordExpires:
+            resetExpires
+        }
+      });
+
+      try {
+        await sendPasswordResetEmail(
+          user.email,
+          resetToken
+        );
+      } catch (emailError) {
+        console.error(
+          'PASSWORD RESET EMAIL ERROR:',
+          emailError
+        );
+
+        /*
+         * Invalidate the token if the email could
+         * not be sent.
+         */
+        await prisma.user.update({
+          where: {
+            id: user.id
+          },
+
+          data: {
+            resetPasswordToken:
+              null,
+
+            resetPasswordExpires:
+              null
+          }
+        });
+
+        return res.status(500).json({
+          success: false,
+          message:
+            'We could not send the password reset email. Please try again later.'
+        });
+      }
+
+      return res.json(
+        genericResponse
+      );
+
+    } catch (error) {
+      console.error(
+        'Forgot password error:',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          'Unable to process password reset request.'
+      });
+    }
+  }
+);
+
+// ------------------------------------------------------------
+// RESET PASSWORD
+// ------------------------------------------------------------
+
+router.post(
+  '/reset-password',
+  async (req, res) => {
+    try {
+      const token =
+        typeof req.body.token === 'string'
+          ? req.body.token.trim()
+          : '';
+
+      const password =
+        typeof req.body.password === 'string'
+          ? req.body.password
+          : '';
+
+      if (!token || !password) {
+        return res.status(400).json({
+          message:
+            'Reset token and new password are required.'
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({
+          message:
+            'Password must be at least 8 characters long.'
+        });
+      }
+
+      const user =
+        await prisma.user.findFirst({
+          where: {
+            resetPasswordToken: token,
+            resetPasswordExpires: {
+              gt: new Date()
+            }
+          }
+        });
+
+      if (!user) {
+        return res.status(400).json({
+          message:
+            'This password reset link is invalid or has expired.'
+        });
+      }
+
+      const salt =
+        await bcrypt.genSalt(10);
+
+      const passwordHash =
+        await bcrypt.hash(
+          password,
+          salt
+        );
+
+      await prisma.user.update({
+        where: {
+          id: user.id
+        },
+
+        data: {
+          password_hash:
+            passwordHash,
+
+          resetPasswordToken:
+            null,
+
+          resetPasswordExpires:
+            null
+        }
+      });
+
+      return res.json({
+        success: true,
+        message:
+          'Your password has been reset successfully.'
+      });
+
+    } catch (error) {
+      console.error(
+        'Reset password error:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Unable to reset password.'
+      });
+    }
+  }
+);
 
 // ------------------------------------------------------------
 // LOGOUT
