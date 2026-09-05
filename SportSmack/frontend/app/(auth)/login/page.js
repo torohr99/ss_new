@@ -46,6 +46,26 @@ export default function Login() {
               required
             />
           </div>
+
+          <div
+            style={{
+              textAlign: 'right',
+              marginTop: '-0.5rem',
+              marginBottom: '0.75rem'
+            }}
+          >
+            <Link
+              href="/reset-password"
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--primary-color)',
+                textDecoration: 'none'
+              }}
+            >
+              Forgot password?
+            </Link>
+          </div>
+                
           <button type="submit" className="auth-button">Login</button>
         </form>
         <p className="auth-link">
