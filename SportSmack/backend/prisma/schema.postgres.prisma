@@ -39,6 +39,9 @@ model User {
   // Profile enhancements
   predictions_total Int @default(0)
   predictions_won   Int @default(0)
+
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
 }
 
 model Notification {
