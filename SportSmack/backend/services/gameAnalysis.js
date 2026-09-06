@@ -157,7 +157,12 @@ async function buildGameContext(league, gameId) {
         team => String(team.id) === String(awayTeam.id)
     );
 
-    const [homeRecentRaw, awayRecentRaw] = await Promise.all([
+    const [
+        homeRecentRaw,
+        awayRecentRaw,
+        homeNewsRaw,
+        awayNewsRaw
+    ] = await Promise.all([
         sportsApi.getRecentTeamGames(
             mapping.sport,
             mapping.league,
@@ -169,6 +174,16 @@ async function buildGameContext(league, gameId) {
             mapping.league,
             awayTeam.id,
             5
+        ),
+        sportsApi.getTeamNews(
+            mapping.sport,
+            mapping.league,
+            homeTeam.id
+        ),
+        sportsApi.getTeamNews(
+            mapping.sport,
+            mapping.league,
+            awayTeam.id
         )
     ]);
 
@@ -177,79 +192,194 @@ async function buildGameContext(league, gameId) {
             id: gameId,
             league,
             sport: mapping.sport,
-            name: summary.header.competitions[0].type?.text
-                ? summary.header.competitions[0].type.text
-                : `${awayTeam.name} at ${homeTeam.name}`,
-            date: competition.date || summary.header.date || null,
-            status: competition.status?.type?.state || 'unknown',
-            statusDetail: competition.status?.type?.shortDetail || null,
+            name:
+                summary.header.competitions[0].type?.text ||
+                `${awayTeam.name} at ${homeTeam.name}`,
+            date:
+                competition.date ||
+                summary.header.date ||
+                null,
+            status:
+                competition.status?.type?.state ||
+                'unknown',
+            statusDetail:
+                competition.status?.type?.shortDetail ||
+                null,
             venue:
                 competition.venue?.fullName ||
                 competition.venue?.address?.city ||
                 null,
-            neutralSite: competition.neutralSite === true
+            neutralSite:
+                competition.neutralSite === true
         },
-
+    
         matchup: {
             home: {
                 ...homeTeam,
                 standings: homeStanding || null,
-                recentForm: summarizeRecentGames(homeRecentRaw)
+    
+                recentForm:
+                    summarizeRecentGames(homeRecentRaw),
+    
+                statistics:
+                    home.statistics || [],
+    
+                injuries:
+                    home.injuries || [],
+    
+                news:
+                    Array.isArray(homeNewsRaw)
+                        ? homeNewsRaw.slice(0, 5).map(article => ({
+                            headline:
+                                article.headline ||
+                                article.title ||
+                                null,
+                            description:
+                                article.description ||
+                                null,
+                            published:
+                                article.published ||
+                                null,
+                            link:
+                                article.links?.web?.href ||
+                                null
+                        }))
+                        : []
             },
-
+    
             away: {
                 ...awayTeam,
                 standings: awayStanding || null,
-                recentForm: summarizeRecentGames(awayRecentRaw)
+    
+                recentForm:
+                    summarizeRecentGames(awayRecentRaw),
+    
+                statistics:
+                    away.statistics || [],
+    
+                injuries:
+                    away.injuries || [],
+    
+                news:
+                    Array.isArray(awayNewsRaw)
+                        ? awayNewsRaw.slice(0, 5).map(article => ({
+                            headline:
+                                article.headline ||
+                                article.title ||
+                                null,
+                            description:
+                                article.description ||
+                                null,
+                            published:
+                                article.published ||
+                                null,
+                            link:
+                                article.links?.web?.href ||
+                                null
+                        }))
+                        : []
             }
         },
-
+    
+        keyPlayers: {
+            home: [],
+            away: []
+        },
+    
         betting: {
             line:
                 summary.pickcenter?.[0]?.details ||
                 summary.pickcenter?.[0]?.overUnder ||
                 null,
-
+    
             overUnder:
-                summary.pickcenter?.[0]?.overUnder ?? null,
-
+                summary.pickcenter?.[0]?.overUnder ??
+                null,
+    
             homeMoneyLine:
                 summary.pickcenter?.[0]?.homeTeamOdds?.moneyLine ??
                 null,
-
+    
             awayMoneyLine:
                 summary.pickcenter?.[0]?.awayTeamOdds?.moneyLine ??
                 null
         },
-
+    
         predictor: {
             homeWinPercentage:
-                summary.predictor?.homeTeam?.gameProjection ?? null,
-
+                summary.predictor?.homeTeam?.gameProjection ??
+                null,
+    
             awayWinPercentage:
-                summary.predictor?.awayTeam?.gameProjection ?? null
+                summary.predictor?.awayTeam?.gameProjection ??
+                null
         },
-
-        // ESPN can provide different statistics depending on sport.
-        // Preserve them without assuming a single sport-specific schema.
+    
         statistics: {
             home: home.statistics || [],
             away: away.statistics || []
         },
-
+    
         injuries: {
             home: home.injuries || [],
             away: away.injuries || []
         },
-
+    
         leaders: summary.leaders || [],
-
+    
         notes: summary.notes || [],
-
-        againstTheSpread: summary.againstTheSpread || null,
-
-        seasonType: summary.header.season?.type || null
+    
+        againstTheSpread:
+            summary.againstTheSpread || null,
+    
+        seasonType:
+            summary.header.season?.type || null
     };
+
+    // Extract the most relevant ESPN leaders for each team.
+    if (Array.isArray(summary.leaders)) {
+        for (const leaderGroup of summary.leaders) {
+            const teamId = String(
+                leaderGroup?.team?.id || ''
+            );
+    
+            const target =
+                teamId === String(homeTeam.id)
+                    ? context.keyPlayers.home
+                    : teamId === String(awayTeam.id)
+                        ? context.keyPlayers.away
+                        : null;
+    
+            if (!target) continue;
+    
+            for (const category of leaderGroup.leaders || []) {
+                for (const leader of category.leaders || []) {
+                    const athlete = leader.athlete;
+    
+                    if (!athlete?.id || !athlete?.displayName) {
+                        continue;
+                    }
+    
+                    target.push({
+                        id: athlete.id,
+                        name: athlete.displayName,
+                        category:
+                            category.displayName ||
+                            category.name ||
+                            null,
+                        statistics:
+                            leader.statistics ||
+                            leader.displayValue ||
+                            null,
+                        image:
+                            athlete.headshot?.href ||
+                            athlete.image?.href ||
+                            null
+                    });
+                }
+            }
+        }
+    }
 
     setCached(cacheKey, context);
 
@@ -265,18 +395,23 @@ You are SportSmack's pre-game sports analyst.
 
 Analyze ONLY this specific upcoming matchup.
 
-IMPORTANT:
-- Do not give generic descriptions of either team.
-- Do not discuss unrelated games.
-- Do not invent statistics, injuries, players, news, or trends.
-- Use only information contained in the supplied GAME DATA.
-- If a piece of information is unavailable, explicitly say it is unavailable rather than guessing.
-- ESPN's predictor is a reference point, NOT the conclusion you must copy.
-- Your job is to independently reason from the matchup data.
-- Every important conclusion should be connected to a specific piece of supplied evidence.
-- The game has NOT started yet, so do not discuss live-game events.
+MATCHUP-CONTEXT REQUIREMENTS:
 
-Your analysis should identify the factors that actually differentiate these two teams.
+- Compare these two specific teams.
+- Use the supplied team statistics.
+- Identify meaningful offensive and defensive advantages when the supplied statistics support them.
+- Compare recent form.
+- Identify the most important key players when supplied.
+- Discuss relevant injuries when supplied.
+- Consider recent team news when supplied.
+- Consider standings and relevant matchup statistics.
+- Do NOT invent statistics, players, injuries, news, or trends.
+- Do NOT make generic statements that are unsupported by the supplied data.
+- If information is unavailable, explicitly say it is unavailable.
+- ESPN's predictor is only a reference point. Do your own reasoning.
+- Every major conclusion must be supported by supplied evidence.
+- The game has NOT started yet.
+- Do not discuss live-game events.
 
 GAME DATA:
 
@@ -285,62 +420,100 @@ ${JSON.stringify(context, null, 2)}
 Return ONLY valid JSON using exactly this structure:
 
 {
-  "headline": "Short matchup-specific headline",
-  "summary": "2-4 sentence explanation of what makes this particular matchup interesting.",
+    "headline": "Short matchup-specific headline",
 
-  "homeTeam": {
-    "name": "${home.name}",
-    "advantages": [
-      "Specific advantage supported by the supplied data"
+    "summary": "2-4 sentence explanation of what makes this matchup interesting.",
+
+    "homeTeam": {
+        "name": "${home.name}",
+
+        "advantages": [
+            "Specific statistical or matchup advantage"
+        ],
+
+        "concerns": [
+            "Specific statistical or matchup concern"
+        ]
+    },
+
+    "awayTeam": {
+        "name": "${away.name}",
+
+        "advantages": [
+            "Specific statistical or matchup advantage"
+        ],
+
+        "concerns": [
+            "Specific statistical or matchup concern"
+        ]
+    },
+
+    "offensiveComparison": {
+        "analysis": "Compare the offensive strengths and weaknesses of both teams using supplied evidence.",
+        "advantage": "Team with the offensive advantage, or unavailable"
+    },
+
+    "defensiveComparison": {
+        "analysis": "Compare the defensive strengths and weaknesses of both teams using supplied evidence.",
+        "advantage": "Team with the defensive advantage, or unavailable"
+    },
+
+    "keyMatchup": {
+        "title": "The most important matchup factor",
+        "analysis": "Explain why this matchup factor matters.",
+        "evidence": [
+            "Specific supporting fact",
+            "Specific supporting fact"
+        ]
+    },
+
+    "keyPlayers": {
+        "home": [
+            "Important player and why they matter"
+        ],
+        "away": [
+            "Important player and why they matter"
+        ]
+    },
+
+    "injuries": {
+        "analysis": "Explain which injuries could materially affect the matchup.",
+        "important": [
+            "Specific injury and its relevance"
+        ]
+    },
+
+    "recentForm": {
+        "analysis": "Compare the recent form of both teams.",
+        "homeRecord": "W-L-T",
+        "awayRecord": "W-L-T"
+    },
+
+    "news": {
+        "analysis": "Explain any recent team news that materially affects the matchup.",
+        "important": [
+            "Specific relevant news item"
+        ]
+    },
+
+    "mostImportantFactor": "The single factor most likely to determine the outcome.",
+
+    "prediction": {
+        "winner": "Exact team name",
+        "confidence": 0,
+        "reason": "Explain the prediction using specific supplied evidence."
+    },
+
+    "whatCouldChangeThePrediction": [
+        "Specific scenario",
+        "Specific scenario"
     ],
-    "concerns": [
-      "Specific concern supported by the supplied data"
+
+    "watchFor": [
+        "Specific thing fans should watch",
+        "Specific thing fans should watch",
+        "Specific thing fans should watch"
     ]
-  },
-
-  "awayTeam": {
-    "name": "${away.name}",
-    "advantages": [
-      "Specific advantage supported by the supplied data"
-    ],
-    "concerns": [
-      "Specific concern supported by the supplied data"
-    ]
-  },
-
-  "keyMatchup": {
-    "title": "The most important matchup factor",
-    "analysis": "Explain why this matchup factor matters.",
-    "evidence": [
-      "Specific supporting fact",
-      "Specific supporting fact"
-    ]
-  },
-
-  "recentForm": {
-    "analysis": "Compare the recent form of both teams using the supplied last-five-game data.",
-    "homeRecord": "W-L-T",
-    "awayRecord": "W-L-T"
-  },
-
-  "mostImportantFactor": "The single factor most likely to determine the outcome.",
-
-  "prediction": {
-    "winner": "Exact team name",
-    "confidence": 0,
-    "reason": "Explain the prediction using specific supplied evidence."
-  },
-
-  "whatCouldChangeThePrediction": [
-    "Specific scenario",
-    "Specific scenario"
-  ],
-
-  "watchFor": [
-    "Specific thing fans should watch",
-    "Specific thing fans should watch",
-    "Specific thing fans should watch"
-  ]
 }
 `;
 }
@@ -363,36 +536,36 @@ async function generatePregameAnalysis(league, gameId) {
 
     const prompt = buildAnalysisPrompt(context);
 
+    const model =
+        process.env.GEMINI_MODEL ||
+        'gemini-2.5-flash';
+    
     const response = await axios.post(
-        'https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}',
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
-            model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-            temperature: 0.2,
-            response_format: {
-                type: 'json_object'
-            },
-            messages: [
-                {
-                    role: 'system',
-                    content:
-                        'You are a precise sports analyst. Never invent data. Return valid JSON only.'
-                },
+            contents: [
                 {
                     role: 'user',
-                    content: prompt
+                    parts: [
+                        {
+                            text: prompt
+                        }
+                    ]
                 }
-            ]
+            ],
+            generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 1800,
+                responseMimeType: 'application/json'
+            }
         },
         {
-            headers: {
-                Authorization: `Bearer ${process.env.GEMINI_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
             timeout: 30000
         }
     );
 
-    const content = response.data?.choices?.[0]?.message?.content;
+    const content =
+        response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
         throw new Error('AI returned an empty analysis.');
@@ -411,6 +584,9 @@ async function generatePregameAnalysis(league, gameId) {
         status: 'pre',
         game: context.game,
         matchup: context.matchup,
+        keyPlayers: context.keyPlayers,
+        injuries: context.injuries,
+        statistics: context.statistics,
         predictor: context.predictor,
         betting: context.betting,
         analysis
