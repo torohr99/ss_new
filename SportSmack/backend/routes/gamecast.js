@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
-const gameAI = require('../services/gameAI')
 const sportsApi = require('../services/sportsApi');
 const gameAnalysis = require('../services/gameAnalysis');
 
@@ -54,13 +53,12 @@ router.get(
           : summary;
 
       const result =
-        await gameAI.getPregameAnalysis(
-          gameState,
-          league,
-          gameId
+        await gameAnalysis.generatePregameAnalysis(
+            league,
+            gameId
         );
-
-      res.json(result);
+    
+    res.json(result);
 
     } catch (error) {
       console.error(
