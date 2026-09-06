@@ -249,7 +249,8 @@ router.get('/players/search', authenticateToken, async (req, res) => {
 
     if (q) {
       where.name = {
-        contains: q
+        contains: q,
+        mode: 'insensitive'
       };
     }
 
@@ -561,6 +562,13 @@ router.delete(
         err
       );
 
+      if (err?.code === 'P2002') {
+        return res.status(409).json({
+          error:
+            'That player or draft pick has already been taken.'
+        });
+      }
+      
       res.status(500).json({
         error: 'Failed to delete fantasy league',
         details: err.message
