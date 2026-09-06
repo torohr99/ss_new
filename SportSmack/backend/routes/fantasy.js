@@ -142,29 +142,96 @@ router.post('/seed', authenticateToken, async (req, res) => {
 
 router.get('/players', authenticateToken, async (req, res) => {
   try {
-    let players = await prisma.fantasyPlayer.findMany({
-      orderBy: {
-        name: 'asc'
-      }
-    });
+    const cursor = req.query.cursor
+      ? parseInt(req.query.cursor, 10)
+      : null;
 
-    // If the database has not been seeded yet, seed it automatically.
-    if (players.length === 0) {
-      console.log('FantasyPlayer table is empty. Seeding NFL players...');
-      
-      await seedFantasyPlayers();
+    const take = Math.min(
+      Math.max(
+        parseInt(req.query.limit, 10) || 100,
+        1
+      ),
+      200
+    );
 
-      players = await prisma.fantasyPlayer.findMany({
-        orderBy: {
-          name: 'asc'
-        }
-      });
+    const position = normalizePosition(
+      req.query.position
+    );
+
+    const search = String(
+      req.query.search || ''
+    ).trim();
+
+    const where = {};
+
+    if (
+      position &&
+      VALID_POSITIONS.has(position)
+    ) {
+      where.position = position;
     }
 
-    res.json(players);
+    if (search) {
+      where.name = {
+        contains: search,
+        mode: 'insensitive'
+      };
+    }
+
+    const query = {
+      where,
+      orderBy: {
+        id: 'asc'
+      },
+      take
+    };
+
+    if (
+      cursor &&
+      !Number.isNaN(cursor)
+    ) {
+      query.cursor = {
+        id: cursor
+      };
+      query.skip = 1;
+    }
+
+    let players =
+      await prisma.fantasyPlayer.findMany(query);
+
+    // Only seed automatically if the database is
+    // completely empty.
+    if (
+      !cursor &&
+      !search &&
+      !position &&
+      players.length === 0
+    ) {
+      console.log(
+        'FantasyPlayer table is empty. Seeding NFL players...'
+      );
+
+      await seedFantasyPlayers();
+
+      players =
+        await prisma.fantasyPlayer.findMany(query);
+    }
+
+    const nextCursor =
+      players.length === take
+        ? players[players.length - 1].id
+        : null;
+
+    res.json({
+      players,
+      nextCursor
+    });
 
   } catch (err) {
-    console.error('Fantasy players fetch/seed error:', err);
+    console.error(
+      'Fantasy players fetch error:',
+      err
+    );
 
     res.status(500).json({
       error: 'Failed to load fantasy players'
