@@ -76,25 +76,24 @@ export default function DraftRoom({ params }) {
   
           setLeague(leagueRes.data);
   
-                    const playersRes = await axios.get(
-                      `${apiUrl}/api/fantasy/players`,
+                    const playersResponse = await fetch(
+                      `${API_URL}/api/fantasy/players?limit=200`,
                       {
-                        withCredentials: true
+                        headers: {
+                          Authorization: `Bearer ${localStorage.getItem(
+                            'smack_token'
+                          )}`
+                        },
+                        credentials: 'include'
                       }
                     );
-          
-                    const players = Array.isArray(
-                      playersRes.data
-                    )
-                      ? playersRes.data
-                      : [];
-          
-                    console.log(
-                      'Fantasy players loaded:',
-                      players.length
+                    
+                    const playersData =
+                      await playersResponse.json();
+                    
+                    setAvailablePlayers(
+                      playersData.players || []
                     );
-          
-                    setAvailablePlayers(players);
                 } catch (err) {
                   console.error(
                     'Failed to load fantasy draft data:',
