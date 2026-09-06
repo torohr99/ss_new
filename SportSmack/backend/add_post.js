@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 async function addPost() {
   let user = await prisma.user.findFirst({where: {email: 'test@test.com'}});
   if (!user) {
