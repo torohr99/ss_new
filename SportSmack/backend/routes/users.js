@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
 const sportsApi = require('../services/sportsApi');
 const bcrypt = require('bcrypt');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Protect all user routes
 router.use(authMiddleware);
