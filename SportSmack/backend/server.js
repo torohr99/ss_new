@@ -18,14 +18,12 @@ const server = http.createServer(app);
 // FIX 1: Tell Express to trust Render's proxy headers so express-rate-limit stops crashing
 app.set('trust proxy', 1);
 
-// 1. Allows your backend to read incoming account data text (email, password)
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-// 2. Logs every request that hits your server to the Render console
-app.use((req, res, next) => {
-  console.log(`>>> Incoming Request: ${req.method} ${req.url} from origin: ${req.headers.origin}`);
-  next();
-});
+// Parse request bodies with strict production limits.
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: '1mb'
+}));
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
