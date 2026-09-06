@@ -53,6 +53,9 @@ model Notification {
   created_at DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, created_at])
+  @@index([user_id, read, created_at])
 }
 
 model UserBadge {
@@ -64,6 +67,8 @@ model UserBadge {
   created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, created_at])
 }
 
 model Friendship {
@@ -77,6 +82,8 @@ model Friendship {
   friend User @relation("UserFriendOf", fields: [friend_id], references: [id])
 
   @@unique([user_id, friend_id])
+  @@index([friend_id, status])
+  @@index([user_id, status])
 }
 
 model Team {
@@ -157,7 +164,8 @@ model GameMessage {
   teamId    Int? // EspnId of the team the user supports, if any
   createdAt DateTime @default(now())
 
-  @@index([gameId])
+  @@index([gameId, createdAt])
+  @@index([league, gameId, createdAt])
 }
 
 // =======================
@@ -179,6 +187,9 @@ model FantasyLeague {
   transactions  FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
   trades       FantasyTrade[]
+
+  @@index([ownerId])
+  @@index([status, createdAt])
 }
 
 model FantasyTeam {
@@ -238,6 +249,10 @@ model FantasyDraftPick {
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
   @@index([leagueId])
+  @@index([teamId])
+  @@index([playerId])
+  @@unique([leagueId, playerId])
+  @@unique([leagueId, pickNumber])
 }
 
 model FantasyTeamPlayer {
@@ -250,6 +265,8 @@ model FantasyTeamPlayer {
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
   @@index([teamId])
+  @@index([playerId])
+  @@unique([teamId, playerId])
 }
 
 model FantasyWeeklyScore {
@@ -262,6 +279,7 @@ model FantasyWeeklyScore {
   team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, weekNumber])
+  @@index([weekNumber])
 }
 
 model FantasyPlayerWeeklyScore {
@@ -301,6 +319,10 @@ model BracketPick {
 
   league BracketLeague @relation(fields: [leagueId], references: [id])
   user   User          @relation("UserBracketPicks", fields: [userId], references: [id])
+
+  @@index([leagueId])
+  @@index([userId])
+  @@index([leagueId, userId])
 }
 
 model FantasyMatchup {
@@ -333,8 +355,9 @@ model FantasyTransaction {
   team   FantasyTeam   @relation(fields: [teamId], references: [id])
   player FantasyPlayer? @relation(fields: [playerId], references: [id])
 
-  @@index([leagueId])
-  @@index([teamId])
+  @@index([leagueId, createdAt])
+  @@index([teamId, createdAt])
+  @@index([playerId])
 }
 
 model FantasyWaiverClaim {
