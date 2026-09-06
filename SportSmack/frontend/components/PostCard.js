@@ -80,21 +80,19 @@ export default function PostCard({ post }) {
   const fetchComments = async () => {
     setLoadingComments(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/comments`,
+      const response = await fetch(
+        `${API_URL}/api/posts/${post.id}/comments?limit=20`,
         {
-          credentials: 'include',
-          headers: getAuthHeaders()
+          headers: {
+            ...getAuthHeaders()
+          },
+          credentials: 'include'
         }
       );
-      if (res.ok) {
-        setComments(await res.json());
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingComments(false);
-    }
+      
+      const data = await response.json();
+      
+      setComments(data.comments || []);
   };
 
   const toggleComments = () => {
