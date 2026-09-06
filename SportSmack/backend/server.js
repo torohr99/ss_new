@@ -59,28 +59,6 @@ const io = new Server(server, {
   }
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Endpoint not found'
-  });
-});
-
-// Centralized error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled server error:', err);
-
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  res.status(err.status || 500).json({
-    error:
-      process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : err.message
-  });
-});
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -90,7 +68,6 @@ app.use(cors({
   credentials: true
 }));
 app.options('*', cors());
-app.use(express.json());
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
 
@@ -118,6 +95,37 @@ app.use('/api/sports', sportsRoute);
 app.use('/api/fantasy', fantasyRoute);
 app.use('/api/ai', aiRoute);
 app.use('/api/gamecast', gamecastRoute);
+
+// Health check endpoint
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'SportSmack Backend is running'
+  });
+});
+
+// 404 handler — MUST come after all routes
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found'
+  });
+});
+
+// Centralized error handler — MUST be last
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(err.status || 500).json({
+    error:
+      process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : err.message
+  });
+});
 
 // Health check endpoint
 app.get('/api/status', (req, res) => {
