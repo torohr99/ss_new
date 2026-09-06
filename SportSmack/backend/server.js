@@ -58,6 +58,29 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Endpoint not found'
+  });
+});
+
+// Centralized error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled server error:', err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  res.status(err.status || 500).json({
+    error:
+      process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : err.message
+  });
+});
 const PORT = process.env.PORT || 5000;
 
 // Middleware
