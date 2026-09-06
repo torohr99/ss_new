@@ -235,6 +235,34 @@ export function PregameAnalysis({ data, loading, error }) {
 
     const analysis = data.analysis;
 
+    const home =
+        data.matchup?.home || {};
+    
+    const away =
+        data.matchup?.away || {};
+    
+    const formatRecord = (standing) => {
+        if (!standing) return 'Unavailable';
+    
+        const wins =
+            standing.wins ??
+            standing.record?.wins ??
+            '-';
+    
+        const losses =
+            standing.losses ??
+            standing.record?.losses ??
+            '-';
+    
+        return `${wins}-${losses}`;
+    };
+    
+    const recentRecord = (form) => {
+        if (!form) return 'Unavailable';
+    
+        return `${form.wins || 0}-${form.losses || 0}-${form.ties || 0}`;
+    };
+
     return (
         <div
             className="gamecast-analysis"
@@ -322,6 +350,68 @@ export function PregameAnalysis({ data, loading, error }) {
                 </p>
             )}
 
+            <div
+              style={{
+                  marginTop: '1.2rem',
+                  padding: '1rem',
+                  background: 'rgba(255,255,255,0.04)',
+                  borderRadius: '8px'
+              }}
+          >
+              <h4 style={{ marginTop: 0 }}>
+                  Matchup Context
+              </h4>
+          
+              <div
+                  style={{
+                      display: 'grid',
+                      gridTemplateColumns:
+                          'repeat(auto-fit, minmax(220px, 1fr))',
+                      gap: '1rem'
+                  }}
+              >
+                  <div>
+                      <strong>{home.name || 'Home Team'}</strong>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Record:{' '}
+                          {formatRecord(home.standings)}
+                      </p>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Last 5:{' '}
+                          {recentRecord(home.recentForm)}
+                      </p>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Point differential:{' '}
+                          {home.recentForm?.pointDifferential ??
+                              'Unavailable'}
+                      </p>
+                  </div>
+          
+                  <div>
+                      <strong>{away.name || 'Away Team'}</strong>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Record:{' '}
+                          {formatRecord(away.standings)}
+                      </p>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Last 5:{' '}
+                          {recentRecord(away.recentForm)}
+                      </p>
+          
+                      <p style={{ margin: '0.5rem 0' }}>
+                          Point differential:{' '}
+                          {away.recentForm?.pointDifferential ??
+                              'Unavailable'}
+                      </p>
+                  </div>
+              </div>
+          </div>
+
             {analysis.keyMatchup && (
                 <div
                     style={{
@@ -360,6 +450,117 @@ export function PregameAnalysis({ data, loading, error }) {
                 </div>
             )}
 
+            {analysis.offensiveComparison && (
+              <div style={{ marginTop: '1rem' }}>
+                  <h4>Offensive Comparison</h4>
+          
+                  <p style={{ lineHeight: 1.5 }}>
+                      {analysis.offensiveComparison.analysis}
+                  </p>
+          
+                  <strong>
+                      Advantage:{' '}
+                      {analysis.offensiveComparison.advantage ||
+                          'Unavailable'}
+                  </strong>
+              </div>
+          )}
+          
+          {analysis.defensiveComparison && (
+              <div style={{ marginTop: '1rem' }}>
+                  <h4>Defensive Comparison</h4>
+          
+                  <p style={{ lineHeight: 1.5 }}>
+                      {analysis.defensiveComparison.analysis}
+                  </p>
+          
+                  <strong>
+                      Advantage:{' '}
+                      {analysis.defensiveComparison.advantage ||
+                          'Unavailable'}
+                  </strong>
+              </div>
+          )}
+
+          {analysis.keyPlayers && (
+            <div style={{ marginTop: '1rem' }}>
+                <h4>Key Players</h4>
+        
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns:
+                            'repeat(auto-fit, minmax(220px, 1fr))',
+                        gap: '1rem'
+                    }}
+                >
+                    <div>
+                        <strong>
+                            {home.name || 'Home'}
+                        </strong>
+        
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.keyPlayers.home || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+                    </div>
+        
+                    <div>
+                        <strong>
+                            {away.name || 'Away'}
+                        </strong>
+        
+                        <ul style={{ paddingLeft: '1.2rem' }}>
+                            {(analysis.keyPlayers.away || []).map(
+                                (item, index) => (
+                                    <li key={index}>{item}</li>
+                                )
+                            )}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        )}
+        
+        {analysis.injuries && (
+            <div style={{ marginTop: '1rem' }}>
+                <h4>Injury Impact</h4>
+        
+                <p style={{ lineHeight: 1.5 }}>
+                    {analysis.injuries.analysis}
+                </p>
+        
+                <ul style={{ paddingLeft: '1.2rem' }}>
+                    {(analysis.injuries.important || []).map(
+                        (item, index) => (
+                            <li key={index}>{item}</li>
+                        )
+                    )}
+                </ul>
+            </div>
+        )}
+        
+        {analysis.news && (
+            <div style={{ marginTop: '1rem' }}>
+                <h4>Relevant Team News</h4>
+        
+                <p style={{ lineHeight: 1.5 }}>
+                    {analysis.news.analysis}
+                </p>
+        
+                <ul style={{ paddingLeft: '1.2rem' }}>
+                    {(analysis.news.important || []).map(
+                        (item, index) => (
+                            <li key={index}>{item}</li>
+                        )
+                    )}
+                </ul>
+            </div>
+        )}
+              
             <div
                 style={{
                     display: 'grid',
