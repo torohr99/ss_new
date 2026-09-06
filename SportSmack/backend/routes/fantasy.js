@@ -167,8 +167,7 @@ router.get('/players', authenticateToken, async (req, res) => {
     console.error('Fantasy players fetch/seed error:', err);
 
     res.status(500).json({
-      error: 'Failed to load fantasy players',
-      details: err.message
+      error: 'Failed to load fantasy players'
     });
   }
 });
