@@ -3,7 +3,9 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 
 const prisma = require('../lib/prisma');
-
+const {
+  writeLimiter
+} = require('../middleware/rateLimits');
 // Protect all post routes
 router.use(authMiddleware);
 
@@ -67,7 +69,10 @@ router.get('/', async (req, res) => {
 
 // @route   POST /api/posts
 // @desc    Create a new post
-router.post('/', async (req, res) => {
+router.post(
+  '/',
+  writeLimiter,
+  async (req, res) => {
   try {
     const { content, image_url } = req.body;
 
@@ -96,7 +101,10 @@ router.post('/', async (req, res) => {
 
 // @route   POST /api/posts/:id/like
 // @desc    Toggle like on a post
-router.post('/:id/like', async (req, res) => {
+router.post(
+  '/:id/like',
+  writeLimiter,
+  async (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     if (isNaN(postId)) return res.status(400).json({ message: 'Invalid ID' });
@@ -139,7 +147,10 @@ router.post('/:id/like', async (req, res) => {
 
 // @route   GET /api/posts/:id/comments
 // @desc    Get comments for a post
-router.get('/:id/comments', async (req, res) => {
+router.post(
+  '/:id/comment',
+  writeLimiter,
+  async (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     if (isNaN(postId)) return res.status(400).json({ message: 'Invalid ID' });
