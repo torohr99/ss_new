@@ -5,7 +5,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const helmet = require('helmet');
 const liveGameEngine = require('./services/liveGameEngine');
-const rateLimit = require('express-rate-limit');
+const {
+  standardLimiter,
+  authLimiter
+} = require('./middleware/rateLimits');
 const xss = require('xss-clean');
 require('dotenv').config();
 const {
@@ -68,21 +71,7 @@ app.use(express.json());
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
 
-// Rate Limiting (DDoS & Brute Force protection)
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 1000 requests per `window`
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api', globalLimiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 50, // Limit each IP to 50 login/register requests per window
-  message: 'Too many authentication attempts, please try again later.'
-});
+app.use('/api', standardLimiter);
 app.use('/api/auth', authLimiter);
 
 // Routes
