@@ -1,10 +1,9 @@
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const sportsApi = require('../services/sportsApi');
 const gameAI = require('../services/gameAI');
 const liveGameEngine = require('../services/liveGameEngine');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 async function userFollowsGameTeam(userId, competitors) {
   if (!Array.isArray(competitors) || competitors.length === 0) {
