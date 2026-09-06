@@ -1,6 +1,5 @@
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const LEAGUE_MAP = {
   nfl: { sport: 'football', league: 'nfl', sportName: 'Football' },
