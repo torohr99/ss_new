@@ -24,25 +24,6 @@ const getAuthHeaders = () => {
 };
 
 export default function PostCard({ post }) {
-    const getAuthHeaders = () => {
-      if (
-        typeof window === 'undefined'
-      ) {
-        return {};
-      }
-  
-      const token =
-        localStorage.getItem(
-          'smack_token'
-        );
-  
-      return token
-        ? {
-            Authorization:
-              `Bearer ${token}`
-          }
-        : {};
-    };
   const [isLiked, setIsLiked] = useState(post.hasLiked);
   const [likesCount, setLikesCount] = useState(post._count.likes);
   const [showComments, setShowComments] = useState(false);
@@ -78,22 +59,36 @@ export default function PostCard({ post }) {
   };
 
   const fetchComments = async () => {
-    setLoadingComments(true);
-    try {
-      const response = await fetch(
-        `${API_URL}/api/posts/${post.id}/comments?limit=20`,
-        {
-          headers: {
-            ...getAuthHeaders()
-          },
-          credentials: 'include'
-        }
-      );
-      
-      const data = await response.json();
-      
-      setComments(data.comments || []);
-  };
+  setLoadingComments(true);
+
+  try {
+    const API_URL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+
+    const response = await fetch(
+      `${API_URL}/api/posts/${post.id}/comments?limit=20`,
+      {
+        headers: {
+          ...getAuthHeaders()
+        },
+        credentials: 'include'
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch comments');
+    }
+
+    const data = await response.json();
+
+    setComments(data.comments || []);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+  } finally {
+    setLoadingComments(false);
+  }
+};
 
   const toggleComments = () => {
     if (!showComments && comments.length === 0 && commentsCount > 0) {
