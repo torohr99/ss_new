@@ -1,5 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const teams = [
   { city: 'Atlanta', name: 'Hawks', sport: 'Basketball', logo_url: 'https://via.placeholder.com/50?text=ATL' },
