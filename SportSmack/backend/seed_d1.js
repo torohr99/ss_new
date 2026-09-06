@@ -1,6 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
 const axios = require('axios');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 async function run() {
   console.log('Fetching D1 Colleges from ESPN...');
