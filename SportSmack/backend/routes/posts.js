@@ -147,6 +147,78 @@ router.post(
 
 // @route   GET /api/posts/:id/comments
 // @desc    Get comments for a post
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const postId = parseInt(req.params.id, 10);
+
+    if (Number.isNaN(postId)) {
+      return res.status(400).json({
+        message: 'Invalid ID'
+      });
+    }
+
+    const cursor = req.query.cursor
+      ? parseInt(req.query.cursor, 10)
+      : null;
+
+    const take = Math.min(
+      Math.max(
+        parseInt(req.query.limit, 10) || 20,
+        1
+      ),
+      50
+    );
+
+    const query = {
+      where: {
+        post_id: postId
+      },
+      orderBy: {
+        id: 'asc'
+      },
+      take,
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true
+          }
+        }
+      }
+    };
+
+    if (cursor && !Number.isNaN(cursor)) {
+      query.cursor = {
+        id: cursor
+      };
+      query.skip = 1;
+    }
+
+    const comments =
+      await prisma.comment.findMany(query);
+
+    const nextCursor =
+      comments.length === take
+        ? comments[comments.length - 1].id
+        : null;
+
+    res.json({
+      comments,
+      nextCursor
+    });
+
+  } catch (error) {
+    console.error(
+      'Error fetching comments:',
+      error
+    );
+
+    res.status(500).json({
+      message: 'Server error fetching comments'
+    });
+  }
+});
+
 router.post(
   '/:id/comment',
   writeLimiter,
