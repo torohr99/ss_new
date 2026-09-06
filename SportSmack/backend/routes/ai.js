@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
+const {
+  aiLimiter
+} = require('../middleware/rateLimits');
 const entityDb = require('../services/entityDb');
 const sportsApi = require('../services/sportsApi');
 
@@ -126,7 +129,11 @@ Return only the image-generation prompt.
 }
 
 // @route POST /api/ai/meme
-router.post('/meme', authMiddleware, async (req, res) => {
+router.post(
+  '/meme',
+  authMiddleware,
+  aiLimiter,
+  async (req, res) => {
   try {
     const {
       prompt,
