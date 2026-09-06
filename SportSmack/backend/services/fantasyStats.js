@@ -1,7 +1,5 @@
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const SCORING = {
   PASSING_YARD: 0.04,
