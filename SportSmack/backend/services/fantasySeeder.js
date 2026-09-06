@@ -1,7 +1,5 @@
 const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 const CURRENT_SEASON = 2026;
 const PREVIOUS_SEASON = 2025;
