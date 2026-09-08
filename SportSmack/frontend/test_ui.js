@@ -27,9 +27,25 @@ async function testFrontend() {
   console.log('Waiting for redirect...');
   await page.waitForNavigation({ waitUntil: 'networkidle2' });
   
-  // 4. Check if token exists in localStorage
-  const token = await page.evaluate(() => localStorage.getItem('smack_token'));
-  console.log('Token exists:', !!token);
+  // 4. Verify authentication through the application
+  const authStatus = await page.evaluate(async () => {
+    const response = await fetch(
+      'http://localhost:5000/api/auth/me',
+      {
+        credentials: 'include'
+      }
+    );
+  
+    return {
+      status: response.status,
+      authenticated: response.ok
+    };
+  });
+  
+  console.log(
+    'Authentication status:',
+    authStatus
+  );
   
   // 5. Go to Explore page
   console.log('Navigating to Explore...');
