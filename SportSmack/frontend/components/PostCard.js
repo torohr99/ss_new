@@ -3,26 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-const getAuthHeaders = () => {
-  if (
-    typeof window === 'undefined'
-  ) {
-    return {};
-  }
-
-  const token =
-    localStorage.getItem(
-      'smack_token'
-    );
-
-  return token
-    ? {
-        Authorization:
-          `Bearer ${token}`
-      }
-    : {};
-};
-
 export default function PostCard({ post }) {
   const [isLiked, setIsLiked] = useState(post.hasLiked);
   const [likesCount, setLikesCount] = useState(post._count.likes);
@@ -69,9 +49,13 @@ export default function PostCard({ post }) {
       const response = await fetch(
         `${API_URL}/api/posts/${post.id}/comments?limit=20`,
         {
-          headers: {
-            ...getAuthHeaders()
-          },
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/like`,
+            {
+              method: 'POST',
+              credentials: 'include'
+            }
+          );
           credentials: 'include'
         }
       );
@@ -107,14 +91,12 @@ export default function PostCard({ post }) {
         {
           method: 'POST',
           headers: {
-            'Content-Type':
-              'application/json',
-            ...getAuthHeaders()
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({
             content: newComment
-          }),
-          credentials: 'include'
+          })
         }
       );
 
