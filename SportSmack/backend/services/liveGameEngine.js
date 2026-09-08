@@ -250,12 +250,7 @@ class LiveGameEngine {
           state: gameState
         }
       );
-
-      const previousState =
-        previousState === null
-          ? null
-          : previousState;
-      
+    
       const lastAnalysis =
         this.liveAnalyses.get(
           trackingKey
