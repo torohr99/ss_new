@@ -132,11 +132,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Health check endpoint
-app.get('/api/status', (req, res) => {
-  res.json({ status: 'OK', message: 'SportSmack Backend is running' });
-});
-
 // Socket.io Handlers
 const setupChatSockets = require('./sockets/chatHandler');
 const setupFantasySockets = require('./sockets/fantasyHandler');
