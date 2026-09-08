@@ -8,7 +8,8 @@ import MemeEditor from '../../../../components/MemeEditor';
 import {
     LiveStats,
     PregameAnalysis,
-    LiveAIAnalysis
+    LiveAIAnalysis,
+    PostGameAnalysis
 } from '../../../../components/gamecast';
 
 function normalizeChatMessage(message) {
@@ -149,6 +150,11 @@ export default function GameHubPage({ params }) {
   const [pregameAnalysis, setPregameAnalysis] = useState(null);
   const [pregameAnalysisLoading, setPregameAnalysisLoading] = useState(false);
   const [pregameAnalysisError, setPregameAnalysisError] = useState(false);
+  const [postGameAnalysis, setPostGameAnalysis] =
+    useState(null);
+
+  const [postGameAnalysisLoading, setPostGameAnalysisLoading] =
+    useState(false);
 
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -202,6 +208,52 @@ export default function GameHubPage({ params }) {
         cancelled = true;
     };
 }, [league, gameId]);
+
+    useEffect(() => {
+        if (
+            !gameData ||
+            gameData.status !== 'post'
+        ) {
+            return;
+        }
+    
+        let cancelled = false;
+    
+        const fetchPostGameAnalysis =
+            async () => {
+                setPostGameAnalysisLoading(true);
+    
+                try {
+                    const res =
+                        await axios.get(
+                            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/gamecast/${league}/${gameId}/postgame-analysis`
+                        );
+    
+                    if (!cancelled) {
+                        setPostGameAnalysis(
+                            res.data
+                        );
+                    }
+                } catch (error) {
+                    console.error(
+                        'Failed to fetch post-game AI analysis:',
+                        error
+                    );
+                } finally {
+                    if (!cancelled) {
+                        setPostGameAnalysisLoading(
+                            false
+                        );
+                    }
+                }
+            };
+    
+        fetchPostGameAnalysis();
+    
+        return () => {
+            cancelled = true;
+        };
+    }, [gameData, league, gameId]);
 
   // Fetch stats when modal is opened, and interval it
   useEffect(() => {
@@ -505,6 +557,26 @@ export default function GameHubPage({ params }) {
               loading={false}
               error={true}
           />
+      )}
+
+      {postGameAnalysis && (
+          <PostGameAnalysis
+              data={postGameAnalysis}
+          />
+      )}
+    
+      {postGameAnalysisLoading && (
+          <div
+              style={{
+                  background:
+                      'var(--glass-bg)',
+                  padding: '1rem',
+                  borderRadius: '12px',
+                  marginBottom: '1rem'
+              }}
+          >
+              Generating post-game AI analysis...
+          </div>
       )}
 
       {/* CHAT INTERFACE */}
