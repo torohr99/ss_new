@@ -3,6 +3,67 @@ const router = express.Router();
 const axios = require('axios');
 const sportsApi = require('../services/sportsApi');
 const gameAnalysis = require('../services/gameAnalysis');
+const postGameAnalysis =
+  require('../services/postGameAnalysis');
+
+// @route GET /api/gamecast/:league/:gameId/postgame-analysis
+// @desc Generate AI post-game analysis
+router.get(
+  '/:league/:gameId/postgame-analysis',
+  async (req, res) => {
+    const { league, gameId } = req.params;
+
+    try {
+      const summary =
+        await getGameSummary(
+          league,
+          gameId
+        );
+
+      if (!summary) {
+        return res.status(404).json({
+          message:
+            'Game data not found.'
+        });
+      }
+
+      const status =
+        summary.header
+          ?.competitions?.[0]
+          ?.status?.type?.state;
+
+      if (status !== 'post') {
+        return res.status(400).json({
+          message:
+            'Post-game analysis is only available after the game has ended.'
+        });
+      }
+
+      const result =
+        await postGameAnalysis
+          .generatePostGameAnalysis(
+            league,
+            gameId,
+            summary
+          );
+
+      res.json(result);
+    } catch (error) {
+      console.error(
+        'Post-game AI analysis error:',
+        error.message
+      );
+
+      res.status(503).json({
+        success: false,
+        code:
+          'POSTGAME_ANALYSIS_UNAVAILABLE',
+        message:
+          'Post-game AI analysis is temporarily unavailable.'
+      });
+    }
+  }
+);
 
 // @route GET /api/gamecast/:league/:gameId/pregame-analysis
 // @desc Generate matchup-specific AI pre-game analysis
