@@ -23,8 +23,7 @@ export default function PostCard({ post }) {
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/like`,
         {
           method: 'POST',
-          credentials: 'include',
-          headers: getAuthHeaders()
+          credentials: 'include'
         }
       );
       if (!res.ok) {
@@ -49,26 +48,26 @@ export default function PostCard({ post }) {
       const response = await fetch(
         `${API_URL}/api/posts/${post.id}/comments?limit=20`,
         {
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/like`,
-            {
-              method: 'POST',
-              credentials: 'include'
-            }
-          );
           credentials: 'include'
         }
       );
   
       if (!response.ok) {
-        throw new Error('Failed to fetch comments');
+        throw new Error(
+          'Failed to fetch comments'
+        );
       }
   
       const data = await response.json();
   
-      setComments(data.comments || []);
+      setComments(
+        data.comments || data || []
+      );
     } catch (err) {
-      console.error('Error fetching comments:', err);
+      console.error(
+        'Failed to fetch comments:',
+        err
+      );
     } finally {
       setLoadingComments(false);
     }
