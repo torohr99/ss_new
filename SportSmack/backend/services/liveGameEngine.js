@@ -1,8 +1,8 @@
 const sportsApi = require('./sportsApi');
 const gamePolls = require('./gamePolls');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const liveGameAnalysis =
+  require('./liveGameAnalysis');
+const prisma = require('../lib/prisma');
 
 class LiveGameEngine {
   constructor() {
@@ -13,6 +13,14 @@ class LiveGameEngine {
     // for each live game.
     this.activeGames = new Map();
 
+    // Stores the last live AI analysis generated
+    // for each active game.
+    this.liveAnalyses = new Map();
+    
+    // Prevent excessive Gemini calls.
+    this.AI_ANALYSIS_COOLDOWN_MS =
+      2 * 60 * 1000;
+    
     // Prevent excessive AI poll generation.
     this.lastPollTimes = new Map();
 
@@ -205,7 +213,13 @@ class LiveGameEngine {
           teams: gameState.teams,
           situation:
             gameState.sportSituation,
-          latestPlay
+      
+          latestPlay,
+      
+          playsCount:
+            Array.isArray(gameState.plays)
+              ? gameState.plays.length
+              : 0
         });
 
       const previousState =
@@ -228,6 +242,56 @@ class LiveGameEngine {
         trackingKey,
         stateFingerprint
       );
+
+      const previousState =
+        previousState === null
+          ? null
+          : previousState;
+      
+      const lastAnalysis =
+        this.liveAnalyses.get(
+          trackingKey
+        );
+      
+      const lastAnalysisTime =
+        lastAnalysis?.generatedAt || 0;
+      
+      const enoughTimePassed =
+        Date.now() -
+          lastAnalysisTime >=
+        this.AI_ANALYSIS_COOLDOWN_MS;
+      
+      if (enoughTimePassed) {
+        try {
+          const liveAnalysis =
+            await liveGameAnalysis.generateLiveAnalysis(
+              league,
+              gameId,
+              previousState,
+              {
+                ...gameState,
+                fingerprint:
+                  stateFingerprint
+              }
+            );
+      
+          this.liveAnalyses.set(
+            trackingKey,
+            liveAnalysis
+          );
+      
+          this.emitLiveAnalysis(
+            league,
+            gameId,
+            liveAnalysis
+          );
+        } catch (error) {
+          console.error(
+            `Live AI analysis failed for ${league}/${gameId}:`,
+            error.message
+          );
+        }
+      }
 
       /*
        * Cooldown prevents a game with many rapid
@@ -293,6 +357,30 @@ class LiveGameEngine {
     }
   }
 
+  emitLiveAnalysis(
+    league,
+    gameId,
+    analysis
+  ) {
+    if (!this.io || !analysis) {
+      return;
+    }
+  
+    const roomId =
+      `game_${league}_${gameId}`;
+  
+    this.io
+      .to(roomId)
+      .emit(
+        'live_ai_analysis',
+        analysis
+      );
+  
+    console.log(
+      `Live AI analysis emitted for ${league}/${gameId}`
+    );
+  }
+  
   async emitPoll(
     league,
     gameId,
