@@ -22,11 +22,6 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('smack_token')
-          : null;
-
       const res = await fetch(`${apiUrl}/api/posts`, {
         method: 'POST',
         headers: {
