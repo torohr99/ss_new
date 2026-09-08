@@ -285,9 +285,13 @@ export default function GameHubPage({ params }) {
     const connectToSocket = async () => {
       try {
         const token = localStorage.getItem('smack_token');
-        socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000', {
-          auth: token ? { token } : {}
-        });
+        const socket = io(
+            process.env.NEXT_PUBLIC_API_URL ||
+            'http://localhost:5000',
+            {
+                withCredentials: true
+            }
+        );
 
         socketRef.current = socket;
 
