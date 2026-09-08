@@ -79,11 +79,6 @@ export default function DraftRoom({ params }) {
                     const playersResponse = await fetch(
                       `${API_URL}/api/fantasy/players?limit=200`,
                       {
-                        headers: {
-                          Authorization: `Bearer ${localStorage.getItem(
-                            'smack_token'
-                          )}`
-                        },
                         credentials: 'include'
                       }
                     );
@@ -110,7 +105,6 @@ export default function DraftRoom({ params }) {
             }, [id]);
 
   useEffect(() => {
-    const token = localStorage.getItem('smack_token');
     const newSocket = io((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'), {
       auth: token ? { token } : {},
       transports: ['websocket', 'polling']
