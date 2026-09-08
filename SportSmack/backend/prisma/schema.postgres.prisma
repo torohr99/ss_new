@@ -47,14 +47,13 @@ model User {
 model Notification {
   id         Int      @id @default(autoincrement())
   user_id    Int
-  type       String   // "BADGE", "SYSTEM"
+  type       String
   message    String
   read       Boolean  @default(false)
   created_at DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
 
-  @@index([user_id, created_at])
   @@index([user_id, read, created_at])
 }
 
@@ -69,6 +68,7 @@ model UserBadge {
   user User @relation(fields: [user_id], references: [id])
 
   @@index([user_id, created_at])
+  @@index([user_id, badge_name])
 }
 
 model Friendship {
@@ -147,7 +147,7 @@ model Comment {
   user    User @relation(fields: [user_id], references: [id])
   post    Post @relation(fields: [post_id], references: [id])
 
-  @@index([post_id])
+  @@index([post_id, created_at])
 }
 
 model GameMessage {
@@ -236,6 +236,8 @@ model FantasyPlayer {
   waiverClaims FantasyWaiverClaim[]
   weeklyScores FantasyPlayerWeeklyScore[]
   tradeItems FantasyTradeItem[]
+
+ @@index([position, name])
 }
 
 model FantasyDraftPick {
@@ -248,7 +250,6 @@ model FantasyDraftPick {
   league FantasyLeague @relation(fields: [leagueId], references: [id])
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@index([leagueId])
   @@index([teamId])
   @@index([playerId])
   @@unique([leagueId, playerId])
@@ -264,7 +265,7 @@ model FantasyTeamPlayer {
   team   FantasyTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@index([teamId])
+  @@index([teamId, status])
   @@index([playerId])
   @@unique([teamId, playerId])
 }
