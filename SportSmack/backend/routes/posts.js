@@ -4,8 +4,17 @@ const authMiddleware = require('../middleware/auth');
 
 const prisma = require('../lib/prisma');
 const {
-  writeLimiter
+  writeLimiter,
+  postCreationLimiter,
+  socialLimiter
 } = require('../middleware/rateLimits');
+
+const {
+  MAX_POST_LENGTH,
+  validateContent,
+  hasRecentDuplicatePost,
+  isBlocked
+} = require('../middleware/moderation');
 // Protect all post routes
 router.use(authMiddleware);
 
@@ -72,17 +81,45 @@ router.get('/', async (req, res) => {
 router.post(
   '/',
   writeLimiter,
+  postCreationLimiter,
   async (req, res) => {
   try {
-    const { content, image_url } = req.body;
-
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ message: 'Content is required' });
+    const {
+      content,
+      image_url
+    } = req.body;
+    
+    const validation =
+      validateContent(
+        content,
+        MAX_POST_LENGTH,
+        'Post content'
+      );
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        message: validation.message
+      });
+    }
+    
+    const normalizedContent =
+      validation.content;
+    
+    if (
+      await hasRecentDuplicatePost(
+        req.user.id,
+        normalizedContent
+      )
+    ) {
+      return res.status(409).json({
+        message:
+          'You already posted this content recently.'
+      });
     }
 
     const newPost = await prisma.post.create({
       data: {
-        content: content.trim(),
+        content: normalizedContent,
         image_url: image_url || null,
         user_id: req.user.id
       },
@@ -112,6 +149,18 @@ router.post(
     // Check if post exists
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
+
+    if (
+      await isBlocked(
+        req.user.id,
+        post.user_id
+      )
+    ) {
+      return res.status(403).json({
+        message:
+          'You cannot interact with this post.'
+      });
+    }
 
     // Check if already liked
     const existingLike = await prisma.like.findUnique({
@@ -219,47 +268,61 @@ router.get('/:id/comments', async (req, res) => {
   }
 });
 
+// @route   POST /api/posts/:id/comment
+// @desc    Add a comment to a post
 router.post(
   '/:id/comment',
-  writeLimiter,
+  socialLimiter,
   async (req, res) => {
   try {
     const postId = parseInt(req.params.id);
     if (isNaN(postId)) return res.status(400).json({ message: 'Invalid ID' });
 
-    const comments = await prisma.comment.findMany({
-      where: { post_id: postId },
-      orderBy: { created_at: 'asc' },
-      include: {
-        user: { select: { id: true, username: true } }
-      }
-    });
-
-    res.json(comments);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error fetching comments' });
-  }
-});
-
-// @route   POST /api/posts/:id/comment
-// @desc    Add a comment to a post
-router.post('/:id/comment', async (req, res) => {
-  try {
-    const postId = parseInt(req.params.id);
-    if (isNaN(postId)) return res.status(400).json({ message: 'Invalid ID' });
-
-    const { content } = req.body;
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ message: 'Comment content is required' });
+    const validation =
+      validateContent(
+        req.body.content,
+        MAX_COMMENT_LENGTH,
+        'Comment content'
+      );
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        message: validation.message
+      });
     }
-
+    
+    const normalizedContent =
+      validation.content;
+    
+    if (
+      await hasRecentDuplicateComment(
+        req.user.id,
+        normalizedContent
+      )
+    ) {
+      return res.status(409).json({
+        message:
+          'You already posted this comment recently.'
+      });
+    }
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
-
+    
+    if (
+      await isBlocked(
+        req.user.id,
+        post.user_id
+      )
+    ) {
+      return res.status(403).json({
+        message:
+          'You cannot comment on this post.'
+      });
+    }
+    
     const newComment = await prisma.comment.create({
       data: {
-        content: content.trim(),
+        content: normalizedContent,
         user_id: req.user.id,
         post_id: postId
       },
