@@ -14,6 +14,7 @@ require('dotenv').config();
 const {
   startFantasyScheduler
 } = require('./services/fantasyScheduler');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
@@ -67,6 +68,11 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+app.use(
+  compression({
+    threshold: 1024
+  })
+);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: verifyOrigin,
