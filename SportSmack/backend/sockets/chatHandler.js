@@ -132,6 +132,35 @@ module.exports = function(io) {
   });
 
   io.on('connection', (socket) => {
+    const socketRate = {
+      messages: [],
+      polls: [],
+      votes: []
+    };
+    
+    const checkSocketRate = (
+      bucket,
+      max,
+      windowMs
+    ) => {
+      const now = Date.now();
+    
+      socketRate[bucket] =
+        socketRate[bucket].filter(
+          time =>
+            now - time < windowMs
+        );
+    
+      if (
+        socketRate[bucket].length >= max
+      ) {
+        return false;
+      }
+    
+      socketRate[bucket].push(now);
+    
+      return true;
+    };
     console.log(`User connected to chat: ${socket.user.username}`);
 
     socket.on('join_game', async (data, callback) => {
@@ -346,9 +375,30 @@ module.exports = function(io) {
     });
 
     socket.on('send_message', async (data, callback) => {
+      if (
+        !checkSocketRate(
+          'messages',
+          30,
+          60 * 1000
+        )
+      ) {
+        return callback({
+          success: false,
+          message:
+            'You are sending messages too quickly.'
+        });
+      }
       const league = String(data.league || '').trim();
       const gameId = String(data.gameId || '').trim();
       const content = String(data.content || '').trim();
+
+      if (content.length > 1000) {
+        return callback({
+          success: false,
+          message:
+            'Message must be 1000 characters or fewer.'
+        });
+      }
       
       if (
         !socket.gameContext ||
@@ -470,6 +520,19 @@ module.exports = function(io) {
     });
 
     socket.on('create_poll', async (data, callback) => {
+      if (
+        !checkSocketRate(
+          'polls',
+          5,
+          60 * 1000
+        )
+      ) {
+        return callback?.({
+          success: false,
+          message:
+            'You are creating polls too quickly.'
+        });
+      }
       const { league, gameId, question, options } = data;
       if (!socket.gameContext || socket.gameContext.gameId !== gameId) {
         return callback && callback({ success: false, message: 'Not joined to this game' });
@@ -507,6 +570,19 @@ module.exports = function(io) {
     });
 
     socket.on('vote_poll', async (data, callback) => {
+      if (
+        !checkSocketRate(
+          'votes',
+          30,
+          60 * 1000
+        )
+      ) {
+        return callback?.({
+          success: false,
+          message:
+            'You are voting too quickly.'
+        });
+      }
       const { messageId, option } = data;
       try {
         const msg = await prisma.gameMessage.findUnique({ where: { id: messageId } });
