@@ -93,9 +93,7 @@ module.exports = function(io) {
       let token = cookies.smack_auth;
       
       // Fallback: Check explicit token passed in socket.auth
-      if (!token && socket.handshake.auth && socket.handshake.auth.token) {
-        token = socket.handshake.auth.token;
-      }
+      
       console.log(
         'Socket handshake received. Token present:',
         !!token
