@@ -41,9 +41,57 @@ const aiLimiter = rateLimit({
   }
 });
 
+const socialLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req =>
+    req.user?.id
+      ? `user:${req.user.id}`
+      : `ip:${req.ip}`,
+  message: {
+    error:
+      'Too many social actions. Please slow down.'
+  }
+});
+
+const postCreationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req =>
+    req.user?.id
+      ? `user:${req.user.id}`
+      : `ip:${req.ip}`,
+  message: {
+    error:
+      'You are posting too quickly. Please wait a moment.'
+  }
+});
+
+const reportLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: req =>
+    req.user?.id
+      ? `user:${req.user.id}`
+      : `ip:${req.ip}`,
+  message: {
+    error:
+      'Too many reports. Please try again later.'
+  }
+});
+
 module.exports = {
   standardLimiter,
   authLimiter,
   writeLimiter,
-  aiLimiter
+  aiLimiter,
+  socialLimiter,
+  postCreationLimiter,
+  reportLimiter
 };
