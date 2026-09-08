@@ -25,7 +25,28 @@ router.get('/', async (req, res) => {
     const cursor = req.query.cursor;
     const take = 15; // smaller chunk size for better performance
     const forum = req.query.forum;
-    let whereClause = {};
+
+    const blockedUsers =
+      await prisma.block.findMany({
+        where: {
+          blockerId:
+            req.user.id
+        },
+        select: {
+          blockedId: true
+        }
+      });
+    
+    const blockedUserIds =
+      blockedUsers.map(
+        block => block.blockedId
+      );
+    
+    let whereClause = {
+      user_id: {
+        notIn: blockedUserIds
+      }
+    };
     if (forum) {
       // Fetch posts specific to this forum category
       whereClause.content = { startsWith: `[FORUM:${forum}]` };
