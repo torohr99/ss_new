@@ -639,6 +639,162 @@ export function PregameAnalysis({ data, loading, error }) {
                 )}
             </div>
 
+            {analysis.reasoning?.primaryEvidence?.length > 0 && (
+              <div
+                  style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'rgba(255,255,255,0.04)',
+                      borderRadius: '8px'
+                  }}
+              >
+                  <h4 style={{ marginTop: 0 }}>
+                      Why the AI Thinks This
+                  </h4>
+          
+                  <div
+                      style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.8rem'
+                      }}
+                  >
+                      {analysis.reasoning.primaryEvidence.map(
+                          (item, index) => (
+                              <div
+                                  key={index}
+                                  style={{
+                                      padding: '0.8rem',
+                                      background:
+                                          'rgba(255,255,255,0.03)',
+                                      borderRadius: '6px'
+                                  }}
+                              >
+                                  <strong>
+                                      {item.factor}
+                                  </strong>
+          
+                                  {item.team && (
+                                      <div
+                                          style={{
+                                              fontSize: '0.8rem',
+                                              opacity: 0.7,
+                                              marginTop: '0.2rem'
+                                          }}
+                                      >
+                                          {item.team}
+                                      </div>
+                                  )}
+          
+                                  <p
+                                      style={{
+                                          margin:
+                                              '0.4rem 0',
+                                          lineHeight: 1.5
+                                      }}
+                                  >
+                                      {item.evidence}
+                                  </p>
+          
+                                  {item.impact && (
+                                      <p
+                                          style={{
+                                              margin: 0,
+                                              lineHeight: 1.5,
+                                              opacity: 0.85
+                                          }}
+                                      >
+                                          <strong>
+                                              Impact:
+                                          </strong>{' '}
+                                          {item.impact}
+                                      </p>
+                                  )}
+                              </div>
+                          )
+                      )}
+                  </div>
+              </div>
+          )}
+          
+          {analysis.reasoning?.counterEvidence?.length > 0 && (
+              <div
+                  style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'rgba(255,255,255,0.04)',
+                      borderRadius: '8px'
+                  }}
+              >
+                  <h4 style={{ marginTop: 0 }}>
+                      Evidence Against the Pick
+                  </h4>
+          
+                  <div
+                      style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.8rem'
+                      }}
+                  >
+                      {analysis.reasoning.counterEvidence.map(
+                          (item, index) => (
+                              <div
+                                  key={index}
+                                  style={{
+                                      padding: '0.8rem',
+                                      background:
+                                          'rgba(255,255,255,0.03)',
+                                      borderRadius: '6px'
+                                  }}
+                              >
+                                  <strong>
+                                      {item.factor}
+                                  </strong>
+          
+                                  {item.team && (
+                                      <div
+                                          style={{
+                                              fontSize: '0.8rem',
+                                              opacity: 0.7,
+                                              marginTop: '0.2rem'
+                                          }}
+                                      >
+                                          {item.team}
+                                      </div>
+                                  )}
+          
+                                  <p
+                                      style={{
+                                          margin:
+                                              '0.4rem 0',
+                                          lineHeight: 1.5
+                                      }}
+                                  >
+                                      {item.evidence}
+                                  </p>
+          
+                                  {item.impact && (
+                                      <p
+                                          style={{
+                                              margin: 0,
+                                              lineHeight: 1.5,
+                                              opacity: 0.85
+                                          }}
+                                      >
+                                          <strong>
+                                              Why It Matters:
+                                          </strong>{' '}
+                                          {item.impact}
+                                      </p>
+                                  )}
+                              </div>
+                          )
+                      )}
+                  </div>
+              </div>
+          )}
+
             {analysis.mostImportantFactor && (
                 <div style={{ marginTop: '1rem' }}>
                     <h4>Most Important Factor</h4>
