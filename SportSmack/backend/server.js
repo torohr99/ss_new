@@ -15,7 +15,6 @@ const {
   startFantasyScheduler
 } = require('./services/fantasyScheduler');
 const compression = require('compression');
-const prisma = require('./lib/prisma');
 
 const app = express();
 const server = http.createServer(app);
@@ -120,77 +119,6 @@ app.use('/api/fantasy', fantasyRoute);
 app.use('/api/ai', aiRoute);
 app.use('/api/gamecast', gamecastRoute);
 
-// TEMPORARY ADMIN SETUP — REMOVE AFTER USE
-app.post('/api/setup/promote-admin', async (req, res) => {
-  try {
-    const setupSecret = process.env.ADMIN_SETUP_SECRET;
-
-    if (!setupSecret) {
-      return res.status(404).json({
-        error: 'Not found'
-      });
-    }
-
-    const providedSecret = req.get('x-admin-setup-secret');
-
-    if (!providedSecret || providedSecret !== setupSecret) {
-      return res.status(403).json({
-        error: 'Forbidden'
-      });
-    }
-
-    const { username } = req.body;
-
-    if (!username || typeof username !== 'string') {
-      return res.status(400).json({
-        error: 'Username is required.'
-      });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: {
-        username: username.trim()
-      },
-      select: {
-        id: true,
-        username: true,
-        role: true
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        error: 'User not found.'
-      });
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: {
-        id: user.id
-      },
-      data: {
-        role: 'ADMIN'
-      },
-      select: {
-        id: true,
-        username: true,
-        role: true
-      }
-    });
-
-    return res.json({
-      success: true,
-      message: 'User promoted to administrator.',
-      user: updatedUser
-    });
-  } catch (error) {
-    console.error('Temporary admin setup error:', error);
-
-    return res.status(500).json({
-      error: 'Unable to promote user.'
-    });
-  }
-});
 // Health check endpoint
 app.get('/api/status', (req, res) => {
   res.json({
