@@ -7,11 +7,15 @@ const postGameAnalysis =
   require('../services/postGameAnalysis');
 const gameAssistant =
   require('../services/gameAssistant');
+const {
+  aiLimiter
+} = require('../middleware/rateLimits');
 
 // @route GET /api/gamecast/:league/:gameId/postgame-analysis
 // @desc Generate AI post-game analysis
 router.get(
   '/:league/:gameId/postgame-analysis',
+  aiLimiter,
   async (req, res) => {
     const { league, gameId } = req.params;
 
@@ -71,6 +75,7 @@ router.get(
 // @desc Answer an AI question about a specific game
 router.post(
   '/:league/:gameId/assistant',
+  aiLimiter,
   async (req, res) => {
     const {
       league,
@@ -125,6 +130,7 @@ router.post(
 // @desc Generate matchup-specific AI pre-game analysis
 router.get(
   '/:league/:gameId/pregame-analysis',
+  aiLimiter,
   async (req, res) => {
     const { league, gameId } = req.params;
 
