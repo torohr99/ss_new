@@ -11,6 +11,17 @@ export default function PostCard({ post }) {
   const [newComment, setNewComment] = useState('');
   const [commentsCount, setCommentsCount] = useState(post._count.comments);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [showModerationMenu, setShowModerationMenu] =
+    useState(false);
+  
+  const [showReportForm, setShowReportForm] =
+    useState(false);
+  
+  const [reportReason, setReportReason] =
+    useState('SPAM');
+  
+  const [moderationMessage, setModerationMessage] =
+    useState('');
 
   const toggleLike = async () => {
     const originalLiked = isLiked;
@@ -112,6 +123,86 @@ export default function PostCard({ post }) {
 
   const authorInitials = post.user.username.substring(0, 2).toUpperCase();
 
+  const blockAuthor = async () => {
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const response = await fetch(
+        `${API_URL}/api/moderation/block/${post.user.id}`,
+        {
+          method: 'POST',
+          credentials: 'include'
+        }
+      );
+  
+      const data =
+        await response.json();
+  
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+          'Failed to block user.'
+        );
+      }
+  
+      setModerationMessage(
+        'User blocked.'
+      );
+      setShowModerationMenu(false);
+    } catch (error) {
+      setModerationMessage(
+        error.message
+      );
+    }
+  };
+  
+  const reportPost = async () => {
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const response = await fetch(
+        `${API_URL}/api/moderation/report`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            targetType: 'POST',
+            targetId: post.id,
+            reason: reportReason
+          })
+        }
+      );
+  
+      const data =
+        await response.json();
+  
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+          'Failed to report post.'
+        );
+      }
+  
+      setModerationMessage(
+        'Report submitted.'
+      );
+      setShowReportForm(false);
+      setShowModerationMenu(false);
+    } catch (error) {
+      setModerationMessage(
+        error.message
+      );
+    }
+  };
+  
   return (
     <div className="post-card">
       <div className="post-header">
@@ -122,7 +213,102 @@ export default function PostCard({ post }) {
           </Link>
           <span className="post-time">{new Date(post.created_at).toLocaleString()}</span>
         </div>
+        <div className="post-moderation">
+          <button
+            type="button"
+            onClick={() =>
+              setShowModerationMenu(
+                previous => !previous
+              )
+            }
+          >
+            •••
+          </button>
+        
+          {showModerationMenu && (
+            <div className="moderation-menu">
+              <button
+                type="button"
+                onClick={blockAuthor}
+              >
+                Block user
+              </button>
+        
+              <button
+                type="button"
+                onClick={() =>
+                  setShowReportForm(true)
+                }
+              >
+                Report post
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+      {showReportForm && (
+        <div className="report-form">
+          <label>
+            Report reason
+          </label>
+      
+          <select
+            value={reportReason}
+            onChange={event =>
+              setReportReason(
+                event.target.value
+              )
+            }
+          >
+            <option value="SPAM">
+              Spam
+            </option>
+            <option value="HARASSMENT">
+              Harassment
+            </option>
+            <option value="HATE">
+              Hate
+            </option>
+            <option value="THREATS">
+              Threats
+            </option>
+            <option value="SEXUAL_CONTENT">
+              Sexual content
+            </option>
+            <option value="VIOLENCE">
+              Violence
+            </option>
+            <option value="MISINFORMATION">
+              Misinformation
+            </option>
+            <option value="OTHER">
+              Other
+            </option>
+          </select>
+      
+          <button
+            type="button"
+            onClick={reportPost}
+          >
+            Submit report
+          </button>
+      
+          <button
+            type="button"
+            onClick={() =>
+              setShowReportForm(false)
+            }
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      
+      {moderationMessage && (
+        <div className="moderation-message">
+          {moderationMessage}
+        </div>
+      )}
 
       <div className="post-content">{post.content.replace(/^\[FORUM:[^\]]+\]\s*/, '')}</div>
 
