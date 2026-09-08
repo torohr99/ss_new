@@ -49,6 +49,23 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate --schema prisma/schema.postgres.prisma
 
+      - name: Start backend
+        run: npm start > backend.log 2>&1 &
+
+      - name: Wait for backend
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:5000/api/status > /dev/null; then
+              echo "Backend is ready."
+              break
+            fi
+
+            sleep 2
+          done
+
+      - name: Run backend smoke tests
+        run: npm test
+
   frontend:
     name: Frontend checks
     runs-on: ubuntu-latest
