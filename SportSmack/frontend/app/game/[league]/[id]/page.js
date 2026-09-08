@@ -284,7 +284,6 @@ export default function GameHubPage({ params }) {
 
     const connectToSocket = async () => {
       try {
-        const token = localStorage.getItem('smack_token');
         const socket = io(
             process.env.NEXT_PUBLIC_API_URL ||
             'http://localhost:5000',
@@ -460,10 +459,9 @@ export default function GameHubPage({ params }) {
             method: 'POST',
         
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization':
-                `Bearer ${localStorage.getItem('smack_token')}`
+              'Content-Type': 'application/json'
             },
+            credentials: 'include',
         
             body: JSON.stringify({
               prompt: memeInput,
