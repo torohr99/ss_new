@@ -1038,3 +1038,218 @@ export function PregameAnalysis({ data, loading, error }) {
         </div>
     );
 }
+
+export function PostGameAnalysis({ data }) {
+  if (!data?.analysis) {
+    return null;
+  }
+
+  const analysis = data.analysis;
+
+  return (
+    <div
+      style={{
+        background: 'var(--glass-bg)',
+        padding: '1rem',
+        borderRadius: '12px',
+        border:
+          '1px solid var(--glass-border)',
+        marginBottom: '1rem'
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '0.75rem'
+        }}
+      >
+        <h3 style={{ margin: 0 }}>
+          🏁 Post-Game AI Analysis
+        </h3>
+
+        <span
+          style={{
+            fontSize: '0.75rem',
+            opacity: 0.7
+          }}
+        >
+          Final
+        </span>
+      </div>
+
+      <h4 style={{ margin: '0 0 0.5rem' }}>
+        {analysis.headline}
+      </h4>
+
+      <p style={{ lineHeight: 1.5 }}>
+        {analysis.summary}
+      </p>
+
+      {analysis.winner && (
+        <div
+          style={{
+            padding: '0.8rem',
+            marginBottom: '0.75rem',
+            background:
+              'rgba(255,255,255,0.05)',
+            borderRadius: '8px'
+          }}
+        >
+          <strong>
+            Why {analysis.winner.team} Won
+          </strong>
+
+          <p
+            style={{
+              margin: '0.4rem 0 0',
+              lineHeight: 1.5
+            }}
+          >
+            {analysis.winner.whyTheyWon}
+          </p>
+        </div>
+      )}
+
+      {analysis.loser && (
+        <div
+          style={{
+            padding: '0.8rem',
+            marginBottom: '0.75rem',
+            background:
+              'rgba(255,255,255,0.05)',
+            borderRadius: '8px'
+          }}
+        >
+          <strong>
+            Why {analysis.loser.team} Lost
+          </strong>
+
+          <p
+            style={{
+              margin: '0.4rem 0 0',
+              lineHeight: 1.5
+            }}
+          >
+            {analysis.loser.whyTheyLost}
+          </p>
+        </div>
+      )}
+
+      {analysis.turningPoint && (
+        <div
+          style={{
+            marginBottom: '0.75rem'
+          }}
+        >
+          <strong>
+            {analysis.turningPoint.title}
+          </strong>
+
+          <p
+            style={{
+              margin: '0.3rem 0',
+              lineHeight: 1.5
+            }}
+          >
+            {analysis.turningPoint.explanation}
+          </p>
+        </div>
+      )}
+
+      {Array.isArray(
+        analysis.keyPlayers
+      ) &&
+        analysis.keyPlayers.length > 0 && (
+          <div
+            style={{
+              marginBottom: '0.75rem'
+            }}
+          >
+            <strong>
+              Key Players
+            </strong>
+
+            <ul
+              style={{
+                paddingLeft: '1.2rem'
+              }}
+            >
+              {analysis.keyPlayers.map(
+                (player, index) => (
+                  <li key={index}>
+                    <strong>
+                      {player.name}
+                    </strong>{' '}
+                    ({player.team}) —{' '}
+                    {player.impact}
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+        )}
+
+      {analysis.preGamePrediction && (
+        <div
+          style={{
+            padding: '0.8rem',
+            marginBottom: '0.75rem',
+            background:
+              'rgba(255,255,255,0.05)',
+            borderRadius: '8px'
+          }}
+        >
+          <strong>
+            Pre-Game Prediction
+          </strong>
+
+          <p
+            style={{
+              margin: '0.4rem 0',
+              lineHeight: 1.5
+            }}
+          >
+            Predicted:{' '}
+            {analysis.preGamePrediction.prediction}
+            <br />
+            Actual winner:{' '}
+            {analysis.preGamePrediction.actualWinner}
+            <br />
+            Result:{' '}
+            {analysis.preGamePrediction.correct
+              ? '✅ Correct'
+              : '❌ Incorrect'}
+          </p>
+
+          <p
+            style={{
+              margin: 0,
+              lineHeight: 1.5
+            }}
+          >
+            {analysis.preGamePrediction.analysis}
+          </p>
+        </div>
+      )}
+
+      {analysis.biggestTakeaway && (
+        <div>
+          <strong>
+            Biggest Takeaway
+          </strong>
+
+          <p
+            style={{
+              margin: '0.3rem 0',
+              lineHeight: 1.5
+            }}
+          >
+            {analysis.biggestTakeaway}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
