@@ -1,6 +1,10 @@
 "use client";
 import React from 'react';
 
+import {
+  useState
+} from 'react';
+
 export function Timeline({ timelineData, winProbability }) {
   if (!timelineData || timelineData.length === 0) {
     return <div className="gamecast-timeline">Waiting for game events...</div>;
@@ -1250,6 +1254,298 @@ export function PostGameAnalysis({ data }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+export function GameAssistant({
+  league,
+  gameId
+}) {
+  const [question, setQuestion] =
+    useState('');
+
+  const [messages, setMessages] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const askQuestion =
+    async (e) => {
+      e.preventDefault();
+
+      const cleanQuestion =
+        question.trim();
+
+      if (
+        !cleanQuestion ||
+        loading
+      ) {
+        return;
+      }
+
+      const previousMessages =
+        messages.slice(-6);
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'user',
+          content:
+            cleanQuestion
+        }
+      ]);
+
+      setQuestion('');
+      setLoading(true);
+
+      try {
+        const response =
+          await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/gamecast/${league}/${gameId}/assistant`,
+            {
+              method: 'POST',
+
+              headers: {
+                'Content-Type':
+                  'application/json'
+              },
+
+              body: JSON.stringify({
+                question:
+                  cleanQuestion,
+
+                conversation:
+                  previousMessages
+              })
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              'Failed to get AI answer.'
+          );
+        }
+
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              data.result?.answer ||
+              'No answer available.',
+            evidence:
+              data.result
+                ?.evidence || [],
+            confidence:
+              data.result
+                ?.confidence
+          }
+        ]);
+      } catch (error) {
+        console.error(
+          'Game assistant error:',
+          error
+        );
+
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content:
+              'Sorry, I could not answer that question right now.'
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  return (
+    <div
+      style={{
+        background:
+          'var(--glass-bg)',
+        padding: '1rem',
+        borderRadius: '12px',
+        border:
+          '1px solid var(--glass-border)',
+        marginBottom: '1rem'
+      }}
+    >
+      <h3
+        style={{
+          marginTop: 0
+        }}
+      >
+        🤖 Ask SportSmack AI
+      </h3>
+
+      <p
+        style={{
+          opacity: 0.75,
+          fontSize: '0.9rem'
+        }}
+      >
+        Ask anything about this
+        game, matchup, players,
+        statistics, or what is
+        happening right now.
+      </p>
+
+      {messages.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection:
+              'column',
+            gap: '0.75rem',
+            marginBottom:
+              '1rem',
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}
+        >
+          {messages.map(
+            (message, index) => (
+              <div
+                key={index}
+                style={{
+                  alignSelf:
+                    message.role ===
+                    'user'
+                      ? 'flex-end'
+                      : 'flex-start',
+
+                  maxWidth: '85%',
+
+                  background:
+                    message.role ===
+                    'user'
+                      ? 'var(--primary-color)'
+                      : 'rgba(255,255,255,0.06)',
+
+                  padding:
+                    '0.75rem 1rem',
+
+                  borderRadius:
+                    '10px'
+                }}
+              >
+                <div
+                  style={{
+                    lineHeight: 1.5
+                  }}
+                >
+                  {message.content}
+                </div>
+
+                {message.evidence
+                  ?.length > 0 && (
+                  <div
+                    style={{
+                      marginTop:
+                        '0.6rem',
+                      fontSize:
+                        '0.8rem',
+                      opacity: 0.8
+                    }}
+                  >
+                    <strong>
+                      Evidence:
+                    </strong>
+
+                    <ul
+                      style={{
+                        margin:
+                          '0.3rem 0 0 1rem'
+                      }}
+                    >
+                      {message.evidence.map(
+                        (
+                          item,
+                          evidenceIndex
+                        ) => (
+                          <li
+                            key={
+                              evidenceIndex
+                            }
+                          >
+                            {item}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                {message.confidence !=
+                  null && (
+                  <div
+                    style={{
+                      marginTop:
+                        '0.4rem',
+                      fontSize:
+                        '0.75rem',
+                      opacity: 0.65
+                    }}
+                  >
+                    AI confidence:{' '}
+                    {
+                      message.confidence
+                    }%
+                  </div>
+                )}
+              </div>
+            )
+          )}
+        </div>
+      )}
+
+      <form
+        onSubmit={
+          askQuestion
+        }
+        style={{
+          display: 'flex',
+          gap: '0.5rem'
+        }}
+      >
+        <input
+          type="text"
+          className="form-input"
+          value={question}
+          onChange={e =>
+            setQuestion(
+              e.target.value
+            )
+          }
+          placeholder="Why is this team winning?"
+          disabled={loading}
+          style={{
+            flex: 1,
+            borderRadius: '20px'
+          }}
+        />
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={
+            loading ||
+            !question.trim()
+          }
+        >
+          {loading
+            ? '...'
+            : 'Ask'}
+        </button>
+      </form>
     </div>
   );
 }
