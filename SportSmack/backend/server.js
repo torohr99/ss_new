@@ -89,6 +89,8 @@ app.use('/api/auth', authLimiter);
 const indexRoutes = require('./routes/index');
 const authRoutes = require('./routes/auth');
 const usersRoute = require('./routes/users');
+const moderationRoute =
+  require('./routes/moderation');
 const teamsRoute = require('./routes/teams');
 const postsRoute = require('./routes/posts');
 const searchRoutes = require('./routes/search');
@@ -99,6 +101,10 @@ const gamecastRoute = require('./routes/gamecast');
 app.use('/api', indexRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoute);
+app.use(
+  '/api/moderation',
+  moderationRoute
+);
 app.use('/api/teams', teamsRoute);
 app.use('/api/posts', postsRoute);
 app.use('/api/search', searchRoutes);
