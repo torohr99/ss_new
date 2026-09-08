@@ -7,7 +7,8 @@ import { useAuth } from '../../../context/AuthContext';
 import MemeEditor from '../../../../components/MemeEditor';
 import {
     LiveStats,
-    PregameAnalysis
+    PregameAnalysis,
+    LiveAIAnalysis
 } from '../../../../components/gamecast';
 
 function normalizeChatMessage(message) {
@@ -483,7 +484,13 @@ export default function GameHubPage({ params }) {
               error={pregameAnalysisError}
           />
       )}
-      
+
+      {liveAiAnalysis && (
+          <LiveAIAnalysis
+            data={liveAiAnalysis}
+          />
+        )}
+
       {pregameAnalysisLoading && !pregameAnalysis && (
           <PregameAnalysis
               data={null}
