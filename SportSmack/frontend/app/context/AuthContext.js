@@ -16,52 +16,7 @@ const AuthContext = createContext();
 // INITIALIZE AUTHORIZATION HEADER
 // ------------------------------------------------------------
 
-if (typeof window !== 'undefined') {
-  const token =
-    localStorage.getItem('smack_token');
 
-  if (token) {
-    axios.defaults.headers.common[
-      'Authorization'
-    ] = `Bearer ${token}`;
-  }
-
-  // Global fetch interceptor for existing application
-  // requests that use fetch().
-  const originalFetch = window.fetch;
-
-  window.fetch = async function (...args) {
-    let [resource, config] = args;
-
-    const currentToken =
-      localStorage.getItem('smack_token');
-
-    const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      'http://localhost:5000';
-
-    if (
-      currentToken &&
-      typeof resource === 'string' &&
-      resource.startsWith(apiUrl)
-    ) {
-      config = config || {};
-
-      config.headers = {
-        ...config.headers,
-        Authorization:
-          `Bearer ${currentToken}`
-      };
-
-      args[1] = config;
-    }
-
-    return originalFetch.apply(
-      this,
-      args
-    );
-  };
-}
 
 // ------------------------------------------------------------
 // AUTH PROVIDER
@@ -88,18 +43,6 @@ export const AuthProvider = ({
 
   const checkUserLoggedIn = async () => {
     try {
-      const token =
-        localStorage.getItem('smack_token');
-
-      if (!token) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      axios.defaults.headers.common[
-        'Authorization'
-      ] = `Bearer ${token}`;
 
       const baseUrl =
         process.env.NEXT_PUBLIC_API_URL ||
@@ -108,10 +51,7 @@ export const AuthProvider = ({
       const res = await fetch(
         `${baseUrl}/api/auth/me`,
         {
-          headers: {
-            Authorization:
-              `Bearer ${token}`
-          }
+          credentials: 'include'
         }
       );
 
@@ -182,6 +122,7 @@ export const AuthProvider = ({
       `${baseUrl}/api/auth/login`,
       {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type':
             'application/json'
@@ -197,14 +138,6 @@ export const AuthProvider = ({
       await res.json();
 
     if (res.ok) {
-      localStorage.setItem(
-        'smack_token',
-        data.token
-      );
-
-      axios.defaults.headers.common[
-        'Authorization'
-      ] = `Bearer ${data.token}`;
 
       setUser(data);
 
@@ -279,17 +212,28 @@ export const AuthProvider = ({
   // ----------------------------------------------------------
 
   const logout = async () => {
-    localStorage.removeItem(
-      'smack_token'
+  try {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+
+    await fetch(
+      `${baseUrl}/api/auth/logout`,
+      {
+        method: 'POST',
+        credentials: 'include'
+      }
     );
+  } catch (error) {
+    console.error(
+      'Logout request failed:',
+      error
+    );
+  }
 
-    delete axios.defaults.headers
-      .common['Authorization'];
-
-    setUser(null);
-
-    router.push('/login');
-  };
+  setUser(null);
+  router.push('/login');
+};
 
   return (
     <AuthContext.Provider
