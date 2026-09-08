@@ -44,8 +44,13 @@ const verifyOrigin = (origin, callback) => {
   if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
   
   // Wildcard check for any Vercel deployment under this project name
-  const isVercelPreview = /^https:\/\/ss-new-backendfromr.*\.vercel\.app$/.test(origin);
-  if (isVercelPreview) return callback(null, true);
+  // Production should use only explicitly trusted origins.
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    /^https:\/\/ss-new-backendfromr.*\.vercel\.app$/.test(origin)
+  ) {
+    return callback(null, true);
+  }
   
   console.error(`Blocked CORS Origin: ${origin}`);
   return callback(null, false);
@@ -67,7 +72,7 @@ app.use(cors({
   origin: verifyOrigin,
   credentials: true
 }));
-app.options('*', cors());
+
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
 
