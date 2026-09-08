@@ -262,13 +262,23 @@ router.get('/players/search', authenticateToken, async (req, res) => {
       where.team = team;
     }
 
-    const players = await prisma.fantasyPlayer.findMany({
-      where,
-      orderBy: {
-        name: 'asc'
-      },
-      take: 100
-    });
+    const players =
+      await prisma.fantasyPlayer.findMany({
+        where: {
+          id: {
+            notIn: rosteredIds
+          }
+        },
+        orderBy: [
+          {
+            position: 'asc'
+          },
+          {
+            name: 'asc'
+          }
+        ],
+        take: 200
+      });
 
     res.json(players);
   } catch (err) {
