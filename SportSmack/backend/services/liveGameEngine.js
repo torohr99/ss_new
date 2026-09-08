@@ -222,17 +222,20 @@ class LiveGameEngine {
               : 0
         });
 
-      const previousState =
+      const previousGame =
         this.activeGames.get(
           trackingKey
         );
+      
+      const previousState =
+        previousGame?.state || null;
 
       /*
        * If absolutely nothing relevant changed,
        * don't ask the AI to generate another poll.
        */
       if (
-        previousState ===
+        previousState?.fingerprint ===
         stateFingerprint
       ) {
         return;
@@ -240,7 +243,12 @@ class LiveGameEngine {
 
       this.activeGames.set(
         trackingKey,
-        stateFingerprint
+        {
+          fingerprint:
+            stateFingerprint,
+      
+          state: gameState
+        }
       );
 
       const previousState =
