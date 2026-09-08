@@ -496,17 +496,25 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const token =
-      generateToken(
-        user.id,
-        user.username
-      );
-
+    const token = generateToken(
+      user.id,
+      user.username
+    );
+    
+    res.cookie('smack_auth', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production'
+        ? 'none'
+        : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/'
+    });
+    
     return res.json({
       id: user.id,
       username: user.username,
-      email: user.email,
-      token
+      email: user.email
     });
 
   } catch (error) {
@@ -746,14 +754,19 @@ router.post(
 
 // POST /api/auth/logout
 router.post('/logout', (req, res) => {
-  res.cookie('token', '', {
+  res.clearCookie('smack_auth', {
     httpOnly: true,
-    expires: new Date(0)
+    secure: process.env.NODE_ENV === 'production',
+    sameSite:
+      process.env.NODE_ENV === 'production'
+        ? 'none'
+        : 'lax',
+    path: '/'
   });
 
   return res.status(200).json({
-    message:
-      'Logged out successfully'
+    success: true,
+    message: 'Logged out successfully'
   });
 });
 
