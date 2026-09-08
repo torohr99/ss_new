@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id            Int      @id @default(autoincrement())
+  role          String   @default("USER")
   username      String   @unique
   email         String   @unique
   password_hash String
@@ -20,6 +21,10 @@ model User {
 
   friends        Friendship[]    @relation("UserFriends")
   friendOf       Friendship[]    @relation("UserFriendOf")
+  blocksMade     Block[]         @relation("UserBlocks")
+  blockedBy      Block[]         @relation("UserBlockedBy")
+  reportsMade   Report[]        @relation("ReportsMade")
+  reportsResolved Report[]      @relation("ReportsResolved")
   teams          UserTeam[]
   posts          Post[]
   likes          Like[]
@@ -84,6 +89,40 @@ model Friendship {
   @@unique([user_id, friend_id])
   @@index([friend_id, status])
   @@index([user_id, status])
+}
+
+model Block {
+  id         Int      @id @default(autoincrement())
+  blockerId  Int
+  blockedId  Int
+  createdAt  DateTime @default(now())
+
+  blocker User @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  reporterId  Int
+  targetType  String
+  targetId    String
+  reason      String
+  details     String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  Int?
+
+  reporter User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver User? @relation("ReportsResolved", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@index([reporterId, createdAt])
 }
 
 model Team {
