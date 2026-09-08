@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 const sportsApi = require('../services/sportsApi');
 const gameAnalysis = require('../services/gameAnalysis');
 const postGameAnalysis =
@@ -167,12 +166,26 @@ router.get(
   }
 );
 // Helper to get raw ESPN summary
-async function getGameSummary(league, gameId) {
-  const mapping = sportsApi.LEAGUE_MAP[league.toLowerCase()];
-  if (!mapping) throw new Error('Invalid league mapping');
-  
-  const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`);
-  return response.data;
+async function getGameSummary(
+  league,
+  gameId
+) {
+  const mapping =
+    sportsApi.LEAGUE_MAP[
+      league.toLowerCase()
+    ];
+
+  if (!mapping) {
+    throw new Error(
+      'Invalid league mapping'
+    );
+  }
+
+  return sportsApi.getGameSummary(
+    mapping.sport,
+    mapping.league,
+    gameId
+  );
 }
 
 // @route GET /api/gamecast/:league/:gameId/timeline
