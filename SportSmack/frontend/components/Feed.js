@@ -27,18 +27,7 @@ export default function Feed() {
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL ||
         'http://localhost:5000';
-  
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('smack_token')
-          : null;
-  
-      const authHeaders = token
-        ? {
-            Authorization: `Bearer ${token}`
-          }
-        : {};
-  
+
       const url = cursor
         ? `${apiUrl}/api/posts?cursor=${cursor}`
         : `${apiUrl}/api/posts`;
@@ -46,16 +35,14 @@ export default function Feed() {
       const [postsRes, newsRes] =
         await Promise.all([
           fetch(url, {
-            credentials: 'include',
-            headers: authHeaders
+            credentials: 'include'
           }),
   
           !cursor
             ? fetch(
                 `${apiUrl}/api/users/feed/news`,
                 {
-                  credentials: 'include',
-                  headers: authHeaders
+                  credentials: 'include'
                 }
               )
             : Promise.resolve(null)
