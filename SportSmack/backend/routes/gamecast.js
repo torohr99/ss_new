@@ -5,6 +5,8 @@ const sportsApi = require('../services/sportsApi');
 const gameAnalysis = require('../services/gameAnalysis');
 const postGameAnalysis =
   require('../services/postGameAnalysis');
+const gameAssistant =
+  require('../services/gameAssistant');
 
 // @route GET /api/gamecast/:league/:gameId/postgame-analysis
 // @desc Generate AI post-game analysis
@@ -60,6 +62,60 @@ router.get(
           'POSTGAME_ANALYSIS_UNAVAILABLE',
         message:
           'Post-game AI analysis is temporarily unavailable.'
+      });
+    }
+  }
+);
+
+// @route POST /api/gamecast/:league/:gameId/assistant
+// @desc Answer an AI question about a specific game
+router.post(
+  '/:league/:gameId/assistant',
+  async (req, res) => {
+    const {
+      league,
+      gameId
+    } = req.params;
+
+    const {
+      question,
+      conversation
+    } = req.body;
+
+    if (
+      !question ||
+      !String(question).trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Question is required.'
+      });
+    }
+
+    try {
+      const result =
+        await gameAssistant
+          .answerGameQuestion(
+            league,
+            gameId,
+            question,
+            conversation
+          );
+
+      res.json(result);
+    } catch (error) {
+      console.error(
+        'Game assistant error:',
+        error.message
+      );
+
+      res.status(503).json({
+        success: false,
+        code:
+          'GAME_ASSISTANT_UNAVAILABLE',
+        message:
+          'AI game assistant is temporarily unavailable.'
       });
     }
   }
