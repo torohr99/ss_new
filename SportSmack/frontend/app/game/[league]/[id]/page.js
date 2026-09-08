@@ -125,6 +125,8 @@ export default function GameHubPage({ params }) {
   const [readOnlyReason, setReadOnlyReason] = useState('Connecting to chat...');
   const [connected, setConnected] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [liveAiAnalysis, setLiveAiAnalysis] =
+  useState(null);
   
   const { user } = useAuth();
   
@@ -285,6 +287,15 @@ export default function GameHubPage({ params }) {
         
         });
 
+        socket.on(
+          'live_ai_analysis',
+          (analysis) => {
+            if (!analysis) return;
+        
+            setLiveAiAnalysis(analysis);
+          }
+        );
+        
         socket.on('poll_updated', (updatedMsg) => {
 
             const normalizedMessage =
