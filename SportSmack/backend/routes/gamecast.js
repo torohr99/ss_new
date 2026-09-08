@@ -6,65 +6,32 @@ const gameAnalysis = require('../services/gameAnalysis');
 
 // @route GET /api/gamecast/:league/:gameId/pregame-analysis
 // @desc Generate matchup-specific AI pre-game analysis
-
 router.get(
   '/:league/:gameId/pregame-analysis',
   async (req, res) => {
     const { league, gameId } = req.params;
 
     try {
-      const leagueKey =
-        String(league).toLowerCase();
+      const leagueKey = String(league).toLowerCase();
 
-      const mapping =
-        sportsApi.LEAGUE_MAP?.[leagueKey];
-
-      if (!mapping) {
+      if (!sportsApi.LEAGUE_MAP?.[leagueKey]) {
         return res.status(400).json({
           success: false,
           message: `Unsupported league: ${league}`
         });
       }
 
-      const summary =
-        await sportsApi.getGameSummary(
-          mapping.sport,
-          league,
+      const result =
+        await gameAnalysis.generatePregameAnalysis(
+          leagueKey,
           gameId
         );
 
-      if (!summary) {
-        return res.status(404).json({
-          success: false,
-          message: 'Game data unavailable'
-        });
-      }
-
-      /*
-       * IMPORTANT:
-       * Use the centralized live-game builder.
-       */
-      const gameState =
-        sportsApi.buildSportSpecificState
-          ? sportsApi.buildSportSpecificState(
-              summary,
-              league
-            )
-          : summary;
-
-      const result =
-        await gameAnalysis.generatePregameAnalysis(
-            league,
-            gameId
-        );
-    
-    res.json(result);
-
+      res.json(result);
     } catch (error) {
       console.error(
-        'AI analysis error:',
-        error.response?.data ||
-        error.message
+        'AI pregame analysis error:',
+        error.response?.data || error.message
       );
 
       res.status(503).json({
@@ -76,7 +43,6 @@ router.get(
     }
   }
 );
-
 // Helper to get raw ESPN summary
 async function getGameSummary(league, gameId) {
   const mapping = sportsApi.LEAGUE_MAP[league.toLowerCase()];
