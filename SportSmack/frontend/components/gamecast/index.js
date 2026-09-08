@@ -182,6 +182,217 @@ export function DynamicPolls({ pollsData }) {
   );
 }
 
+export function LiveAIAnalysis({
+  data
+}) {
+  if (!data?.analysis) {
+    return null;
+  }
+
+  const analysis =
+    data.analysis;
+
+  const advantage =
+    analysis.advantage || {};
+
+  return (
+    <div
+      className="gamecast-live-ai"
+      style={{
+        background:
+          'var(--glass-bg)',
+        padding: '1rem',
+        borderRadius: '12px',
+        border:
+          '1px solid var(--glass-border)',
+        marginBottom: '1rem'
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent:
+            'space-between',
+          alignItems: 'center',
+          marginBottom: '0.75rem'
+        }}
+      >
+        <h3
+          style={{
+            margin: 0
+          }}
+        >
+          🔴 Live AI Analysis
+        </h3>
+
+        <span
+          style={{
+            fontSize: '0.75rem',
+            opacity: 0.7
+          }}
+        >
+          Updated{' '}
+          {new Date(
+            data.generatedAt
+          ).toLocaleTimeString()}
+        </span>
+      </div>
+
+      <h4
+        style={{
+          margin:
+            '0 0 0.5rem 0'
+        }}
+      >
+        {analysis.headline}
+      </h4>
+
+      <p
+        style={{
+          lineHeight: 1.5,
+          margin:
+            '0 0 1rem 0'
+        }}
+      >
+        {analysis.update}
+      </p>
+
+      {advantage.team && (
+        <div
+          style={{
+            padding:
+              '0.75rem',
+            background:
+              'rgba(255,255,255,0.05)',
+            borderRadius: '8px',
+            marginBottom:
+              '0.75rem'
+          }}
+        >
+          <strong>
+            Current Advantage:{' '}
+          </strong>
+
+          {advantage.team}
+
+          <div
+            style={{
+              marginTop:
+                '0.35rem',
+              fontSize:
+                '0.85rem',
+              opacity: 0.85
+            }}
+          >
+            {advantage.reason}
+          </div>
+
+          <div
+            style={{
+              marginTop:
+                '0.35rem',
+              fontSize:
+                '0.8rem'
+            }}
+          >
+            Confidence:{' '}
+            {advantage.confidence}%
+          </div>
+        </div>
+      )}
+
+      {analysis.keyDevelopment && (
+        <div
+          style={{
+            marginBottom:
+              '0.75rem'
+          }}
+        >
+          <strong>
+            {analysis.keyDevelopment.title}
+          </strong>
+
+          <p
+            style={{
+              margin:
+                '0.25rem 0',
+              lineHeight: 1.5
+            }}
+          >
+            {
+              analysis
+                .keyDevelopment
+                .explanation
+            }
+          </p>
+        </div>
+      )}
+
+      {analysis.momentum && (
+        <div
+          style={{
+            marginBottom:
+              '0.75rem'
+          }}
+        >
+          <strong>
+            Momentum:{' '}
+            {analysis.momentum.team}
+          </strong>
+
+          <p
+            style={{
+              margin:
+                '0.25rem 0',
+              lineHeight: 1.5
+            }}
+          >
+            {
+              analysis
+                .momentum
+                .explanation
+            }
+          </p>
+        </div>
+      )}
+
+      {Array.isArray(
+        analysis.watchNext
+      ) &&
+        analysis.watchNext.length >
+          0 && (
+          <div>
+            <strong>
+              Watch Next
+            </strong>
+
+            <ul
+              style={{
+                margin:
+                  '0.4rem 0 0 1.2rem',
+                padding: 0
+              }}
+            >
+              {analysis.watchNext.map(
+                (item, index) => (
+                  <li
+                    key={index}
+                    style={{
+                      marginBottom:
+                        '0.3rem'
+                    }}
+                  >
+                    {item}
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+        )}
+    </div>
+  );
+}
+
 export function PregameAnalysis({ data, loading, error }) {
     if (loading) {
         return (
