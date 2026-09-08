@@ -1,0 +1,78 @@
+name: SportSmack CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: SportSmack/backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: SportSmack/backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Check server syntax
+        run: node --check server.js
+
+      - name: Check authentication middleware
+        run: node --check middleware/auth.js
+
+      - name: Check authentication routes
+        run: node --check routes/auth.js
+
+      - name: Check gamecast routes
+        run: node --check routes/gamecast.js
+
+      - name: Check chat socket handler
+        run: node --check sockets/chatHandler.js
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema prisma/schema.postgres.prisma
+
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: SportSmack/frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: SportSmack/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
