@@ -391,133 +391,185 @@ function buildAnalysisPrompt(context) {
     const away = context.matchup.away;
 
     return `
-You are SportSmack's pre-game sports analyst.
+You are SportSmack's advanced pre-game sports analyst.
 
-Analyze ONLY this specific upcoming matchup.
+Your job is to independently reason about ONE SPECIFIC upcoming matchup.
 
-MATCHUP-CONTEXT REQUIREMENTS:
+You must base your reasoning ONLY on the supplied GAME DATA.
 
-- Compare these two specific teams.
-- Use the supplied team statistics.
-- Identify meaningful offensive and defensive advantages when the supplied statistics support them.
-- Compare recent form.
-- Identify the most important key players when supplied.
-- Discuss relevant injuries when supplied.
-- Consider recent team news when supplied.
-- Consider standings and relevant matchup statistics.
-- Do NOT invent statistics, players, injuries, news, or trends.
-- Do NOT make generic statements that are unsupported by the supplied data.
-- If information is unavailable, explicitly say it is unavailable.
-- ESPN's predictor is only a reference point. Do your own reasoning.
-- Every major conclusion must be supported by supplied evidence.
-- The game has NOT started yet.
-- Do not discuss live-game events.
+CORE RULES:
+
+1. Do not invent statistics, players, injuries, news, records, trends, or matchup information.
+2. Do not use general knowledge that is not supported by the supplied GAME DATA.
+3. Do not discuss unrelated games.
+4. Do not discuss events that have already happened during the game.
+5. If information is unavailable, say "Unavailable."
+6. ESPN's predictor is evidence, NOT the answer.
+7. Do your own matchup-specific reasoning.
+8. Every major conclusion must be supported by specific supplied evidence.
+9. Prefer multiple independent pieces of evidence when available.
+10. Distinguish between facts from the data and your interpretation of those facts.
+11. Do not claim that one team has an advantage unless the supplied evidence supports it.
+12. Confidence must reflect the strength and consistency of the evidence, not simply how strongly you phrase the prediction.
+
+REASONING PROCESS:
+
+First, identify the most meaningful differences between the two teams.
+
+Then evaluate:
+
+A. Overall team quality
+B. Recent form
+C. Offensive strengths and weaknesses
+D. Defensive strengths and weaknesses
+E. Key players
+F. Injuries
+G. Recent team news
+H. Home/away or neutral-site context
+I. Standings
+J. Betting information
+K. ESPN predictor
+L. Any sport-specific statistics supplied by ESPN
+
+Then determine:
+
+1. Which team has the stronger overall case.
+2. What specific matchup creates that advantage.
+3. Which evidence is most important.
+4. What evidence works against your prediction.
+5. What could cause your prediction to be wrong.
+6. How confident you should actually be.
+
+IMPORTANT:
+
+A prediction with conflicting evidence should have LOWER confidence.
+
+A prediction supported by several independent pieces of evidence may have HIGHER confidence.
+
+Do not artificially force a large confidence number.
 
 GAME DATA:
 
 ${JSON.stringify(context, null, 2)}
 
-Return ONLY valid JSON using exactly this structure:
+Return ONLY valid JSON.
+
+Use exactly this structure:
 
 {
-    "headline": "Short matchup-specific headline",
+  "headline": "Short matchup-specific headline",
 
-    "summary": "2-4 sentence explanation of what makes this matchup interesting.",
+  "summary": "2-4 sentence explanation of the matchup and why one team has an advantage.",
 
-    "homeTeam": {
-        "name": "${home.name}",
-
-        "advantages": [
-            "Specific statistical or matchup advantage"
-        ],
-
-        "concerns": [
-            "Specific statistical or matchup concern"
-        ]
-    },
-
-    "awayTeam": {
-        "name": "${away.name}",
-
-        "advantages": [
-            "Specific statistical or matchup advantage"
-        ],
-
-        "concerns": [
-            "Specific statistical or matchup concern"
-        ]
-    },
-
-    "offensiveComparison": {
-        "analysis": "Compare the offensive strengths and weaknesses of both teams using supplied evidence.",
-        "advantage": "Team with the offensive advantage, or unavailable"
-    },
-
-    "defensiveComparison": {
-        "analysis": "Compare the defensive strengths and weaknesses of both teams using supplied evidence.",
-        "advantage": "Team with the defensive advantage, or unavailable"
-    },
-
-    "keyMatchup": {
-        "title": "The most important matchup factor",
-        "analysis": "Explain why this matchup factor matters.",
-        "evidence": [
-            "Specific supporting fact",
-            "Specific supporting fact"
-        ]
-    },
-
-    "keyPlayers": {
-        "home": [
-            "Important player and why they matter"
-        ],
-        "away": [
-            "Important player and why they matter"
-        ]
-    },
-
-    "injuries": {
-        "analysis": "Explain which injuries could materially affect the matchup.",
-        "important": [
-            "Specific injury and its relevance"
-        ]
-    },
-
-    "recentForm": {
-        "analysis": "Compare the recent form of both teams.",
-        "homeRecord": "W-L-T",
-        "awayRecord": "W-L-T"
-    },
-
-    "news": {
-        "analysis": "Explain any recent team news that materially affects the matchup.",
-        "important": [
-            "Specific relevant news item"
-        ]
-    },
-
-    "mostImportantFactor": "The single factor most likely to determine the outcome.",
-
-    "prediction": {
-        "winner": "Exact team name",
-        "confidence": 0,
-        "reason": "Explain the prediction using specific supplied evidence."
-    },
-
-    "whatCouldChangeThePrediction": [
-        "Specific scenario",
-        "Specific scenario"
+  "reasoning": {
+    "primaryEvidence": [
+      {
+        "factor": "Name of factor",
+        "team": "Exact team name or Both",
+        "evidence": "Specific factual evidence from GAME DATA",
+        "impact": "Explain how this evidence affects the matchup"
+      }
     ],
 
-    "watchFor": [
-        "Specific thing fans should watch",
-        "Specific thing fans should watch",
-        "Specific thing fans should watch"
+    "counterEvidence": [
+      {
+        "factor": "Name of factor",
+        "team": "Exact team name or Both",
+        "evidence": "Specific evidence that works against the prediction",
+        "impact": "Explain why this evidence matters"
+      }
     ]
+  },
+
+  "homeTeam": {
+    "name": "${home.name}",
+    "advantages": [
+      "Specific supported advantage"
+    ],
+    "concerns": [
+      "Specific supported concern"
+    ]
+  },
+
+  "awayTeam": {
+    "name": "${away.name}",
+    "advantages": [
+      "Specific supported advantage"
+    ],
+    "concerns": [
+      "Specific supported concern"
+    ]
+  },
+
+  "offensiveComparison": {
+    "analysis": "Evidence-based comparison of the offenses.",
+    "advantage": "Exact team name or Unavailable"
+  },
+
+  "defensiveComparison": {
+    "analysis": "Evidence-based comparison of the defenses.",
+    "advantage": "Exact team name or Unavailable"
+  },
+
+  "keyMatchup": {
+    "title": "Most important matchup factor",
+    "analysis": "Explain why this matchup factor matters.",
+    "evidence": [
+      "Specific supporting evidence",
+      "Specific supporting evidence"
+    ]
+  },
+
+  "keyPlayers": {
+    "home": [
+      "Specific player and why the player matters"
+    ],
+    "away": [
+      "Specific player and why the player matters"
+    ]
+  },
+
+  "injuries": {
+    "analysis": "Explain which injuries materially affect the matchup.",
+    "important": [
+      "Specific injury and why it matters"
+    ]
+  },
+
+  "recentForm": {
+    "analysis": "Evidence-based comparison of recent form.",
+    "homeRecord": "W-L-T",
+    "awayRecord": "W-L-T"
+  },
+
+  "news": {
+    "analysis": "Explain only recent news that materially affects the matchup.",
+    "important": [
+      "Specific relevant news item"
+    ]
+  },
+
+  "mostImportantFactor": "The single factor most likely to determine the outcome.",
+
+  "prediction": {
+    "winner": "Exact team name",
+    "confidence": 0,
+    "reason": "Evidence-based explanation of the prediction."
+  },
+
+  "whatCouldChangeThePrediction": [
+    "Specific scenario that could invalidate or change the prediction.",
+    "Specific scenario that could invalidate or change the prediction."
+  ],
+
+  "watchFor": [
+    "Specific matchup development fans should watch.",
+    "Specific matchup development fans should watch.",
+    "Specific matchup development fans should watch."
+  ]
 }
 `;
 }
-
 async function generatePregameAnalysis(league, gameId) {
     const context = await buildGameContext(league, gameId);
 
@@ -576,19 +628,76 @@ async function generatePregameAnalysis(league, gameId) {
     try {
         analysis = JSON.parse(content);
     } catch (error) {
-        console.error('Failed to parse AI analysis:', content);
-        throw new Error('AI returned invalid JSON.');
+        console.error(
+            'Failed to parse AI analysis:',
+            content
+        );
+    
+        throw new Error(
+            'AI returned invalid JSON.'
+        );
+    }
+    
+    if (
+        !analysis ||
+        typeof analysis !== 'object' ||
+        !analysis.prediction ||
+        typeof analysis.prediction !== 'object' ||
+        !analysis.prediction.winner ||
+        typeof analysis.prediction.confidence !== 'number' ||
+        !analysis.prediction.reason
+    ) {
+        console.error(
+            'AI returned incomplete analysis:',
+            analysis
+        );
+    
+        throw new Error(
+            'AI returned incomplete analysis.'
+        );
+    }
+    
+    analysis.prediction.confidence = Math.max(
+        0,
+        Math.min(
+            100,
+            Math.round(
+                analysis.prediction.confidence
+            )
+        )
+    );
+    
+    if (!Array.isArray(analysis.reasoning?.primaryEvidence)) {
+        analysis.reasoning = {
+            ...(analysis.reasoning || {}),
+            primaryEvidence: []
+        };
+    }
+    
+    if (!Array.isArray(analysis.reasoning?.counterEvidence)) {
+        analysis.reasoning = {
+            ...(analysis.reasoning || {}),
+            counterEvidence: []
+        };
     }
 
     return {
         status: 'pre',
+    
         game: context.game,
+    
         matchup: context.matchup,
+    
         keyPlayers: context.keyPlayers,
+    
         injuries: context.injuries,
+    
         statistics: context.statistics,
+    
         predictor: context.predictor,
+    
         betting: context.betting,
+    
         analysis
     };
 }
