@@ -9,7 +9,8 @@ import {
     LiveStats,
     PregameAnalysis,
     LiveAIAnalysis,
-    PostGameAnalysis
+    PostGameAnalysis,
+    GameAssistant
 } from '../../../../components/gamecast';
 
 function normalizeChatMessage(message) {
@@ -562,6 +563,10 @@ export default function GameHubPage({ params }) {
       {postGameAnalysis && (
           <PostGameAnalysis
               data={postGameAnalysis}
+          />
+          <GameAssistant
+              league={league}
+              gameId={gameId}
           />
       )}
     
