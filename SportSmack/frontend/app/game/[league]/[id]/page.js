@@ -564,12 +564,13 @@ export default function GameHubPage({ params }) {
           <PostGameAnalysis
               data={postGameAnalysis}
           />
-          <GameAssistant
-              league={league}
-              gameId={gameId}
-          />
       )}
-    
+
+      <GameAssistant
+          league={league}
+          gameId={gameId}
+      />
+
       {postGameAnalysisLoading && (
           <div
               style={{
