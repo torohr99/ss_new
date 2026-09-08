@@ -13,10 +13,27 @@ export default function Feed() {
   const [nextCursor, setNextCursor] = useState(null);
 
   useEffect(() => {
-    fetchFeed();
+    let cancelled = false;
+  
+    fetchFeed(null, cancelled)
+      .catch(error => {
+        if (!cancelled) {
+          console.error(
+            'Failed to initialize feed:',
+            error
+          );
+        }
+      });
+  
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchFeed = async (cursor = null) => {
+  const fetchFeed = async (
+  cursor = null,
+  cancelled = false
+) => {
     try {
       if (cursor) {
         setLoadingMore(true);
@@ -83,7 +100,11 @@ export default function Feed() {
           feedType: 'news',
           sortDate: new Date(n.published)
         }));
-  
+
+      if (cancelled) {
+        return;
+      }
+      
       setNextCursor(postsData.nextCursor);
   
       if (cursor) {
