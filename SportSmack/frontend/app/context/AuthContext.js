@@ -8,7 +8,6 @@ import {
 } from 'react';
 
 import { useRouter } from 'next/navigation';
-import axios from 'axios';
 
 const AuthContext = createContext();
 
@@ -43,64 +42,36 @@ export const AuthProvider = ({
 
   const checkUserLoggedIn = async () => {
     try {
-
       const baseUrl =
         process.env.NEXT_PUBLIC_API_URL ||
         'http://localhost:5000';
-
+  
       const res = await fetch(
         `${baseUrl}/api/auth/me`,
         {
           credentials: 'include'
         }
       );
-
+  
       if (res.ok) {
-        const data =
-          await res.json();
-
-        // Never keep an unverified user
-        // authenticated in the frontend.
+        const data = await res.json();
+  
         if (data.isVerified === false) {
-          localStorage.removeItem(
-            'smack_token'
-          );
-
-          delete axios.defaults.headers
-            .common['Authorization'];
-
           setUser(null);
           return;
         }
-
+  
         setUser(data);
-
       } else {
-        localStorage.removeItem(
-          'smack_token'
-        );
-
-        delete axios.defaults.headers
-          .common['Authorization'];
-
         setUser(null);
       }
-
     } catch (error) {
       console.error(
         'Failed to check auth status:',
         error
       );
-
-      localStorage.removeItem(
-        'smack_token'
-      );
-
-      delete axios.defaults.headers
-        .common['Authorization'];
-
+  
       setUser(null);
-
     } finally {
       setLoading(false);
     }
