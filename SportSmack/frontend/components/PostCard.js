@@ -59,36 +59,36 @@ export default function PostCard({ post }) {
   };
 
   const fetchComments = async () => {
-  setLoadingComments(true);
-
-  try {
-    const API_URL =
-      process.env.NEXT_PUBLIC_API_URL ||
-      'http://localhost:5000';
-
-    const response = await fetch(
-      `${API_URL}/api/posts/${post.id}/comments?limit=20`,
-      {
-        headers: {
-          ...getAuthHeaders()
-        },
-        credentials: 'include'
+    setLoadingComments(true);
+  
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const response = await fetch(
+        `${API_URL}/api/posts/${post.id}/comments?limit=20`,
+        {
+          headers: {
+            ...getAuthHeaders()
+          },
+          credentials: 'include'
+        }
+      );
+  
+      if (!response.ok) {
+        throw new Error('Failed to fetch comments');
       }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch comments');
+  
+      const data = await response.json();
+  
+      setComments(data.comments || []);
+    } catch (err) {
+      console.error('Error fetching comments:', err);
+    } finally {
+      setLoadingComments(false);
     }
-
-    const data = await response.json();
-
-    setComments(data.comments || []);
-  } catch (err) {
-    console.error('Error fetching comments:', err);
-  } finally {
-    setLoadingComments(false);
-  }
-};
+  };
 
   const toggleComments = () => {
     if (!showComments && comments.length === 0 && commentsCount > 0) {
