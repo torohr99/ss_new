@@ -30,11 +30,11 @@ class LiveGameEngine {
 
   init(io) {
     this.io = io;
-
+  
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
-
+  
     this.start();
   }
 
