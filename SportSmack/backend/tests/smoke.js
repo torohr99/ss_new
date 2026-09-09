@@ -130,6 +130,38 @@ async function main() {
     }
   );
 
+    await runTest(
+      'Unauthenticated moderation endpoint rejects request',
+      async () => {
+        const result =
+          await request(
+            '/api/moderation/blocks'
+          );
+  
+        if (result.status !== 401) {
+          throw new Error(
+            `Expected 401, received ${result.status}`
+          );
+        }
+      }
+    );
+  
+    await runTest(
+      'Unauthenticated admin moderation endpoint rejects request',
+      async () => {
+        const result =
+          await request(
+            '/api/admin/moderation/reports'
+          );
+  
+        if (result.status !== 401) {
+          throw new Error(
+            `Expected 401, received ${result.status}`
+          );
+        }
+      }
+    );
+  
   console.log(
     '\nBackend smoke tests completed.'
   );
