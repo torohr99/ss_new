@@ -14,11 +14,11 @@ const VALID_POSITIONS = new Set([
 ]);
 
 const POSITION_IDS = {
-  QB: 1,
+  QB: 0,
   RB: 2,
-  WR: 3,
-  TE: 4,
-  K: 5,
+  WR: 4,
+  TE: 6,
+  K: 17,
   DST: 16
 };
 
@@ -360,18 +360,46 @@ async function seedFantasyPlayers() {
         for (
           const item of athletes
         ) {
-          const position =
-            typeof item.position ===
-            'string'
+          const rawPosition =
+            typeof item.position === 'string'
               ? item.position.toUpperCase()
               : item.position
                   ?.abbreviation
                   ?.toUpperCase();
-
+        
+          const positionMap = {
+            QUARTERBACK: 'QB',
+            QB: 'QB',
+        
+            RUNNINGBACK: 'RB',
+            'RUNNING BACK': 'RB',
+            RB: 'RB',
+        
+            WIDE_RECEIVER: 'WR',
+            'WIDE RECEIVER': 'WR',
+            WR: 'WR',
+        
+            TIGHT_END: 'TE',
+            'TIGHT END': 'TE',
+            TE: 'TE',
+        
+            KICKER: 'K',
+            K: 'K',
+            PK: 'K',
+        
+            DEFENSIVE_TACKLE: null,
+            DEFENSIVE_END: null,
+            LINEBACKER: null,
+            CORNERBACK: null,
+            SAFETY: null
+          };
+        
+          const position =
+            positionMap[rawPosition] || null;
+        
           if (
-            !VALID_POSITIONS.has(
-              position
-            )
+            !position ||
+            !VALID_POSITIONS.has(position)
           ) {
             continue;
           }
