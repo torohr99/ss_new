@@ -3,6 +3,10 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
+const {
+  createAdapter
+} = require('@socket.io/redis-adapter');
+const redis = require('./lib/redis');
 const helmet = require('helmet');
 const liveGameEngine = require('./services/liveGameEngine');
 const {
@@ -72,6 +76,30 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
+const pubClient = redis.duplicate();
+const subClient = redis.duplicate();
+
+pubClient.on('error', error => {
+  console.error(
+    'Socket.IO Redis publisher error:',
+    error.message
+  );
+});
+
+subClient.on('error', error => {
+  console.error(
+    'Socket.IO Redis subscriber error:',
+    error.message
+  );
+});
+
+io.adapter(
+  createAdapter(
+    pubClient,
+    subClient
+  )
+);
 
 const PORT = process.env.PORT || 5000;
 
@@ -205,8 +233,69 @@ startFantasyScheduler();
 
 // Start server
 server.listen(PORT, '0.0.0.0', () => {
-  logger.info('SportSmack backend started', {
-    port: PORT,
-    environment: process.env.NODE_ENV || 'development'
-  });
+  console.log(
+    `Server running on port ${PORT}`
+  );
 });
+
+const gracefulShutdown = signal => {
+  console.log(
+    `Received ${signal}. Starting graceful shutdown...`
+  );
+
+  liveGameEngine.stop();
+
+  try {
+    const {
+      stopFantasyScheduler
+    } = require('./services/fantasyScheduler');
+
+    stopFantasyScheduler();
+  } catch (error) {
+    console.error(
+      'Error stopping fantasy scheduler:',
+      error.message
+    );
+  }
+
+  io.close(() => {
+    console.log(
+      'Socket.IO connections closed.'
+    );
+
+    server.close(async () => {
+      try {
+        await redis.quit();
+      } catch (error) {
+        console.error(
+          'Error closing Redis:',
+          error.message
+        );
+      }
+
+      console.log(
+        'SportSmack backend shutdown complete.'
+      );
+
+      process.exit(0);
+    });
+  });
+
+  setTimeout(() => {
+    console.error(
+      'Graceful shutdown timed out.'
+    );
+
+    process.exit(1);
+  }, 25000).unref();
+};
+
+process.on(
+  'SIGTERM',
+  () => gracefulShutdown('SIGTERM')
+);
+
+process.on(
+  'SIGINT',
+  () => gracefulShutdown('SIGINT')
+);
