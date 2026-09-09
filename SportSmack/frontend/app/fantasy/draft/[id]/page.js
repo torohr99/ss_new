@@ -117,13 +117,7 @@ export default function DraftRoom({ params }) {
       process.env.NEXT_PUBLIC_API_URL ||
       'http://localhost:5000';
   
-    const token =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('smack_token')
-        : null;
-  
     const newSocket = io(apiUrl, {
-      auth: token ? { token } : {},
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
