@@ -174,7 +174,6 @@ const prisma = require('./lib/prisma');
 
 app.get('/api/status', async (req, res) => {
   try {
-    const prisma = require('./lib/prisma');
     const redis = require('./lib/redis');
 
     await prisma.$queryRaw`SELECT 1`;
