@@ -174,23 +174,39 @@ const prisma = require('./lib/prisma');
 
 app.get('/api/status', async (req, res) => {
   try {
+    const prisma = require('./lib/prisma');
+    const redis = require('./lib/redis');
+
     await prisma.$queryRaw`SELECT 1`;
+    await redis.ping();
 
     return res.status(200).json({
       status: 'OK',
       database: 'OK',
-      timestamp: new Date().toISOString(),
-      uptime: Math.round(process.uptime())
+      redis: 'OK',
+      instance:
+        process.env.RENDER_INSTANCE_ID ||
+        'local',
+      timestamp:
+        new Date().toISOString(),
+      uptime:
+        Math.round(process.uptime())
     });
   } catch (error) {
-    logger.error('Health check failed', {
-      error
-    });
+    console.error(
+      'Health check failed:',
+      error.message
+    );
 
     return res.status(503).json({
       status: 'ERROR',
       database: 'ERROR',
-      timestamp: new Date().toISOString()
+      redis: 'ERROR',
+      instance:
+        process.env.RENDER_INSTANCE_ID ||
+        'local',
+      timestamp:
+        new Date().toISOString()
     });
   }
 });
