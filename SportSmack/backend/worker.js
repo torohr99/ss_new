@@ -6,6 +6,12 @@ const { Emitter } =
 const Redis =
   require('ioredis');
 
+const {
+  acquireWorkerLock,
+  renewWorkerLock,
+  releaseWorkerLock
+} = require('./lib/workerLock');
+
 const liveGameEngine =
   require('./services/liveGameEngine');
 
@@ -45,7 +51,33 @@ async function startWorker() {
 
   await emitterRedis.ping();
 
-  /*
+  const acquired =
+    await acquireWorkerLock();
+  
+  if (!acquired) {
+    throw new Error(
+      'Another SportSmack background worker is already active.'
+    );
+  }
+  
+  setInterval(
+    async () => {
+      const renewed =
+        await renewWorkerLock();
+  
+      if (!renewed) {
+        console.error(
+          'Lost background-worker Redis lock.'
+        );
+  
+        await shutdown(
+          'WORKER_LOCK_LOST'
+        );
+      }
+    },
+    30000
+  );
+    /*
    * Start the single authoritative live-game
    * processor.
    */
@@ -97,6 +129,15 @@ async function shutdown(signal) {
     );
   }
 
+  try {
+    await releaseWorkerLock();
+  } catch (error) {
+    console.error(
+      'Worker lock release error:',
+      error.message
+    );
+  }
+  
   try {
     await redis.quit();
   } catch (error) {
