@@ -3,21 +3,24 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
+
+const {
+  createAdapter
+} = require('@socket.io/redis-adapter');
+
+const redis =
+  require('./lib/redis');
 const {
   createAdapter
 } = require('@socket.io/redis-adapter');
 const redis = require('./lib/redis');
 const helmet = require('helmet');
-const liveGameEngine = require('./services/liveGameEngine');
 const {
   standardLimiter,
   authLimiter
 } = require('./middleware/rateLimits');
 const xss = require('xss-clean');
 require('dotenv').config();
-const {
-  startFantasyScheduler
-} = require('./services/fantasyScheduler');
 const compression = require('compression');
 const logger = require('./lib/logger');
 const metrics = require('./services/metrics');
@@ -77,20 +80,27 @@ const io = new Server(server, {
   }
 });
 
-const pubClient = redis.duplicate();
-const subClient = redis.duplicate();
+const pubClient =
+  redis.duplicate();
+
+const subClient =
+  redis.duplicate();
 
 pubClient.on('error', error => {
-  console.error(
-    'Socket.IO Redis publisher error:',
-    error.message
+  logger.error(
+    'Socket.IO Redis publisher error',
+    {
+      error
+    }
   );
 });
 
 subClient.on('error', error => {
-  console.error(
-    'Socket.IO Redis subscriber error:',
-    error.message
+  logger.error(
+    'Socket.IO Redis subscriber error',
+    {
+      error
+    }
   );
 });
 
@@ -174,9 +184,8 @@ const prisma = require('./lib/prisma');
 
 app.get('/api/status', async (req, res) => {
   try {
-    const redis = require('./lib/redis');
-
     await prisma.$queryRaw`SELECT 1`;
+
     await redis.ping();
 
     return res.status(200).json({
@@ -192,9 +201,11 @@ app.get('/api/status', async (req, res) => {
         Math.round(process.uptime())
     });
   } catch (error) {
-    console.error(
-      'Health check failed:',
-      error.message
+    logger.error(
+      'Health check failed',
+      {
+        error
+      }
     );
 
     return res.status(503).json({
@@ -241,69 +252,75 @@ const setupFantasySockets = require('./sockets/fantasyHandler');
 setupChatSockets(io);
 setupFantasySockets(io);
 
-// Initialize Live Game Engine for dynamic polls
-liveGameEngine.init(io);
-
-startFantasyScheduler();
-
 // Start server
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(
-    `Server running on port ${PORT}`
-  );
+  logger.info('SportSmack backend started', {
+    port: PORT,
+    environment:
+      process.env.NODE_ENV || 'development'
+  });
 });
 
-const gracefulShutdown = signal => {
-  console.log(
-    `Received ${signal}. Starting graceful shutdown...`
-  );
+let isShuttingDown = false;
 
-  liveGameEngine.stop();
-
-  try {
-    const {
-      stopFantasyScheduler
-    } = require('./services/fantasyScheduler');
-
-    stopFantasyScheduler();
-  } catch (error) {
-    console.error(
-      'Error stopping fantasy scheduler:',
-      error.message
-    );
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    return;
   }
 
+  isShuttingDown = true;
+
+  logger.info(
+    'Starting graceful shutdown',
+    {
+      signal
+    }
+  );
+
   io.close(() => {
-    console.log(
+    logger.info(
       'Socket.IO connections closed.'
     );
+  });
 
-    server.close(async () => {
-      try {
-        await redis.quit();
-      } catch (error) {
-        console.error(
-          'Error closing Redis:',
-          error.message
-        );
-      }
-
-      console.log(
-        'SportSmack backend shutdown complete.'
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+    } catch (error) {
+      logger.error(
+        'Prisma shutdown error',
+        {
+          error
+        }
       );
+    }
 
-      process.exit(0);
-    });
+    try {
+      await redis.quit();
+    } catch (error) {
+      logger.error(
+        'Redis shutdown error',
+        {
+          error
+        }
+      );
+    }
+
+    logger.info(
+      'SportSmack backend shutdown complete.'
+    );
+
+    process.exit(0);
   });
 
   setTimeout(() => {
-    console.error(
+    logger.error(
       'Graceful shutdown timed out.'
     );
 
     process.exit(1);
   }, 25000).unref();
-};
+}
 
 process.on(
   'SIGTERM',
