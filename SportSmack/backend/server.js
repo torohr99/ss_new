@@ -16,6 +16,7 @@ const {
 } = require('./services/fantasyScheduler');
 const compression = require('compression');
 const logger = require('./lib/logger');
+const metrics = require('./services/metrics');
 
 const app = express();
 const server = http.createServer(app);
@@ -89,6 +90,14 @@ app.use(cors({
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
 
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    metrics.recordRequest(res.statusCode);
+  });
+
+  next();
+});
+
 app.use('/api', standardLimiter);
 app.use('/api/auth', authLimiter);
 
@@ -100,6 +109,8 @@ const moderationRoute =
   require('./routes/moderation');
 const adminModerationRoute =
   require('./routes/adminModeration');
+const adminMetricsRoute =
+  require('./routes/adminMetrics');
 const teamsRoute = require('./routes/teams');
 const postsRoute = require('./routes/posts');
 const searchRoutes = require('./routes/search');
@@ -117,6 +128,10 @@ app.use(
 app.use(
   '/api/admin/moderation',
   adminModerationRoute
+);
+app.use(
+  '/api/admin/metrics',
+  adminMetricsRoute
 );
 app.use('/api/teams', teamsRoute);
 app.use('/api/posts', postsRoute);
