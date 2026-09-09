@@ -11,7 +11,6 @@ const {
 const redis =
   require('./lib/redis');
 
-const redis = require('./lib/redis');
 const helmet = require('helmet');
 const {
   standardLimiter,
