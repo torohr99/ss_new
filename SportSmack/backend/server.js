@@ -15,6 +15,7 @@ const {
   startFantasyScheduler
 } = require('./services/fantasyScheduler');
 const compression = require('compression');
+const logger = require('./lib/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,7 +58,9 @@ const verifyOrigin = (origin, callback) => {
     return callback(null, true);
   }
 
-  console.error(`Blocked CORS Origin: ${origin}`);
+  logger.warn('Blocked CORS origin', {
+    origin
+  });
   return callback(null, false);
 };
 
@@ -124,11 +127,29 @@ app.use('/api/ai', aiRoute);
 app.use('/api/gamecast', gamecastRoute);
 
 // Health check endpoint
-app.get('/api/status', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'SportSmack Backend is running'
-  });
+const prisma = require('./lib/prisma');
+
+app.get('/api/status', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+
+    return res.status(200).json({
+      status: 'OK',
+      database: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: Math.round(process.uptime())
+    });
+  } catch (error) {
+    logger.error('Health check failed', {
+      error
+    });
+
+    return res.status(503).json({
+      status: 'ERROR',
+      database: 'ERROR',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // 404 handler — MUST come after all routes
@@ -140,7 +161,9 @@ app.use((req, res) => {
 
 // Centralized error handler — MUST be last
 app.use((err, req, res, next) => {
-  console.error('Unhandled server error:', err);
+  logger.error('Unhandled server error', {
+    error: err
+  });
 
   if (res.headersSent) {
     return next(err);
@@ -167,5 +190,8 @@ startFantasyScheduler();
 
 // Start server
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info('SportSmack backend started', {
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
+  });
 });
