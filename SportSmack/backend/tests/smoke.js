@@ -70,6 +70,44 @@ async function main() {
   );
 
   await runTest(
+    'Health endpoint reports database availability',
+    async () => {
+      const result = await request('/api/status');
+  
+      if (result.status !== 200) {
+        throw new Error(
+          `Expected 200, received ${result.status}`
+        );
+      }
+  
+      if (result.body.status !== 'OK') {
+        throw new Error(
+          `Expected status OK, received ${result.body.status}`
+        );
+      }
+  
+      if (result.body.database !== 'OK') {
+        throw new Error(
+          `Expected database OK, received ${result.body.database}`
+        );
+      }
+    }
+  );
+
+  await runTest(
+    'Unauthenticated admin metrics endpoint rejects request',
+    async () => {
+      const result = await request('/api/admin/metrics');
+  
+      if (result.status !== 401) {
+        throw new Error(
+          `Expected 401, received ${result.status}`
+        );
+      }
+    }
+  );
+  
+  await runTest(
     'Unknown endpoint returns 404',
     async () => {
       const result =
