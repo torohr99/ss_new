@@ -36,23 +36,27 @@ const ALLOWED_ORIGINS = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-// FIX 2 & 3: Reusable origin verifier for both Express and Socket.io that handles Vercel Wildcards
+// Reusable origin verifier for Express and Socket.io
 const verifyOrigin = (origin, callback) => {
-  // Allow requests with no origin (like mobile apps, postman, curl)
-  if (!origin) return callback(null, true);
-  
-  // Check exact matches
-  if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-  
-  // Wildcard check for any Vercel deployment under this project name
-  // Production should use only explicitly trusted origins.
+  // Allow requests with no origin (curl, Postman, server-to-server requests)
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  // Allow explicitly trusted origins
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return callback(null, true);
+  }
+
+  // Allow Vercel preview deployments for this SportSmack project.
+  // Vercel generates different preview URLs for deployments,
+  // so the exact URL cannot always be known in advance.
   if (
-    process.env.NODE_ENV !== 'production' &&
-    /^https:\/\/ss-new-backendfromr.*\.vercel\.app$/.test(origin)
+    /^https:\/\/ss-new-backendfromr(?:-[a-z0-9]+)*-sport-smack\.vercel\.app$/i.test(origin)
   ) {
     return callback(null, true);
   }
-  
+
   console.error(`Blocked CORS Origin: ${origin}`);
   return callback(null, false);
 };
