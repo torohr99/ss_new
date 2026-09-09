@@ -77,17 +77,25 @@ export default function DraftRoom({ params }) {
           setLeague(leagueRes.data);
   
                     const playersResponse = await fetch(
-                      `${API_URL}/api/fantasy/players?limit=200`,
+                      `${apiUrl}/api/fantasy/players?limit=2000`,
                       {
                         credentials: 'include'
                       }
                     );
                     
+                    if (!playersResponse.ok) {
+                      throw new Error(
+                        `Failed to load fantasy players: ${playersResponse.status}`
+                      );
+                    }
+                    
                     const playersData =
                       await playersResponse.json();
                     
                     setAvailablePlayers(
-                      playersData.players || []
+                      Array.isArray(playersData.players)
+                        ? playersData.players
+                        : []
                     );
                 } catch (err) {
                   console.error(
@@ -105,10 +113,21 @@ export default function DraftRoom({ params }) {
             }, [id]);
 
   useEffect(() => {
-    const newSocket = io((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'), {
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://localhost:5000';
+  
+    const token =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('smack_token')
+        : null;
+  
+    const newSocket = io(apiUrl, {
       auth: token ? { token } : {},
+      withCredentials: true,
       transports: ['websocket', 'polling']
     });
+  
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
