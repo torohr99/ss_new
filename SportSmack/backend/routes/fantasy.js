@@ -148,10 +148,10 @@ router.get('/players', authenticateToken, async (req, res) => {
 
     const take = Math.min(
       Math.max(
-        parseInt(req.query.limit, 10) || 100,
+        parseInt(req.query.limit, 10) || 2000,
         1
       ),
-      200
+      2000
     );
 
     const position = normalizePosition(
