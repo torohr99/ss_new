@@ -10,9 +10,7 @@ const {
 
 const redis =
   require('./lib/redis');
-const {
-  createAdapter
-} = require('@socket.io/redis-adapter');
+
 const redis = require('./lib/redis');
 const helmet = require('helmet');
 const {
