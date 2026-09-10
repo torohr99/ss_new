@@ -493,6 +493,52 @@ router.put('/me', async (req, res) => {
   }
 });
 
+router.delete(
+  '/me',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      await prisma.user.delete({
+        where: {
+          id: req.user.id
+        }
+      });
+
+      res.clearCookie(
+        'smack_auth',
+        {
+          httpOnly: true,
+          secure:
+            process.env.NODE_ENV ===
+            'production',
+          sameSite:
+            process.env.NODE_ENV ===
+            'production'
+              ? 'none'
+              : 'lax'
+        }
+      );
+
+      return res.json({
+        message:
+          'Account deleted successfully.'
+      });
+    } catch (error) {
+      logger.error(
+        'Account deletion failed',
+        {
+          error
+        }
+      );
+
+      return res.status(500).json({
+        error:
+          'Unable to delete account.'
+      });
+    }
+  }
+);
+
 // @route   GET /api/users/me/badges
 // @desc    Get current user's badges
 router.get('/me/badges', async (req, res) => {
