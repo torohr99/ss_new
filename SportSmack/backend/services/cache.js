@@ -1,21 +1,35 @@
 const redis = require('../lib/redis');
 
-async function getJson(key) {
-  const value = await redis.get(key);
+const PREFIX = 'ss:cache:';
 
-  if (!value) {
-    return null;
-  }
+async function getJson(key) {
+  const redisKey = `${PREFIX}${key}`;
 
   try {
-    return JSON.parse(value);
+    const value =
+      await redis.get(redisKey);
+
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      console.error(
+        `Redis cache parse error for ${redisKey}:`,
+        error
+      );
+
+      await redis.del(redisKey);
+
+      return null;
+    }
   } catch (error) {
     console.error(
-      `Redis cache parse error for ${key}:`,
-      error
+      `Redis cache read failed for ${redisKey}:`,
+      error.message
     );
-
-    await redis.del(key);
 
     return null;
   }
@@ -26,16 +40,36 @@ async function setJson(
   value,
   ttlSeconds
 ) {
-  await redis.set(
-    key,
-    JSON.stringify(value),
-    'EX',
-    ttlSeconds
-  );
+  const redisKey =
+    `${PREFIX}${key}`;
+
+  try {
+    await redis.set(
+      redisKey,
+      JSON.stringify(value),
+      'EX',
+      ttlSeconds
+    );
+  } catch (error) {
+    console.error(
+      `Redis cache write failed for ${redisKey}:`,
+      error.message
+    );
+  }
 }
 
 async function deleteKey(key) {
-  await redis.del(key);
+  const redisKey =
+    `${PREFIX}${key}`;
+
+  try {
+    await redis.del(redisKey);
+  } catch (error) {
+    console.error(
+      `Redis cache delete failed for ${redisKey}:`,
+      error.message
+    );
+  }
 }
 
 module.exports = {
