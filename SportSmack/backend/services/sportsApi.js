@@ -66,7 +66,7 @@ async function getScoreboard(leagueKey) {
       };
     });
 
-    await cache.setJson((cacheKey, games, 60); // Cache for 60s
+    await cache.setJson(cacheKey, games, 60); // Cache for 60s
     return games;
   } catch (error) {
     console.error(`ESPN API Error fetching scoreboard for ${leagueKey}:`, error.message);
@@ -119,7 +119,7 @@ async function getStandings(leagueKey) {
       });
     });
 
-    await cache.setJson((cacheKey, allStandings, 3600); // Cache for 1 hour
+    await cache.setJson(cacheKey, allStandings, 3600); // Cache for 1 hour
     return allStandings;
   } catch (error) {
     console.error(`ESPN API Error fetching standings for ${leagueKey}:`, error.message);
@@ -129,7 +129,7 @@ async function getStandings(leagueKey) {
 
   async function getTeamDetails(sport, league, teamName, city = null) {
   const cacheKey = `teamDetails_${sport}_${league}_${teamName}_${city || ''}`;
-  const cached = await cache.getJson((cacheKey);
+  const cached = await cache.getJson(cacheKey);
   if (cached) return cached;
 
   try {
@@ -178,7 +178,7 @@ async function getStandings(leagueKey) {
       }
     }
 
-    await cache.setJson((cacheKey, details, 86400); // cache for 24 hours
+    await cache.setJson(cacheKey, details, 86400); // cache for 24 hours
     return details;
   } catch (error) {
     console.error(`ESPN API Error fetching team details for ${teamName}:`, error.message);
@@ -188,7 +188,7 @@ async function getStandings(leagueKey) {
 
 async function getTeamSchedule(sport, league, espnId) {
   const cacheKey = `teamSchedule_${sport}_${league}_${espnId}`;
-  const cached = await cache.getJson((cacheKey);
+  const cached = await cache.getJson(cacheKey);
   if (cached) return cached;
 
   try {
@@ -300,7 +300,7 @@ async function getTeamSchedule(sport, league, espnId) {
       nextGame: formatGame(nextGame),
       allGames
     };
-    await cache.setJson((cacheKey, scheduleData, 3600); // cache for 1 hour
+    await cache.setJson(cacheKey, scheduleData, 3600); // cache for 1 hour
     return scheduleData;
 
   } catch (error) {
@@ -311,7 +311,7 @@ async function getTeamSchedule(sport, league, espnId) {
 
 async function getRecentTeamGames(sport, league, espnId, count = 5) {
     const cacheKey = `recentGames_${sport}_${league}_${espnId}_${count}`;
-    const cached = await cache.getJson((cacheKey);
+    const cached = await cache.getJson(cacheKey);
 
     if (cached) return cached;
 
@@ -358,7 +358,7 @@ async function getRecentTeamGames(sport, league, espnId, count = 5) {
             };
         }).filter(Boolean);
 
-        await cache.setJson((cacheKey, games, 900);
+        await cache.setJson(cacheKey, games, 900);
 
         return games;
     } catch (error) {
@@ -373,13 +373,13 @@ async function getRecentTeamGames(sport, league, espnId, count = 5) {
 
 async function getLeagueNews(sport, league) {
   const cacheKey = `news_${league}`;
-  const cached = await cache.getJson((cacheKey);
+  const cached = await cache.getJson(cacheKey);
   if (cached) return cached;
 
   try {
     const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`);
     const articles = response.data.articles || [];
-    await cache.setJson((cacheKey, articles, 300); // cache for 5 minutes
+    await cache.setJson(cacheKey, articles, 300); // cache for 5 minutes
     return articles;
   } catch (error) {
     console.error(`ESPN API Error fetching news for ${league}:`, error.message);
@@ -440,7 +440,7 @@ async function getTeamSocialFeeds(teamName) {
 
 async function getGameSummary(sport, league, gameId) {
   const cacheKey = `gameSummary_${sport}_${league}_${gameId}`;
-  const cached = await cache.getJson((cacheKey);
+  const cached = await cache.getJson(cacheKey);
   if (cached) return cached;
 
   try {
@@ -454,7 +454,7 @@ async function getGameSummary(sport, league, gameId) {
     if (isCompleted) ttl = 86400; // cache finished games for 24 hours
     else if (isLive) ttl = 15; // cache live games for 15s to keep them snappy but reduce load
 
-    await cache.setJson((cacheKey, response.data, ttl);
+    await cache.setJson(cacheKey, response.data, ttl);
     return response.data;
   } catch (error) {
     console.error(`ESPN API Error fetching game summary for ${gameId}:`, error.message);
