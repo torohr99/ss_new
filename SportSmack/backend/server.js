@@ -3,13 +3,8 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
-
-const {
-  createAdapter
-} = require('@socket.io/redis-adapter');
-
-const redis =
-  require('./lib/redis');
+const { createAdapter } = require('@socket.io/redis-adapter');
+const Redis = require('ioredis');
 
 const helmet = require('helmet');
 const {
@@ -24,6 +19,26 @@ const metrics = require('./services/metrics');
 
 const app = express();
 const server = http.createServer(app);
+
+const redisUrl = process.env.REDIS_URL;
+
+if (!redisUrl) {
+  throw new Error('REDIS_URL environment variable is required.');
+}
+
+const pubClient = new Redis(redisUrl, {
+  maxRetriesPerRequest: null
+});
+
+const subClient = pubClient.duplicate();
+
+pubClient.on('error', (error) => {
+  console.error('Socket.IO Redis publisher error:', error.message);
+});
+
+subClient.on('error', (error) => {
+  console.error('Socket.IO Redis subscriber error:', error.message);
+});
 
 // FIX 1: Tell Express to trust Render's proxy headers so express-rate-limit stops crashing
 app.set('trust proxy', 1);
@@ -77,36 +92,7 @@ const io = new Server(server, {
   }
 });
 
-const pubClient =
-  redis.duplicate();
-
-const subClient =
-  redis.duplicate();
-
-pubClient.on('error', error => {
-  logger.error(
-    'Socket.IO Redis publisher error',
-    {
-      error
-    }
-  );
-});
-
-subClient.on('error', error => {
-  logger.error(
-    'Socket.IO Redis subscriber error',
-    {
-      error
-    }
-  );
-});
-
-io.adapter(
-  createAdapter(
-    pubClient,
-    subClient
-  )
-);
+io.adapter(createAdapter(pubClient, subClient));
 
 const PORT = process.env.PORT || 5000;
 
