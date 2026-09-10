@@ -42,9 +42,21 @@ function setupFantasySockets(io) {
         return next(new Error('Authentication error'));
       }
 
+      if (!process.env.JWT_SECRET) {
+        console.error(
+          'JWT_SECRET is not configured'
+        );
+      
+        return next(
+          new Error(
+            'Server authentication configuration error'
+          )
+        );
+      }
+      
       const decoded = jwt.verify(
         token,
-        process.env.JWT_SECRET || 'fallback_secret_do_not_use_in_prod'
+        process.env.JWT_SECRET
       );
 
       const user = await prisma.user.findUnique({
