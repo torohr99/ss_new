@@ -20,7 +20,7 @@ async function fetchLiveScores(weekNumber) {
   try {
     console.log(`Fetching NFL Scoreboard for live scoring...`);
     // Ideally we pass week limits, but the scoreboard gives current week games
-    const scoreboardRes = await axios.get('http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
+    const scoreboardRes = await axios.get('https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard');
     const events = scoreboardRes.data.events || [];
 
     const playerScores = {}; // espnId -> points
@@ -28,7 +28,7 @@ async function fetchLiveScores(weekNumber) {
     for (const event of events) {
       if (event.status.type.state === 'pre') continue; // Game hasn't started
       
-      const summaryRes = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${event.id}`);
+      const summaryRes = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=${event.id}`);
       const boxscore = summaryRes.data.boxscore;
       if (!boxscore || !boxscore.players) continue;
 
