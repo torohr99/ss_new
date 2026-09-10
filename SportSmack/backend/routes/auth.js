@@ -3,7 +3,8 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const transporter =
+  require('../lib/mailer');
 const prisma = require('../lib/prisma');
 const authMiddleware = require('../middleware/auth');
 
@@ -52,19 +53,6 @@ const sendVerificationEmail = async (email, verificationToken) => {
 
   const verifyLink =
     `${frontendUrl}/verify?token=${encodeURIComponent(verificationToken)}`;
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
-
-  // Verify SMTP connection before attempting to send.
-  await transporter.verify();
 
   const info = await transporter.sendMail({
     from: `"SportSmack" <${process.env.SMTP_FROM}>`,
@@ -155,22 +143,6 @@ const sendPasswordResetEmail = async (
   const resetLink =
     `${frontendUrl}/reset-password?token=` +
     encodeURIComponent(resetToken);
-
-  const transporter =
-    nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(
-        process.env.SMTP_PORT || 587
-      ),
-      secure:
-        process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-
-  await transporter.verify();
 
   const info =
     await transporter.sendMail({
@@ -269,6 +241,30 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    if (
+      username.length < 3 ||
+      username.length > 30
+    ) {
+      return res.status(400).json({
+        message:
+          'Username must be between 3 and 30 characters.'
+      });
+    }
+    
+    if (email.length > 254) {
+      return res.status(400).json({
+        message:
+          'Email address is too long.'
+      });
+    }
+    
+    if (password.length > 128) {
+      return res.status(400).json({
+        message:
+          'Password must not exceed 128 characters.'
+      });
+    }
+    
     if (password.length < 8) {
       return res.status(400).json({
         message:
