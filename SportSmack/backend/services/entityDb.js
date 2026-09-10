@@ -50,7 +50,7 @@ class EntityDb {
   async search(query) {
     try {
       const response = await axios.get(
-        'http://site.api.espn.com/apis/search/v2',
+        'https://site.api.espn.com/apis/search/v2',
         {
           params: {
             query,
