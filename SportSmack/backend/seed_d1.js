@@ -3,7 +3,7 @@ const prisma = require('../lib/prisma');
 
 async function run() {
   console.log('Fetching D1 Colleges from ESPN...');
-  const res = await axios.get('http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400');
+  const res = await axios.get('https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400');
   const teamsList = res.data.sports[0].leagues[0].teams;
   console.log(`Found ${teamsList.length} D1 teams.`);
 
