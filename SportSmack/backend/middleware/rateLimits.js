@@ -1,14 +1,9 @@
 const rateLimit = require('express-rate-limit');
-const { ipKeyGenerator } = require('express-rate-limit');
-const { RedisStore } = require('rate-limit-redis');
+const { ipKeyGenerator } =
+  require('express-rate-limit');
+const { RedisStore } =
+  require('rate-limit-redis');
 const redis = require('../lib/redis');
-
-const createRedisStore = (prefix) =>
-  new RedisStore({
-    prefix,
-    sendCommand: (command, ...args) =>
-      redis.call(command, ...args)
-  });
 
 function userOrIpKeyGenerator(req) {
   if (req.user?.id) {
@@ -18,12 +13,19 @@ function userOrIpKeyGenerator(req) {
   return `ip:${ipKeyGenerator(req.ip)}`;
 }
 
+const redisStore = prefix =>
+  new RedisStore({
+    sendCommand: (...args) =>
+      redis.call(...args),
+    prefix
+  });
+
 const standardLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore('rl:standard:'),
+  store: redisStore('rl:standard:'),
   message: {
     error:
       'Too many requests. Please try again later.'
@@ -36,7 +38,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  store: createRedisStore('rl:auth:'),
+  store: redisStore('rl:auth:'),
   message: {
     error:
       'Too many authentication attempts. Please try again later.'
@@ -48,7 +50,8 @@ const writeLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore('rl:write:'),
+  keyGenerator: userOrIpKeyGenerator,
+  store: redisStore('rl:write:'),
   message: {
     error:
       'Too many requests. Please slow down.'
@@ -60,7 +63,8 @@ const aiLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: createRedisStore('rl:ai:'),
+  keyGenerator: userOrIpKeyGenerator,
+  store: redisStore('rl:ai:'),
   message: {
     error:
       'AI usage limit reached. Please try again later.'
@@ -72,11 +76,8 @@ const socialLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: req =>
-    req.user?.id
-      ? `user:${req.user.id}`
-      : `ip:${req.ip}`,
-  store: createRedisStore('rl:social:'),
+  keyGenerator: userOrIpKeyGenerator,
+  store: redisStore('rl:social:'),
   message: {
     error:
       'Too many social actions. Please slow down.'
@@ -88,11 +89,8 @@ const postCreationLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: req =>
-    req.user?.id
-      ? `user:${req.user.id}`
-      : `ip:${req.ip}`,
-  store: createRedisStore('rl:posts:'),
+  keyGenerator: userOrIpKeyGenerator,
+  store: redisStore('rl:post:'),
   message: {
     error:
       'You are posting too quickly. Please wait a moment.'
@@ -104,11 +102,8 @@ const reportLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: req =>
-    req.user?.id
-      ? `user:${req.user.id}`
-      : `ip:${req.ip}`,
-  store: createRedisStore('rl:reports:'),
+  keyGenerator: userOrIpKeyGenerator,
+  store: redisStore('rl:report:'),
   message: {
     error:
       'Too many reports. Please try again later.'
