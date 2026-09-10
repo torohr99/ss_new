@@ -26,7 +26,7 @@ async function getScoreboard(leagueKey) {
   if (!mapping) throw new Error('Invalid league');
 
   const cacheKey = `scoreboard_${leagueKey}`;
-  const cachedData = await cache.getJson((cacheKey);
+  const cachedData = await cache.getJson(cacheKey);
   if (cachedData) return cachedData;
 
   try {
@@ -79,7 +79,7 @@ async function getStandings(leagueKey) {
   if (!mapping) throw new Error('Invalid league');
 
   const cacheKey = `standings_${leagueKey}`;
-  const cachedData = await cache.getJson((cacheKey);
+  const cachedData = await cache.getJson(cacheKey);
   if (cachedData) return cachedData;
 
   try {
