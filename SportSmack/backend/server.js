@@ -14,6 +14,8 @@ const {
 const xss = require('xss-clean');
 require('dotenv').config();
 const compression = require('compression');
+const csrfProtection =
+  require('./middleware/csrf');
 const logger = require('./lib/logger');
 const metrics = require('./services/metrics');
 
@@ -104,6 +106,8 @@ app.use(cors({
 
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
+
+app.use('/api', csrfProtection);
 
 app.use((req, res, next) => {
   res.on('finish', () => {
