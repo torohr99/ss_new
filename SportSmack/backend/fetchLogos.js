@@ -46,7 +46,7 @@ const TOURNAMENT_TEAMS = {
 };
 
 async function fetchLogos() {
-  const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400`);
+  const response = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400`);
   const teamsList = response.data.sports[0].leagues[0].teams;
 
   for (const region in TOURNAMENT_TEAMS) {
