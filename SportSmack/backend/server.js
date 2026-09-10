@@ -179,6 +179,13 @@ app.use('/api/gamecast', gamecastRoute);
 // Health check endpoint
 const prisma = require('./lib/prisma');
 
+app.get('/health', (req, res) => {
+  return res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.get('/api/status', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
