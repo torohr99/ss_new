@@ -102,7 +102,7 @@ async function getRawGameSummary(league, gameId) {
     }
 
     const response = await axios.get(
-        `http://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`,
+        `https://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`,
         {
             timeout: 10000
         }
