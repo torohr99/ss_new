@@ -49,7 +49,7 @@ export default function VerifyPage() {
           'http://localhost:5000';
 
         const res =
-          await axios.get(
+          await axios.post(
             `${baseUrl}/api/auth/verify/${encodeURIComponent(token)}`
           );
 
