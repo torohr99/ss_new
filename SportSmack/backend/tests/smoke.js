@@ -95,6 +95,29 @@ async function main() {
   );
 
   await runTest(
+    'Health endpoint is publicly available',
+    async () => {
+      const result =
+        await request('/health');
+  
+      if (result.status !== 200) {
+        throw new Error(
+          `Expected 200, received ${result.status}`
+        );
+      }
+  
+      if (
+        result.body?.status !==
+        'OK'
+      ) {
+        throw new Error(
+          'Health endpoint returned an unexpected response.'
+        );
+      }
+    }
+  );
+
+  await runTest(
     'Unauthenticated admin metrics endpoint rejects request',
     async () => {
       const result = await request('/api/admin/metrics');
