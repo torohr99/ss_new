@@ -50,38 +50,32 @@ app.use(express.urlencoded({
   limit: '1mb'
 }));
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://ss-new-backendfromr.vercel.app',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
+const isProduction =
+  process.env.NODE_ENV === 'production';
 
-// Reusable origin verifier for Express and Socket.io
+const ALLOWED_ORIGINS = isProduction
+  ? [process.env.FRONTEND_URL].filter(Boolean)
+  : [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
+
 const verifyOrigin = (origin, callback) => {
-  // Allow requests with no origin (curl, Postman, server-to-server requests)
   if (!origin) {
     return callback(null, true);
   }
 
-  // Allow explicitly trusted origins
   if (ALLOWED_ORIGINS.includes(origin)) {
     return callback(null, true);
   }
 
-  // Allow Vercel preview deployments for this SportSmack project.
-  // Vercel generates different preview URLs for deployments,
-  // so the exact URL cannot always be known in advance.
-  if (
-    /^https:\/\/ss-new-backendfromr(?:-[a-z0-9]+)*-sport-smack\.vercel\.app$/i.test(origin)
-  ) {
-    return callback(null, true);
-  }
+  console.warn(`Blocked CORS origin: ${origin}`);
 
-  logger.warn('Blocked CORS origin', {
-    origin
-  });
-  return callback(null, false);
+  return callback(
+    new Error('Not allowed by CORS'),
+    false
+  );
 };
 
 const io = new Server(server, {
