@@ -4,13 +4,13 @@
   "description": "Backend for SportSmack",
   "main": "server.js",
   "scripts": {
-      "start": "node server.js",
-      "worker": "node worker.js",
-      "test:smoke": "node tests/smoke.js",
-      "dev": "npx kill-port 5000 && nodemon server.js",
-      "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate && npx prisma db push",
-      "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate && npx prisma db push"
-    },
+    "start": "node server.js",
+    "worker": "node worker.js",
+    "test:smoke": "node tests/smoke.js",
+    "dev": "npx kill-port 5000 && nodemon server.js",
+    "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate",
+    "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma migrate deploy && npx prisma generate"
+  }
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@socket.io/redis-adapter": "^8.3.0",
