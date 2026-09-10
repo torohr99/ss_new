@@ -14,7 +14,7 @@ async function seed() {
   for (const { sport, league, display } of NCAA_LEAGUES) {
     console.log(`Fetching teams for ${display}...`);
     try {
-      const res = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams?limit=250`);
+      const res = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams?limit=250`);
       if (res.data && res.data.sports && res.data.sports[0] && res.data.sports[0].leagues[0]) {
         const teams = res.data.sports[0].leagues[0].teams;
         let added = 0;
