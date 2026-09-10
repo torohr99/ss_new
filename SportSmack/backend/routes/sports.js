@@ -40,7 +40,7 @@ router.get('/:league/game/:gameId', authMiddleware, async (req, res) => {
 
     // Using ESPN's summary endpoint for the game
     const axios = require('axios');
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`);
+    const response = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`);
     
     res.json(response.data);
   } catch (error) {
@@ -59,7 +59,7 @@ router.get('/:league/game/:gameId/analysis', authMiddleware, async (req, res) =>
     // In a real scenario, this would call an LLM (like Gemini or OpenAI) using the game summary stats.
     // For now, we procedurally generate a highly detailed realistic analysis based on team matchup.
     const axios = require('axios');
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`);
+    const response = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/summary?event=${gameId}`);
     const summary = response.data;
     
     if (!summary || !summary.header || !summary.header.competitions) {
