@@ -18,6 +18,7 @@ const csrfProtection =
   require('./middleware/csrf');
 const logger = require('./lib/logger');
 const metrics = require('./services/metrics');
+const redis = require('./lib/redis');
 
 const app = express();
 const server = http.createServer(app);
