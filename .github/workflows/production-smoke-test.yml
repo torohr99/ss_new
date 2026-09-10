@@ -1,0 +1,31 @@
+name: Production Smoke Test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * *'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: SportSmack/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: SportSmack/backend
+        run: npm ci
+
+      - name: Run production smoke tests
+        working-directory: SportSmack/backend
+        env:
+          BACKEND_URL: ${{ secrets.SPORTSMACK_BACKEND_URL }}
+        run: npm run test:smoke
