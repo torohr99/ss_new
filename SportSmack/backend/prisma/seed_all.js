@@ -20,7 +20,7 @@ async function main() {
     const mapping = LEAGUE_MAP[leagueKey];
     console.log(`Fetching teams for ${leagueKey}...`);
     try {
-      const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/teams`);
+      const response = await axios.get(`https://site.api.espn.com/apis/site/v2/sports/${mapping.sport}/${mapping.league}/teams`);
       const teamsList = response.data.sports[0].leagues[0].teams;
 
       for (const t of teamsList) {
