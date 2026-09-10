@@ -387,7 +387,7 @@ router.post('/register', async (req, res) => {
 // ------------------------------------------------------------
 
 // GET /api/auth/verify/:token
-router.get('/verify/:token', async (req, res) => {
+router.post('/verify/:token', async (req, res) => {
   try {
     const { token } = req.params;
 
