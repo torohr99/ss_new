@@ -1,6 +1,13 @@
 const axios = require('axios');
 const cache = require('./cache');
 
+const ESPN_TIMEOUT_MS = 8000;
+
+const espnClient =
+  axios.create({
+    timeout: ESPN_TIMEOUT_MS
+  });
+
 const LEAGUE_MAP = {
   nfl: { sport: 'football', league: 'nfl' },
   nba: { sport: 'basketball', league: 'nba' },
@@ -16,9 +23,9 @@ const LEAGUE_MAP = {
 
 const getBaseUrl = (type, sport, league) => {
   if (type === 'scoreboard') {
-    return `http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`;
+    return `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/scoreboard`;
   }
-  return `http://site.api.espn.com/apis/v2/sports/${sport}/${league}/standings`;
+  return `https://site.api.espn.com/apis/v2/sports/${sport}/${league}/standings`;
 };
 
 async function getScoreboard(leagueKey) {
@@ -30,7 +37,7 @@ async function getScoreboard(leagueKey) {
   if (cachedData) return cachedData;
 
   try {
-    const response = await axios.get(getBaseUrl('scoreboard', mapping.sport, mapping.league));
+    const response = await espnClient.get(getBaseUrl('scoreboard', mapping.sport, mapping.league));
     const events = response.data.events || [];
     
     // Normalize data for frontend
@@ -83,7 +90,7 @@ async function getStandings(leagueKey) {
   if (cachedData) return cachedData;
 
   try {
-    const response = await axios.get(getBaseUrl('standings', mapping.sport, mapping.league));
+    const response = await espnClient.get(getBaseUrl('standings', mapping.sport, mapping.league));
     const children = response.data.children || [];
     
     let allStandings = [];
@@ -133,7 +140,7 @@ async function getStandings(leagueKey) {
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams?limit=400`);
+    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams?limit=400`);
     const teamsList = response.data.sports[0].leagues[0].teams;
     
     // Find the team by partial name match
@@ -159,7 +166,7 @@ async function getStandings(leagueKey) {
     // If baseball and no real color, try falling back to mens-college-basketball for the same school
     if (league === 'college-baseball' && (!espnTeam.team.color || details.color === '121212')) {
       try {
-        const fallbackRes = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400`);
+        const fallbackRes = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/teams?limit=400`);
         const fallbackList = fallbackRes.data.sports[0].leagues[0].teams;
         const fallbackTeam = fallbackList.find(t => {
           const matchName = (t.team.displayName && t.team.displayName.toLowerCase().includes(teamName.toLowerCase())) || 
@@ -192,7 +199,7 @@ async function getTeamSchedule(sport, league, espnId) {
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`);
+    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`);
     const events = response.data.events || [];
 
     let lastGame = null;
@@ -316,8 +323,8 @@ async function getRecentTeamGames(sport, league, espnId, count = 5) {
     if (cached) return cached;
 
     try {
-        const response = await axios.get(
-            `http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`
+        const response = await espnClient.get(
+            `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`
         );
 
         const events = response.data.events || [];
@@ -377,7 +384,7 @@ async function getLeagueNews(sport, league) {
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`);
+    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`);
     const articles = response.data.articles || [];
     await cache.setJson(cacheKey, articles, 300); // cache for 5 minutes
     return articles;
@@ -404,8 +411,8 @@ async function getTeamNews(
 
   try {
     const response =
-      await axios.get(
-        `http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`,
+      await espnClient.get(
+        `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`,
         {
           params: {
             team: teamId
@@ -444,7 +451,7 @@ async function getGameSummary(sport, league, gameId) {
   if (cached) return cached;
 
   try {
-    const response = await axios.get(`http://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/summary?event=${gameId}`);
+    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/summary?event=${gameId}`);
     
     // Determine caching time based on game status
     const isCompleted = response.data?.header?.competitions?.[0]?.status?.type?.state === 'post';
