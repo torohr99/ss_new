@@ -101,5 +101,5 @@ export default function (data) {
     }
   });
 
-  sleep(1);
+  sleep(4);
 }
