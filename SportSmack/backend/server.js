@@ -69,16 +69,24 @@ const verifyOrigin = (origin, callback) => {
     return callback(null, true);
   }
 
-  if (ALLOWED_ORIGINS.includes(origin)) {
+  const normalizedOrigin = origin.replace(/\/$/, '');
+
+  if (
+    ALLOWED_ORIGINS.some(
+      allowedOrigin =>
+        allowedOrigin.replace(/\/$/, '') === normalizedOrigin
+    )
+  ) {
     return callback(null, true);
   }
 
-  console.warn(`Blocked CORS origin: ${origin}`);
-
-  return callback(
-    new Error('Not allowed by CORS'),
-    false
+  console.warn(
+    `Blocked CORS origin: ${origin}`
   );
+
+  // Return a normal CORS rejection instead of throwing
+  // an Express 500 error.
+  return callback(null, false);
 };
 
 const io = new Server(server, {
