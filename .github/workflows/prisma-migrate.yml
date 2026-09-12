@@ -1,0 +1,44 @@
+name: Prisma Production Migration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "SportSmack/backend/prisma/migrations/**"
+
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Apply production migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: SportSmack/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: SportSmack/backend
+        run: npm ci
+
+      - name: Prepare PostgreSQL Prisma schema
+        working-directory: SportSmack/backend
+        run: cp prisma/schema.postgres.prisma prisma/schema.prisma
+
+      - name: Generate Prisma Client
+        working-directory: SportSmack/backend
+        run: npx prisma generate
+
+      - name: Deploy production migrations
+        working-directory: SportSmack/backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
