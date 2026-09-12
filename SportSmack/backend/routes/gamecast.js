@@ -165,25 +165,18 @@ router.get(
     }
   }
 );
-// Helper to get raw ESPN summary
-async function getGameSummary(
-  league,
-  gameId
-) {
-  const mapping =
-    sportsApi.LEAGUE_MAP[
-      league.toLowerCase()
-    ];
+
+// Use the centralized sports API/cache layer for game summaries.
+async function getGameSummary(league, gameId) {
+  const mapping = sportsApi.LEAGUE_MAP[league.toLowerCase()];
 
   if (!mapping) {
-    throw new Error(
-      'Invalid league mapping'
-    );
+    throw new Error('Invalid league mapping');
   }
 
   return sportsApi.getGameSummary(
     mapping.sport,
-    mapping.league,
+    league.toLowerCase(),
     gameId
   );
 }
