@@ -64,7 +64,7 @@ jobs:
           done
 
       - name: Run backend smoke tests
-        run: npm test
+        run: npm run test:smoke
 
   frontend:
     name: Frontend checks
