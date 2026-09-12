@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
+const logger = require('../lib/logger');
 
 const prisma = require('../lib/prisma');
 const {
@@ -21,21 +22,30 @@ router.use(authMiddleware);
 // @route   GET /api/posts
 // @desc    Get posts (global feed) ordered by newest, with cursor pagination
 router.get('/', async (req, res) => {
+  const feedRequestStartedAt = process.hrtime.bigint();
   try {
     const cursor = req.query.cursor;
     const take = 15; // smaller chunk size for better performance
     const forum = req.query.forum;
 
+    const blockedUsersStartedAt =
+      process.hrtime.bigint();
+    
     const blockedUsers =
       await prisma.block.findMany({
         where: {
-          blockerId:
-            req.user.id
+          blockerId: req.user.id
         },
         select: {
           blockedId: true
         }
       });
+    
+    const blockedUsersDurationMs =
+      Number(
+        process.hrtime.bigint() -
+          blockedUsersStartedAt
+      ) / 1e6;
     
     const blockedUserIds =
       blockedUsers.map(
@@ -76,17 +86,53 @@ router.get('/', async (req, res) => {
       queryParams.skip = 1; // skip the cursor itself
     }
 
-    const posts = await prisma.post.findMany(queryParams);
+    const postsQueryStartedAt =
+      process.hrtime.bigint();
+    
+    const posts =
+      await prisma.post.findMany(queryParams);
+    
+    const postsQueryDurationMs =
+      Number(
+        process.hrtime.bigint() -
+          postsQueryStartedAt
+      ) / 1e6;
 
     const formattedPosts = posts.map(post => ({
       ...post,
       hasLiked: post.likes.length > 0,
       likes: undefined
     }));
-
+    
     // Determine the next cursor
-    const nextCursor = posts.length === take ? posts[posts.length - 1].id : null;
-
+    const nextCursor =
+      posts.length === take
+        ? posts[posts.length - 1].id
+        : null;
+    
+    const feedRequestDurationMs =
+      Number(
+        process.hrtime.bigint() -
+          feedRequestStartedAt
+      ) / 1e6;
+    
+    if (feedRequestDurationMs >= 500) {
+      logger.warn(
+        {
+          route: '/api/posts',
+          userId: req.user.id,
+          feedRequestDurationMs:
+            Math.round(feedRequestDurationMs),
+          blockedUsersDurationMs:
+            Math.round(blockedUsersDurationMs),
+          postsQueryDurationMs:
+            Math.round(postsQueryDurationMs),
+          postCount: posts.length
+        },
+        'Slow feed request'
+      );
+    }
+    
     res.json({
       posts: formattedPosts,
       nextCursor
