@@ -5,6 +5,9 @@ export const options = {
   vus: 5,
   duration: '30s',
 
+  // Keep each VU's cookies between iterations.
+  noCookiesReset: true,
+
   thresholds: {
     http_req_failed: ['rate<0.01'],
     http_req_duration: ['p(95)<1000']
@@ -47,7 +50,7 @@ export default function (data) {
     );
   }
 
-  // Login once for this VU.
+  // Each VU logs in only once.
   if (__ITER === 0) {
     const login = http.post(
       `${BASE_URL}/api/auth/login`,
@@ -76,24 +79,6 @@ export default function (data) {
         `Login failed for ${user.email}: ${login.status} ${login.body}`
       );
     }
-
-    const cookie =
-      login.cookies.smack_auth?.[0]?.value;
-
-    if (!cookie) {
-      throw new Error(
-        `No authentication cookie returned for ${user.email}.`
-      );
-    }
-
-    http.cookieJar().set(
-      BASE_URL,
-      'smack_auth',
-      cookie,
-      {
-        path: '/'
-      }
-    );
   }
 
   sleep(1);
