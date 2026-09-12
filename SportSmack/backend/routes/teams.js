@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
 const sportsApi = require('../services/sportsApi');
 const axios = require('axios');
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // @route   GET /api/teams
 // @desc    Get all teams ordered alphabetically by city
