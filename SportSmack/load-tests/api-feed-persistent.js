@@ -5,9 +5,6 @@ export const options = {
   vus: 25,
   duration: '30s',
 
-  // Keep each VU's cookies between iterations.
-  noCookiesReset: true,
-
   thresholds: {
     http_req_failed: ['rate<0.01'],
     http_req_duration: ['p(95)<2000']
@@ -28,12 +25,48 @@ if (!BASE_URL || !TEST_PASSWORD) {
 export function setup() {
   const users = [];
 
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 25; i++) {
     const suffix = String(i).padStart(2, '0');
 
+    const email =
+      `${TEST_EMAIL_PREFIX}${suffix}@sportsmack.local`;
+
+    const login = http.post(
+      `${BASE_URL}/api/auth/login`,
+      JSON.stringify({
+        email,
+        password: TEST_PASSWORD
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (login.status !== 200) {
+      throw new Error(
+        `Setup login failed for ${email}: ` +
+        `${login.status} ${login.body}`
+      );
+    }
+
+    const authCookies =
+      login.cookies.smack_auth;
+
+    if (
+      !authCookies ||
+      authCookies.length === 0 ||
+      !authCookies[0].value
+    ) {
+      throw new Error(
+        `No smack_auth cookie returned for ${email}`
+      );
+    }
+
     users.push({
-      email:
-        `${TEST_EMAIL_PREFIX}${suffix}@sportsmack.local`
+      email,
+      authCookie: authCookies[0].value
     });
   }
 
@@ -50,41 +83,16 @@ export default function (data) {
     );
   }
 
-  // Each VU logs in only once.
-  if (__ITER === 0) {
-    const login = http.post(
-      `${BASE_URL}/api/auth/login`,
-      JSON.stringify({
-        email: user.email,
-        password: TEST_PASSWORD
-      }),
+  const response =
+    http.get(
+      `${BASE_URL}/api/posts`,
       {
         headers: {
-          'Content-Type': 'application/json'
+          Cookie:
+            `smack_auth=${user.authCookie}`
         }
       }
     );
-
-    check(login, {
-      'login returns 200': (r) =>
-        r.status === 200,
-
-      'login returns auth cookie': (r) =>
-        r.cookies.smack_auth &&
-        r.cookies.smack_auth.length > 0
-    });
-
-    if (login.status !== 200) {
-      throw new Error(
-        `Login failed for ${user.email}: ${login.status} ${login.body}`
-      );
-    }
-  }
-
-  sleep(1);
-
-  const response =
-    http.get(`${BASE_URL}/api/posts`);
 
   check(response, {
     'feed returns 200': (r) =>
