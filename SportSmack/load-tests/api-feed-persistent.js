@@ -34,9 +34,7 @@ export function setup() {
     });
   }
 
-  return {
-    users
-  };
+  return { users };
 }
 
 export default function (data) {
@@ -49,74 +47,74 @@ export default function (data) {
     );
   }
 
-  const login = http.post(
-    `${BASE_URL}/api/auth/login`,
-    JSON.stringify({
-      email: user.email,
-      password: TEST_PASSWORD
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/json'
+  // Login once for this VU.
+  if (__ITER === 0) {
+    const login = http.post(
+      `${BASE_URL}/api/auth/login`,
+      JSON.stringify({
+        email: user.email,
+        password: TEST_PASSWORD
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
       }
+    );
+
+    check(login, {
+      'login returns 200': (r) =>
+        r.status === 200,
+
+      'login returns auth cookie': (r) =>
+        r.cookies.smack_auth &&
+        r.cookies.smack_auth.length > 0
+    });
+
+    if (login.status !== 200) {
+      throw new Error(
+        `Login failed for ${user.email}: ${login.status} ${login.body}`
+      );
     }
-  );
 
-  check(login, {
-    'login returns 200': (r) =>
-      r.status === 200,
+    const cookie =
+      login.cookies.smack_auth?.[0]?.value;
 
-    'login returns auth cookie': (r) =>
-      r.cookies.smack_auth &&
-      r.cookies.smack_auth.length > 0
-  });
+    if (!cookie) {
+      throw new Error(
+        `No authentication cookie returned for ${user.email}.`
+      );
+    }
 
-  if (login.status !== 200) {
-    throw new Error(
-      `Login failed for ${user.email}: ${login.status} ${login.body}`
+    http.cookieJar().set(
+      BASE_URL,
+      'smack_auth',
+      cookie,
+      {
+        path: '/'
+      }
     );
   }
-
-  const cookie =
-    login.cookies.smack_auth?.[0]?.value;
-
-  if (!cookie) {
-    throw new Error(
-      `No authentication cookie returned for ${user.email}.`
-    );
-  }
-
-  // Store the authenticated cookie in this VU's cookie jar.
-  http.cookieJar().set(
-    BASE_URL,
-    'smack_auth',
-    cookie,
-    {
-      path: '/'
-    }
-  );
 
   sleep(1);
 
-  while (true) {
-    const response =
-      http.get(`${BASE_URL}/api/posts`);
+  const response =
+    http.get(`${BASE_URL}/api/posts`);
 
-    check(response, {
-      'feed returns 200': (r) =>
-        r.status === 200,
+  check(response, {
+    'feed returns 200': (r) =>
+      r.status === 200,
 
-      'feed contains posts array': (r) => {
-        try {
-          return Array.isArray(
-            r.json('posts')
-          );
-        } catch {
-          return false;
-        }
+    'feed contains posts array': (r) => {
+      try {
+        return Array.isArray(
+          r.json('posts')
+        );
+      } catch {
+        return false;
       }
-    });
+    }
+  });
 
-    sleep(1);
-  }
+  sleep(1);
 }
