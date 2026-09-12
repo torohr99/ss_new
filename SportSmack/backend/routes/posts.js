@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
       ) / 1e6;
     
     if (feedRequestDurationMs >= 500) {
-      logger.warn(
+      console.warn(
         {
           route: '/api/posts',
           userId: req.user.id,
