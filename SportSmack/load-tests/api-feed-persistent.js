@@ -28,7 +28,7 @@ if (!BASE_URL || !TEST_PASSWORD) {
 export function setup() {
   const users = [];
 
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 50; i++) {
     const suffix = String(i).padStart(2, '0');
 
     users.push({
