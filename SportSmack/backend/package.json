@@ -9,7 +9,7 @@
     "test:smoke": "node tests/smoke.js",
     "dev": "npx kill-port 5000 && nodemon server.js",
     "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate",
-    "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma migrate deploy && npx prisma generate"
+    "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
