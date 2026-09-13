@@ -8,7 +8,7 @@
     "worker": "node worker.js",
     "test:smoke": "node tests/smoke.js",
     "dev": "npx kill-port 5000 && nodemon server.js",
-    "build": "copy prisma\\schema.postgres.prisma prisma\\schema.prisma && npx prisma generate",
+    "build": "cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate",
     "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate"
   },
   "dependencies": {
