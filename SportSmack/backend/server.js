@@ -69,7 +69,6 @@ const ALLOWED_ORIGINS = new Set(
 );
 
 const verifyOrigin = (origin, callback) => {
-  // Allow non-browser requests such as curl/server-to-server requests.
   if (!origin) {
     return callback(null, true);
   }
@@ -84,8 +83,6 @@ const verifyOrigin = (origin, callback) => {
 
   console.warn(`Blocked CORS origin: ${origin}`);
 
-  // Reject the origin normally so the CORS middleware
-  // handles the response without creating an Express 500.
   return callback(null, false);
 };
 
