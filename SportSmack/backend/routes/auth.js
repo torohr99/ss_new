@@ -502,9 +502,6 @@ router.post('/login', async (req, res) => {
       );
     }
     
-    const bcryptDurationMs =
-      Number(process.hrtime.bigint() - bcryptStartedAt) / 1e6;
-
     if (!passwordMatches) {
       return res.status(401).json({
         message: 'Invalid email or password.'
