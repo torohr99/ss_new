@@ -56,43 +56,43 @@ app.use(express.urlencoded({
 const isProduction =
   process.env.NODE_ENV === 'production';
 
-const ALLOWED_ORIGINS = isProduction
-  ? [process.env.FRONTEND_URL].filter(Boolean)
-  : [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      process.env.FRONTEND_URL
-    ].filter(Boolean);
+const FRONTEND_URL = (process.env.FRONTEND_URL || '')
+  .trim()
+  .replace(/\/+$/, '');
+
+const ALLOWED_ORIGINS = new Set(
+  [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    FRONTEND_URL
+  ].filter(Boolean)
+);
 
 const verifyOrigin = (origin, callback) => {
+  // Allow non-browser requests such as curl/server-to-server requests.
   if (!origin) {
     return callback(null, true);
   }
 
-  const normalizedOrigin = origin.replace(/\/$/, '');
+  const normalizedOrigin = origin
+    .trim()
+    .replace(/\/+$/, '');
 
-  if (
-    ALLOWED_ORIGINS.some(
-      allowedOrigin =>
-        allowedOrigin.replace(/\/$/, '') === normalizedOrigin
-    )
-  ) {
+  if (ALLOWED_ORIGINS.has(normalizedOrigin)) {
     return callback(null, true);
   }
 
-  console.warn(
-    `Blocked CORS origin: ${origin}`
-  );
+  console.warn(`Blocked CORS origin: ${origin}`);
 
-  // Return a normal CORS rejection instead of throwing
-  // an Express 500 error.
+  // Reject the origin normally so the CORS middleware
+  // handles the response without creating an Express 500.
   return callback(null, false);
 };
 
 const io = new Server(server, {
   cors: {
     origin: verifyOrigin,
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true
   }
 });
@@ -107,11 +107,26 @@ app.use(
     threshold: 1024
   })
 );
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({
-  origin: verifyOrigin,
-  credentials: true
-}));
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: {
+      policy: 'cross-origin'
+    }
+  })
+);
+
+app.use(
+  cors({
+    origin: verifyOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization'
+    ]
+  })
+);
 
 app.use(xss()); // Sanitize incoming data to prevent XSS attacks
 app.use(cookieParser());
