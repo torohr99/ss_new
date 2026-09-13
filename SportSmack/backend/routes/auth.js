@@ -482,6 +482,8 @@ router.post('/login', async (req, res) => {
 
     const bcryptStartedAt = process.hrtime.bigint();
 
+    const bcryptStartedAt = process.hrtime.bigint();
+    
     const passwordMatches =
       !!user &&
       await bcrypt.compare(
@@ -489,6 +491,19 @@ router.post('/login', async (req, res) => {
         user.password_hash
       );
 
+    const bcryptDurationMs =
+      Number(process.hrtime.bigint() - bcryptStartedAt) / 1e6;
+    
+    if (bcryptDurationMs >= 1000) {
+      logger.warn(
+        {
+          route: '/api/auth/login',
+          bcryptDurationMs: Math.round(bcryptDurationMs)
+        },
+        'Slow bcrypt login'
+      );
+    }
+    
     const bcryptDurationMs =
       Number(process.hrtime.bigint() - bcryptStartedAt) / 1e6;
 
