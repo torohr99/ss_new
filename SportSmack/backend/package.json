@@ -4,7 +4,7 @@
   "description": "Backend for SportSmack",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node start.js",
     "worker": "node worker.js",
     "test:smoke": "node tests/smoke.js",
     "dev": "npx kill-port 5000 && nodemon server.js",
