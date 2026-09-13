@@ -450,6 +450,8 @@ router.post('/verify/:token', async (req, res) => {
 
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
+  const loginStartedAt = process.hrtime.bigint();
+
   try {
     let { email, password } = req.body;
 
@@ -463,27 +465,39 @@ router.post('/login', async (req, res) => {
         ? password
         : '';
 
-    const user = await prisma.user.findUnique({
-      where: {
-        email
-      }
-    });
-
-    if (
-      !user ||
-      !(await bcrypt.compare(
-        password,
-        user.password_hash
-      ))
-    ) {
-      return res.status(401).json({
-        message:
-          'Invalid email or password.'
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Email and password are required.'
       });
     }
 
-    // IMPORTANT:
-    // Users must verify their email before they can log in.
+    const userLookupStartedAt = process.hrtime.bigint();
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    const userLookupDurationMs =
+      Number(process.hrtime.bigint() - userLookupStartedAt) / 1e6;
+
+    const bcryptStartedAt = process.hrtime.bigint();
+
+    const passwordMatches =
+      !!user &&
+      await bcrypt.compare(
+        password,
+        user.password_hash
+      );
+
+    const bcryptDurationMs =
+      Number(process.hrtime.bigint() - bcryptStartedAt) / 1e6;
+
+    if (!passwordMatches) {
+      return res.status(401).json({
+        message: 'Invalid email or password.'
+      });
+    }
+
     if (!user.isVerified) {
       return res.status(403).json({
         message:
@@ -496,17 +510,34 @@ router.post('/login', async (req, res) => {
       user.id,
       user.username
     );
-    
+
     res.cookie('smack_auth', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production'
-        ? 'none'
-        : 'lax',
+      sameSite:
+        process.env.NODE_ENV === 'production'
+          ? 'none'
+          : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/'
     });
-    
+
+    const loginDurationMs =
+      Number(process.hrtime.bigint() - loginStartedAt) / 1e6;
+
+    if (loginDurationMs >= 1000) {
+      logger.warn(
+        {
+          route: '/api/auth/login',
+          userId: user.id,
+          loginDurationMs: Math.round(loginDurationMs),
+          userLookupDurationMs: Math.round(userLookupDurationMs),
+          bcryptDurationMs: Math.round(bcryptDurationMs)
+        },
+        'Slow login'
+      );
+    }
+
     return res.json({
       id: user.id,
       username: user.username,
@@ -514,14 +545,15 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(
-      'Login error:',
-      error
+    logger.error(
+      {
+        error
+      },
+      'Login error'
     );
 
     return res.status(500).json({
-      message:
-        'Server error during login.'
+      message: 'Server error during login.'
     });
   }
 });
