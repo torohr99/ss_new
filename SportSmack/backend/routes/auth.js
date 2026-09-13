@@ -481,8 +481,6 @@ router.post('/login', async (req, res) => {
       Number(process.hrtime.bigint() - userLookupStartedAt) / 1e6;
 
     const bcryptStartedAt = process.hrtime.bigint();
-
-    const bcryptStartedAt = process.hrtime.bigint();
     
     const passwordMatches =
       !!user &&
