@@ -93,11 +93,18 @@ export default function PostCard({ post }) {
 
   const submitComment = async (e) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
-
+  
+    const content = newComment.trim();
+  
+    if (!content) return;
+  
     try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/posts/${post.id}/comment`,
+        `${API_URL}/api/posts/${post.id}/comment`,
         {
           method: 'POST',
           headers: {
@@ -105,19 +112,41 @@ export default function PostCard({ post }) {
           },
           credentials: 'include',
           body: JSON.stringify({
-            content: newComment
+            content
           })
         }
       );
-
-      if (res.ok) {
-        const commentData = await res.json();
-        setComments(prev => [...prev, commentData]);
-        setCommentsCount(prev => prev + 1);
-        setNewComment('');
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        throw new Error(
+          data.message ||
+          'Failed to post comment.'
+        );
       }
-    } catch (err) {
-      console.error(err);
+  
+      setComments(prev => [
+        ...prev,
+        data
+      ]);
+  
+      setCommentsCount(
+        prev => prev + 1
+      );
+  
+      setNewComment('');
+  
+    } catch (error) {
+      console.error(
+        'Failed to submit comment:',
+        error
+      );
+  
+      setModerationMessage(
+        error.message ||
+        'Failed to post comment.'
+      );
     }
   };
 
