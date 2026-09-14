@@ -131,29 +131,52 @@ app.use(cookieParser());
 app.use('/api', csrfProtection);
 
 app.use((req, res, next) => {
+  const requestId =
+    req.headers['x-request-id'] ||
+    `${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+
+  req.requestId = requestId;
+
+  res.setHeader(
+    'X-Request-ID',
+    requestId
+  );
+
   res.on('finish', () => {
-    metrics.recordRequest(res.statusCode);
+    metrics.recordRequest(
+      res.statusCode
+    );
   });
 
   next();
 });
 
 app.use('/api', (req, res, next) => {
-  const startedAt = process.hrtime.bigint();
+  const startedAt =
+    process.hrtime.bigint();
 
   res.on('finish', () => {
     const durationMs =
       Number(
-        process.hrtime.bigint() - startedAt
+        process.hrtime.bigint() -
+          startedAt
       ) / 1e6;
 
     if (durationMs >= 500) {
       logger.warn(
         {
-          method: req.method,
-          path: req.path,
-          statusCode: res.statusCode,
-          durationMs: Math.round(durationMs)
+          requestId:
+            req.requestId,
+          method:
+            req.method,
+          path:
+            req.path,
+          statusCode:
+            res.statusCode,
+          durationMs:
+            Math.round(durationMs)
         },
         'Slow API request'
       );
@@ -263,22 +286,40 @@ app.use((req, res) => {
 });
 
 // Centralized error handler — MUST be last
-app.use((err, req, res, next) => {
-  logger.error('Unhandled server error', {
-    error: err
-  });
+app.use(
+  (err, req, res, next) => {
+    logger.error(
+      'Unhandled server error',
+      {
+        requestId:
+          req.requestId,
+        method:
+          req.method,
+        path:
+          req.path,
+        statusCode:
+          err.status || 500,
+        error: err
+      }
+    );
 
-  if (res.headersSent) {
-    return next(err);
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    return res
+      .status(err.status || 500)
+      .json({
+        error:
+          process.env.NODE_ENV ===
+          'production'
+            ? 'Internal server error'
+            : err.message,
+        requestId:
+          req.requestId
+      });
   }
-
-  res.status(err.status || 500).json({
-    error:
-      process.env.NODE_ENV === 'production'
-        ? 'Internal server error'
-        : err.message
-  });
-});
+);
 
 // Socket.io Handlers
 const setupChatSockets = require('./sockets/chatHandler');
@@ -364,4 +405,40 @@ process.on(
 process.on(
   'SIGINT',
   () => gracefulShutdown('SIGINT')
+);
+
+process.on(
+  'unhandledRejection',
+  reason => {
+    logger.error(
+      'Unhandled promise rejection',
+      {
+        error:
+          reason instanceof Error
+            ? reason
+            : new Error(
+                String(reason)
+              )
+      }
+    );
+  }
+);
+
+process.on(
+  'uncaughtException',
+  error => {
+    logger.error(
+      'Uncaught exception',
+      {
+        error
+      }
+    );
+
+    // Allow the log entry to flush,
+    // then terminate so Railway can
+    // restart the service.
+    setTimeout(() => {
+      process.exit(1);
+    }, 1000).unref();
+  }
 );
