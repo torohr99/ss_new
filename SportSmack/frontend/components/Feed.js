@@ -43,16 +43,14 @@ export default function Feed() {
     if (filterType !== 'posts') {
       return;
     }
-
-    if (
-      socialItems.length > 0 ||
-      socialLoading
-    ) {
-      return;
-    }
-
+  
     let cancelled = false;
-
+  
+    // Clear stale Social-feed state whenever
+    // the Social tab is opened.
+    setSocialItems([]);
+    setSocialNextCursor(null);
+  
     fetchSocialFeed(null, cancelled)
       .catch(error => {
         if (!cancelled) {
@@ -62,15 +60,11 @@ export default function Feed() {
           );
         }
       });
-
+  
     return () => {
       cancelled = true;
     };
-  }, [
-    filterType,
-    socialItems.length,
-    socialLoading
-  ]);
+  }, [filterType]);
 
   const fetchFeed = async (
     cursor = null,
