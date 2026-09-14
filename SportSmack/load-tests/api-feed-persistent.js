@@ -39,7 +39,8 @@ export function setup() {
       }),
       {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': BASE_URL
         }
       }
     );
@@ -94,7 +95,8 @@ export default function (data) {
 
   const headers = {
     Cookie:
-      `smack_auth=${user.authCookie}`
+      `smack_auth=${user.authCookie}`,
+    Origin: BASE_URL
   };
 
   // ----------------------------------------------------------
