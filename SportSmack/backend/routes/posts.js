@@ -33,15 +33,22 @@ router.get('/', async (req, res) => {
     const blockedUsersStartedAt =
       process.hrtime.bigint();
     
-    const blockedUsers =
-      await prisma.block.findMany({
-        where: {
-          blockerId: req.user.id
-        },
-        select: {
-          blockedId: true
-        }
-      });
+    const blockedUsers = await prisma.block.findMany({
+      where: {
+        OR: [
+          {
+            blockerId: req.user.id
+          },
+          {
+            blockedId: req.user.id
+          }
+        ]
+      },
+      select: {
+        blockerId: true,
+        blockedId: true
+      }
+    });
     
     const blockedUsersDurationMs =
       Number(
@@ -49,14 +56,68 @@ router.get('/', async (req, res) => {
           blockedUsersStartedAt
       ) / 1e6;
     
-    const blockedUserIds =
-      blockedUsers.map(
-        block => block.blockedId
-      );
+    // Find accepted friendships involving the current user.
+    const friendships =
+      await prisma.friendship.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [
+            {
+              user_id: req.user.id
+            },
+            {
+              friend_id: req.user.id
+            }
+          ]
+        },
+        select: {
+          user_id: true,
+          friend_id: true
+        }
+      });
+    
+    // All Updates contains the current user
+    // plus accepted friends.
+    const allowedUserIds =
+      new Set([req.user.id]);
+    
+    for (const friendship of friendships) {
+      if (
+        friendship.user_id ===
+        req.user.id
+      ) {
+        allowedUserIds.add(
+          friendship.friend_id
+        );
+      } else {
+        allowedUserIds.add(
+          friendship.user_id
+        );
+      }
+    }
+    
+    // Remove users involved in a block.
+    for (const block of blockedUsers) {
+      if (
+        block.blockerId === req.user.id
+      ) {
+        allowedUserIds.delete(
+          block.blockedId
+        );
+      }
+    
+      if (
+        block.blockedId === req.user.id
+      ) {
+        allowedUserIds.delete(
+          block.blockerId
+        );
+      }
+    }
     
     let whereClause = {
       user_id: {
-        notIn: blockedUserIds
+        in: Array.from(allowedUserIds)
       }
     };
     if (forum) {
