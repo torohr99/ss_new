@@ -205,6 +205,66 @@ router.post(
   }
 });
 
+// @route   DELETE /api/posts/:id
+// @desc    Delete a post owned by the authenticated user
+router.delete(
+  '/:id',
+  writeLimiter,
+  async (req, res) => {
+    try {
+      const postId = parseInt(req.params.id, 10);
+
+      if (Number.isNaN(postId)) {
+        return res.status(400).json({
+          message: 'Invalid ID'
+        });
+      }
+
+      const post = await prisma.post.findUnique({
+        where: {
+          id: postId
+        },
+        select: {
+          id: true,
+          user_id: true
+        }
+      });
+
+      if (!post) {
+        return res.status(404).json({
+          message: 'Post not found'
+        });
+      }
+
+      if (post.user_id !== req.user.id) {
+        return res.status(403).json({
+          message:
+            'You can only delete your own posts.'
+        });
+      }
+
+      await prisma.post.delete({
+        where: {
+          id: postId
+        }
+      });
+
+      return res.json({
+        message: 'Post deleted successfully.'
+      });
+    } catch (error) {
+      console.error(
+        'DELETE POST ERROR:',
+        error
+      );
+
+      return res.status(500).json({
+        message: 'Server error deleting post'
+      });
+    }
+  }
+);
+
 // @route   POST /api/posts/:id/like
 // @desc    Toggle like on a post
 router.post(
