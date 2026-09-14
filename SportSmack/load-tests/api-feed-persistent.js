@@ -13,12 +13,17 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL;
 const TEST_PASSWORD = __ENV.TEST_PASSWORD;
+const FRONTEND_URL = __ENV.FRONTEND_URL;
 const TEST_EMAIL_PREFIX =
   __ENV.TEST_EMAIL_PREFIX || 'loadtest';
 
-if (!BASE_URL || !TEST_PASSWORD) {
+if (
+  !BASE_URL ||
+  !FRONTEND_URL ||
+  !TEST_PASSWORD
+) {
   throw new Error(
-    'BASE_URL and TEST_PASSWORD are required.'
+    'BASE_URL, FRONTEND_URL, and TEST_PASSWORD are required.'
   );
 }
 
@@ -40,7 +45,7 @@ export function setup() {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Origin': BASE_URL
+          'Origin': FRONTEND_URL
         }
       }
     );
@@ -96,7 +101,7 @@ export default function (data) {
   const headers = {
     Cookie:
       `smack_auth=${user.authCookie}`,
-    Origin: BASE_URL
+    Origin: FRONTEND_URL
   };
 
   // ----------------------------------------------------------
