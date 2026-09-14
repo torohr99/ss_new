@@ -1,38 +1,79 @@
-const nodemailer = require('nodemailer');
+const RESEND_API_KEY =
+  process.env.RESEND_API_KEY;
 
-const requiredVariables = [
-  'SMTP_HOST',
-  'SMTP_USER',
-  'SMTP_PASS',
-  'SMTP_FROM'
-];
+const RESEND_FROM =
+  process.env.RESEND_FROM ||
+  'SportSmack <onboarding@resend.dev>';
 
-const missingVariables =
-  requiredVariables.filter(
-    variable => !process.env[variable]
-  );
-
-if (missingVariables.length > 0) {
+if (!RESEND_API_KEY) {
   throw new Error(
-    `Missing required email environment variables: ${missingVariables.join(', ')}`
+    'RESEND_API_KEY is not configured'
   );
 }
 
-const transporter =
-  nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(
-      process.env.SMTP_PORT || 587
-    ),
-    secure:
-      process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100
-  });
+const sendMail = async ({
+  to,
+  subject,
+  text,
+  html
+}) => {
+  if (!to) {
+    throw new Error(
+      'Email recipient is required'
+    );
+  }
 
-module.exports = transporter;
+  const response = await fetch(
+    'https://api.resend.com/emails',
+    {
+      method: 'POST',
+
+      headers: {
+        'Authorization':
+          `Bearer ${RESEND_API_KEY}`,
+        'Content-Type':
+          'application/json'
+      },
+
+      body: JSON.stringify({
+        from: RESEND_FROM,
+        to: [to],
+        subject,
+        text,
+        html
+      })
+    }
+  );
+
+  const data =
+    await response.json();
+
+  if (!response.ok) {
+    const error =
+      new Error(
+        data?.message ||
+        'Resend email request failed.'
+      );
+
+    error.status =
+      response.status;
+
+    error.resendData =
+      data;
+
+    throw error;
+  }
+
+  console.log(
+    `Email sent successfully to ${to}. Resend ID: ${data?.id}`
+  );
+
+  return {
+    messageId: data?.id,
+    ...data
+  };
+};
+
+module.exports = {
+  sendMail
+};
