@@ -1,4 +1,8 @@
-const { spawn } = require('child_process');
+const { spawn } =
+  require('child_process');
+
+const logger =
+  require('./lib/logger');
 
 function startProcess(name, script) {
   const child = spawn(
@@ -11,8 +15,12 @@ function startProcess(name, script) {
   );
 
   child.on('exit', (code, signal) => {
-    console.error(
-      `${name} exited. code=${code} signal=${signal}`
+    logger.error(
+      `${name} exited`,
+      {
+        code,
+        signal
+      }
     );
 
     // If either critical process dies, terminate the
@@ -25,9 +33,11 @@ function startProcess(name, script) {
   });
 
   child.on('error', error => {
-    console.error(
-      `${name} failed to start:`,
-      error
+    logger.error(
+      `${name} failed to start`,
+      {
+        error
+      }
     );
 
     process.exit(1);
@@ -36,7 +46,7 @@ function startProcess(name, script) {
   return child;
 }
 
-console.log(
+logger.info(
   'Starting SportSmack API server and background worker...'
 );
 
@@ -51,7 +61,7 @@ const worker = startProcess(
 );
 
 function shutdown(signal) {
-  console.log(
+  logger.info(
     `Received ${signal}. Shutting down SportSmack...`
   );
 
