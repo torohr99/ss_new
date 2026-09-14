@@ -43,8 +43,8 @@ export default function Notifications() {
       });
 
       if (res.ok) {
-        // Remove from list or refresh
-        fetchRequests();
+        // Refresh friend requests and notifications.
+        await fetchData();
       }
     } catch (err) {
       console.error(err);
@@ -85,8 +85,25 @@ export default function Notifications() {
           notifications.map(notif => (
             <div key={notif.id} className="user-card" style={{ background: notif.type === 'BADGE' ? 'rgba(255, 215, 0, 0.1)' : 'var(--bg-primary)' }}>
               <div className="user-card-info">
-                <span className="user-card-name" style={{ color: notif.type === 'BADGE' ? 'var(--brand-red)' : 'var(--text-primary)' }}>
-                  {notif.type === 'BADGE' ? '🏆 Achievement Unlocked!' : 'System'}
+                <span
+                  className="user-card-name"
+                  style={{
+                    color:
+                      notif.type === 'BADGE'
+                        ? 'var(--brand-red)'
+                        : notif.type === 'FRIEND_REQUEST' ||
+                          notif.type === 'FRIEND_ACCEPTED'
+                        ? 'var(--accent-color)'
+                        : 'var(--text-primary)'
+                  }}
+                >
+                  {notif.type === 'BADGE'
+                    ? '🏆 Achievement Unlocked!'
+                    : notif.type === 'FRIEND_REQUEST'
+                    ? '👥 Friend Request'
+                    : notif.type === 'FRIEND_ACCEPTED'
+                    ? '🤝 Friend Request Accepted'
+                    : 'System'}
                 </span>
                 <span className="user-card-date">{notif.message}</span>
               </div>
