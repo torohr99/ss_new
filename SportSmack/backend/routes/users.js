@@ -153,23 +153,76 @@ router.get('/:id/friends', async (req, res) => {
 // @desc    Send a friend request
 router.post('/:id/friend', async (req, res) => {
   try {
-    const targetUserId = parseInt(req.params.id);
-    if (isNaN(targetUserId) || targetUserId === req.user.id) {
-      return res.status(400).json({ message: 'Invalid operation' });
+    const targetUserId = parseInt(req.params.id, 10);
+
+    if (
+      Number.isNaN(targetUserId) ||
+      targetUserId === req.user.id
+    ) {
+      return res.status(400).json({
+        message: 'Invalid operation'
+      });
     }
 
-    // Check if relationship already exists
+    // Make sure the target user exists.
+    const targetUser = await prisma.user.findUnique({
+      where: {
+        id: targetUserId
+      },
+      select: {
+        id: true,
+        username: true
+      }
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({
+        message: 'User not found'
+      });
+    }
+
+    // Do not allow friend requests between blocked users.
+    const block = await prisma.block.findFirst({
+      where: {
+        OR: [
+          {
+            blockerId: req.user.id,
+            blockedId: targetUserId
+          },
+          {
+            blockerId: targetUserId,
+            blockedId: req.user.id
+          }
+        ]
+      }
+    });
+
+    if (block) {
+      return res.status(403).json({
+        message: 'You cannot send a friend request to this user.'
+      });
+    }
+
+    // Check if a relationship already exists.
     const existing = await prisma.friendship.findFirst({
       where: {
         OR: [
-          { user_id: req.user.id, friend_id: targetUserId },
-          { user_id: targetUserId, friend_id: req.user.id }
+          {
+            user_id: req.user.id,
+            friend_id: targetUserId
+          },
+          {
+            user_id: targetUserId,
+            friend_id: req.user.id
+          }
         ]
       }
     });
 
     if (existing) {
-      return res.status(400).json({ message: 'Relationship already exists' });
+      return res.status(400).json({
+        message: 'Relationship already exists'
+      });
     }
 
     const friendship = await prisma.friendship.create({
@@ -180,10 +233,25 @@ router.post('/:id/friend', async (req, res) => {
       }
     });
 
-    res.status(201).json(friendship);
+    // Notify the recipient.
+    await prisma.notification.create({
+      data: {
+        user_id: targetUserId,
+        type: 'FRIEND_REQUEST',
+        message: `${req.user.username} sent you a friend request.`
+      }
+    });
+
+    return res.status(201).json(friendship);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error sending request' });
+    console.error(
+      'SEND FRIEND REQUEST ERROR:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Server error sending request'
+    });
   }
 });
 
@@ -191,10 +259,15 @@ router.post('/:id/friend', async (req, res) => {
 // @desc    Accept a friend request
 router.put('/:id/friend', async (req, res) => {
   try {
-    const targetUserId = parseInt(req.params.id);
-    if (isNaN(targetUserId)) return res.status(400).json({ message: 'Invalid ID' });
+    const targetUserId = parseInt(req.params.id, 10);
 
-    // Find the pending request sent TO the current user BY the target user
+    if (Number.isNaN(targetUserId)) {
+      return res.status(400).json({
+        message: 'Invalid ID'
+      });
+    }
+
+    // Find the pending request sent by the target user.
     const request = await prisma.friendship.findFirst({
       where: {
         user_id: targetUserId,
@@ -204,18 +277,39 @@ router.put('/:id/friend', async (req, res) => {
     });
 
     if (!request) {
-      return res.status(404).json({ message: 'Friend request not found' });
+      return res.status(404).json({
+        message: 'Friend request not found'
+      });
     }
 
     const updated = await prisma.friendship.update({
-      where: { id: request.id },
-      data: { status: 'ACCEPTED' }
+      where: {
+        id: request.id
+      },
+      data: {
+        status: 'ACCEPTED'
+      }
     });
 
-    res.json(updated);
+    // Notify the original requester.
+    await prisma.notification.create({
+      data: {
+        user_id: targetUserId,
+        type: 'FRIEND_ACCEPTED',
+        message: `${req.user.username} accepted your friend request.`
+      }
+    });
+
+    return res.json(updated);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error accepting request' });
+    console.error(
+      'ACCEPT FRIEND REQUEST ERROR:',
+      error
+    );
+
+    return res.status(500).json({
+      message: 'Server error accepting request'
+    });
   }
 });
 
