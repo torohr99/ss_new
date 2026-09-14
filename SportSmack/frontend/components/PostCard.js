@@ -23,6 +23,9 @@ export default function PostCard({ post }) {
   const [moderationMessage, setModerationMessage] =
     useState('');
 
+  const [deletingPost, setDeletingPost] =
+    useState(false);
+
   const toggleLike = async () => {
     const originalLiked = isLiked;
     // Optimistic update
@@ -152,6 +155,56 @@ export default function PostCard({ post }) {
 
   const authorInitials = post.user.username.substring(0, 2).toUpperCase();
 
+  const deletePost = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this post?'
+    );
+  
+    if (!confirmed) {
+      return;
+    }
+  
+    setDeletingPost(true);
+  
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+  
+      const response = await fetch(
+        `${API_URL}/api/posts/${post.id}`,
+        {
+          method: 'DELETE',
+          credentials: 'include'
+        }
+      );
+  
+      const data =
+        await response.json();
+  
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+          'Failed to delete post.'
+        );
+      }
+  
+      window.location.reload();
+    } catch (error) {
+      console.error(
+        'Failed to delete post:',
+        error
+      );
+  
+      setModerationMessage(
+        error.message ||
+        'Failed to delete post.'
+      );
+  
+      setDeletingPost(false);
+    }
+  };
+  
   const blockAuthor = async () => {
     try {
       const API_URL =
@@ -256,6 +309,17 @@ export default function PostCard({ post }) {
         
           {showModerationMenu && (
             <div className="moderation-menu">
+              {post.canDelete && (
+                <button
+                  type="button"
+                  onClick={deletePost}
+                  disabled={deletingPost}
+                >
+                  {deletingPost
+                    ? 'Deleting...'
+                    : 'Delete post'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={blockAuthor}
@@ -364,11 +428,87 @@ export default function PostCard({ post }) {
           ) : (
             <div className="comment-list">
               {comments.map(c => (
-                <div key={c.id} className="comment-item">
-                  <div className="comment-avatar">{c.user.username[0].toUpperCase()}</div>
+                <div
+                  key={c.id}
+                  className="comment-item"
+                >
+                  <div className="comment-avatar">
+                    {c.user.username[0].toUpperCase()}
+                  </div>
+                
                   <div className="comment-bubble">
-                    <div className="comment-author">{c.user.username}</div>
-                    <div className="comment-text">{c.content}</div>
+                    <div className="comment-author">
+                      {c.user.username}
+                    </div>
+                
+                    <div className="comment-text">
+                      {c.content}
+                    </div>
+                
+                    {c.canDelete && (
+                      <button
+                        type="button"
+                        className="comment-delete-button"
+                        onClick={async () => {
+                          const confirmed =
+                            window.confirm(
+                              'Delete this comment?'
+                            );
+                
+                          if (!confirmed) {
+                            return;
+                          }
+                
+                          try {
+                            const API_URL =
+                              process.env.NEXT_PUBLIC_API_URL ||
+                              'http://localhost:5000';
+                
+                            const response =
+                              await fetch(
+                                `${API_URL}/api/posts/${post.id}/comment/${c.id}`,
+                                {
+                                  method: 'DELETE',
+                                  credentials: 'include'
+                                }
+                              );
+                
+                            const data =
+                              await response.json();
+                
+                            if (!response.ok) {
+                              throw new Error(
+                                data.message ||
+                                'Failed to delete comment.'
+                              );
+                            }
+                
+                            setComments(prev =>
+                              prev.filter(
+                                comment =>
+                                  comment.id !== c.id
+                              )
+                            );
+                
+                            setCommentsCount(prev =>
+                              Math.max(0, prev - 1)
+                            );
+                          } catch (error) {
+                            console.error(
+                              'Failed to delete comment:',
+                              error
+                            );
+                
+                            setModerationMessage(
+                              error.message ||
+                              'Failed to delete comment.'
+                            );
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
