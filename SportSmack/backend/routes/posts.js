@@ -400,8 +400,20 @@ router.post(
 
     res.status(201).json(newComment);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error creating comment' });
+    console.error(
+      'CREATE COMMENT ERROR:',
+      {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code,
+        meta: error?.meta,
+        stack: error?.stack
+      }
+    );
+
+    res.status(500).json({
+      message: 'Server error creating comment'
+    });
   }
 });
 
