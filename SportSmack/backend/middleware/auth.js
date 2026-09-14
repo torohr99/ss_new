@@ -1,4 +1,8 @@
-const jwt = require('jsonwebtoken');
+const jwt =
+  require('jsonwebtoken');
+
+const logger =
+  require('../lib/logger');
 
 const authMiddleware = (req, res, next) => {
   // Get token from cookie
@@ -17,7 +21,12 @@ const authMiddleware = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    console.error('Token verification failed:', error);
+    logger.warn(
+      'Token verification failed',
+      {
+        error
+      }
+    );
     res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };
