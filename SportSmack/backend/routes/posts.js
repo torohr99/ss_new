@@ -103,6 +103,7 @@ router.get('/', async (req, res) => {
     const formattedPosts = posts.map(post => ({
       ...post,
       hasLiked: post.likes.length > 0,
+      canDelete: post.user_id === req.user.id,
       likes: undefined
     }));
     
@@ -374,6 +375,13 @@ router.get('/:id/comments', async (req, res) => {
 
     const comments =
       await prisma.comment.findMany(query);
+    
+    const formattedComments =
+      comments.map(comment => ({
+        ...comment,
+        canDelete:
+          comment.user_id === req.user.id
+      }));
 
     const nextCursor =
       comments.length === take
@@ -381,7 +389,7 @@ router.get('/:id/comments', async (req, res) => {
         : null;
 
     res.json({
-      comments,
+      comments: formattedComments,
       nextCursor
     });
 
@@ -396,6 +404,84 @@ router.get('/:id/comments', async (req, res) => {
     });
   }
 });
+
+// @route   DELETE /api/posts/:postId/comment/:commentId
+// @desc    Delete a comment owned by the authenticated user
+router.delete(
+  '/:postId/comment/:commentId',
+  socialLimiter,
+  async (req, res) => {
+    try {
+      const postId =
+        parseInt(req.params.postId, 10);
+
+      const commentId =
+        parseInt(req.params.commentId, 10);
+
+      if (
+        Number.isNaN(postId) ||
+        Number.isNaN(commentId)
+      ) {
+        return res.status(400).json({
+          message: 'Invalid ID'
+        });
+      }
+
+      const comment =
+        await prisma.comment.findUnique({
+          where: {
+            id: commentId
+          },
+          select: {
+            id: true,
+            post_id: true,
+            user_id: true
+          }
+        });
+
+      if (!comment) {
+        return res.status(404).json({
+          message: 'Comment not found'
+        });
+      }
+
+      if (comment.post_id !== postId) {
+        return res.status(400).json({
+          message:
+            'Comment does not belong to this post.'
+        });
+      }
+
+      if (comment.user_id !== req.user.id) {
+        return res.status(403).json({
+          message:
+            'You can only delete your own comments.'
+        });
+      }
+
+      await prisma.comment.delete({
+        where: {
+          id: commentId
+        }
+      });
+
+      return res.json({
+        message:
+          'Comment deleted successfully.'
+      });
+    } catch (error) {
+      console.error(
+        'DELETE COMMENT ERROR:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Server error deleting comment'
+      });
+    }
+  }
+);
 
 // @route   POST /api/posts/:id/comment
 // @desc    Add a comment to a post
