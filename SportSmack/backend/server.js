@@ -98,6 +98,31 @@ io.adapter(createAdapter(pubClient, subClient));
 
 const PORT = process.env.PORT || 5000;
 
+if (
+  process.env.NODE_ENV ===
+  'production'
+) {
+  const requiredProductionEnv = [
+    'JWT_SECRET',
+    'FRONTEND_URL',
+    'REDIS_URL'
+  ];
+
+  const missingProductionEnv =
+    requiredProductionEnv.filter(
+      variable =>
+        !process.env[variable]
+    );
+
+  if (
+    missingProductionEnv.length > 0
+  ) {
+    throw new Error(
+      `Missing required production environment variables: ${missingProductionEnv.join(', ')}`
+    );
+  }
+}
+
 // Middleware
 app.use(
   compression({
@@ -109,7 +134,19 @@ app.use(
   helmet({
     crossOriginResourcePolicy: {
       policy: 'cross-origin'
-    }
+    },
+
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin'
+    },
+
+    frameguard: {
+      action: 'deny'
+    },
+
+    hidePoweredBy: true,
+
+    noSniff: true
   })
 );
 
