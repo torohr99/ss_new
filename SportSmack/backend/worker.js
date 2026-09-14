@@ -33,6 +33,7 @@ const io =
   new Emitter(emitterRedis);
 
 const workerId =
+  process.env.RAILWAY_REPLICA_ID ||
   process.env.RENDER_INSTANCE_ID ||
   `worker-${process.pid}`;
 
