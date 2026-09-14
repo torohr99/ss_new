@@ -244,10 +244,24 @@ router.delete(
         });
       }
 
-      await prisma.post.delete({
-        where: {
-          id: postId
-        }
+      await prisma.$transaction(async (tx) => {
+        await tx.like.deleteMany({
+          where: {
+            post_id: postId
+          }
+        });
+      
+        await tx.comment.deleteMany({
+          where: {
+            post_id: postId
+          }
+        });
+      
+        await tx.post.delete({
+          where: {
+            id: postId
+          }
+        });
       });
 
       return res.json({
