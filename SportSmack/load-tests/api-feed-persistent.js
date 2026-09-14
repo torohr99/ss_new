@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 
 export const options = {
   vus: 25,
-  duration: '30s',
+  duration: '60s',
 
   thresholds: {
     http_req_failed: ['rate<0.01'],
@@ -44,6 +44,15 @@ export function setup() {
       }
     );
 
+    check(login, {
+      'setup login returns 200': (r) =>
+        r.status === 200,
+
+      'setup login returns auth cookie': (r) =>
+        r.cookies.smack_auth &&
+        r.cookies.smack_auth.length > 0
+    });
+
     if (login.status !== 200) {
       throw new Error(
         `Setup login failed for ${email}: ` +
@@ -83,25 +92,73 @@ export default function (data) {
     );
   }
 
-  const response =
+  const headers = {
+    Cookie:
+      `smack_auth=${user.authCookie}`
+  };
+
+  // ----------------------------------------------------------
+  // NORMAL FEED
+  // ----------------------------------------------------------
+
+  const feedResponse =
     http.get(
       `${BASE_URL}/api/posts`,
       {
-        headers: {
-          Cookie:
-            `smack_auth=${user.authCookie}`
-        }
+        headers
       }
     );
 
-  check(response, {
-    'feed returns 200': (r) =>
+  check(feedResponse, {
+    'normal feed returns 200': (r) =>
       r.status === 200,
 
-    'feed contains posts array': (r) => {
+    'normal feed contains posts array': (r) => {
       try {
         return Array.isArray(
           r.json('posts')
+        );
+      } catch {
+        return false;
+      }
+    }
+  });
+
+  // ----------------------------------------------------------
+  // SOCIAL FEED
+  // ----------------------------------------------------------
+
+  const socialResponse =
+    http.get(
+      `${BASE_URL}/api/posts/social`,
+      {
+        headers
+      }
+    );
+
+  check(socialResponse, {
+    'social feed returns 200': (r) =>
+      r.status === 200,
+
+    'social feed contains posts array': (r) => {
+      try {
+        return Array.isArray(
+          r.json('posts')
+        );
+      } catch {
+        return false;
+      }
+    },
+
+    'social feed contains nextCursor field': (r) => {
+      try {
+        const body = r.json();
+
+        return (
+          Object.prototype.hasOwnProperty.call(
+            body,
+            'nextCursor'
+          )
         );
       } catch {
         return false;
