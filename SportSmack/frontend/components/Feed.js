@@ -408,12 +408,19 @@ export default function Feed() {
           )
         ) : displayedItems.length > 0 ? (
           <>
-            {displayedItems.map(item => (
-              <PostCard
-                key={`post_${item.id}`}
-                post={item}
-              />
-            ))}
+            {displayedItems.map(item =>
+              item.feedType === 'post' ? (
+                <PostCard
+                  key={`post_${item.id}`}
+                  post={item}
+                />
+              ) : (
+                <NewsCard
+                  key={`news_${item.id}`}
+                  article={item}
+                />
+              )
+            )}
 
             {filterType === 'all' &&
               nextCursor && (
