@@ -288,7 +288,8 @@ export default function GameHubPage({ params }) {
             process.env.NEXT_PUBLIC_API_URL ||
             'http://localhost:5000',
             {
-                withCredentials: true
+                withCredentials: true,
+                transports: ['websocket']
             }
         );
 
