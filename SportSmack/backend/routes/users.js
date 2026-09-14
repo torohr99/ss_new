@@ -668,34 +668,133 @@ router.get('/:id/badges', async (req, res) => {
 
 // @route   GET /api/users/me/notifications
 // @desc    Get notifications
+// @route   GET /api/users/me/notifications
+// @desc    Get recent notifications and unread count
 router.get('/me/notifications', async (req, res) => {
   try {
-    const notifs = await prisma.notification.findMany({
-      where: { user_id: req.user.id },
-      orderBy: { created_at: 'desc' },
-      take: 20
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: {
+          user_id: req.user.id
+        },
+        orderBy: {
+          created_at: 'desc'
+        },
+        take: 50
+      }),
+      prisma.notification.count({
+        where: {
+          user_id: req.user.id,
+          read: false
+        }
+      })
+    ]);
+
+    return res.json({
+      notifications,
+      unreadCount
     });
-    res.json(notifs);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error fetching notifications' });
+    console.error(
+      'FETCH NOTIFICATIONS ERROR:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Server error fetching notifications'
+    });
   }
 });
 
-// @route   PUT /api/users/me/notifications/read
-// @desc    Mark notifications as read
-router.put('/me/notifications/read', async (req, res) => {
-  try {
-    await prisma.notification.updateMany({
-      where: { user_id: req.user.id, read: false },
-      data: { read: true }
-    });
-    res.json({ success: true });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error updating notifications' });
+// @route   PUT /api/users/me/notifications/:id/read
+// @desc    Mark one notification as read
+router.put(
+  '/me/notifications/:id/read',
+  async (req, res) => {
+    try {
+      const notificationId =
+        parseInt(req.params.id, 10);
+
+      if (Number.isNaN(notificationId)) {
+        return res.status(400).json({
+          message: 'Invalid notification ID'
+        });
+      }
+
+      const notification =
+        await prisma.notification.findFirst({
+          where: {
+            id: notificationId,
+            user_id: req.user.id
+          }
+        });
+
+      if (!notification) {
+        return res.status(404).json({
+          message: 'Notification not found'
+        });
+      }
+
+      const updated =
+        await prisma.notification.update({
+          where: {
+            id: notification.id
+          },
+          data: {
+            read: true
+          }
+        });
+
+      return res.json(updated);
+    } catch (error) {
+      console.error(
+        'MARK NOTIFICATION READ ERROR:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Server error marking notification as read'
+      });
+    }
   }
-});
+);
+
+// @route   PUT /api/users/me/notifications/read
+// @desc    Mark all notifications as read
+router.put(
+  '/me/notifications/read',
+  async (req, res) => {
+    try {
+      const result =
+        await prisma.notification.updateMany({
+          where: {
+            user_id: req.user.id,
+            read: false
+          },
+          data: {
+            read: true
+          }
+        });
+
+      return res.json({
+        success: true,
+        updated: result.count
+      });
+    } catch (error) {
+      console.error(
+        'MARK ALL NOTIFICATIONS READ ERROR:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Server error updating notifications'
+      });
+    }
+  }
+);
 
 // @route   GET /api/users/me/teams/details
 // @desc    Get detailed schedule and stats for all followed teams (for the sidebar)
