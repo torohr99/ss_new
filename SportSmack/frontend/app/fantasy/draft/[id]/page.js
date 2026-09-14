@@ -119,7 +119,7 @@ export default function DraftRoom({ params }) {
   
     const newSocket = io(apiUrl, {
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      transports: ['websocket']
     });
   
     setSocket(newSocket);
