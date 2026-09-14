@@ -91,7 +91,13 @@ const io = new Server(server, {
     origin: verifyOrigin,
     methods: ['GET', 'POST', 'OPTIONS'],
     credentials: true
-  }
+  },
+
+  // Railway does not provide sticky sessions.
+  // WebSocket-only transport allows Socket.IO
+  // connections to work correctly across replicas
+  // with the Redis adapter.
+  transports: ['websocket']
 });
 
 io.adapter(createAdapter(pubClient, subClient));
@@ -287,7 +293,11 @@ app.get('/api/status', async (req, res) => {
       database: 'OK',
       redis: 'OK',
       instance:
+        process.env.RAILWAY_REPLICA_ID ||
         process.env.RENDER_INSTANCE_ID ||
+        'local',
+      region:
+        process.env.RAILWAY_REPLICA_REGION ||
         'local',
       timestamp:
         new Date().toISOString(),
