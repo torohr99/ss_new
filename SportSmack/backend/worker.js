@@ -51,13 +51,25 @@ async function startWorker() {
 
   await emitterRedis.ping();
 
-  const acquired =
-    await acquireWorkerLock();
+  let acquired = false;
   
-  if (!acquired) {
-    throw new Error(
-      'Another SportSmack background worker is already active.'
-    );
+  while (!acquired && !isShuttingDown) {
+    acquired =
+      await acquireWorkerLock();
+  
+    if (!acquired) {
+      console.warn(
+        'Another SportSmack background worker is already active. Retrying in 10 seconds...'
+      );
+  
+      await new Promise(resolve =>
+        setTimeout(resolve, 10000)
+      );
+    }
+  }
+  
+  if (isShuttingDown) {
+    return;
   }
   
   setInterval(
