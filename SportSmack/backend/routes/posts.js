@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const logger = require('../lib/logger');
-const MAX_COMMENT_LENGTH = 1000;
 
 const prisma = require('../lib/prisma');
 const {
@@ -13,8 +12,10 @@ const {
 
 const {
   MAX_POST_LENGTH,
+  MAX_COMMENT_LENGTH,
   validateContent,
   hasRecentDuplicatePost,
+  hasRecentDuplicateComment,
   isBlocked
 } = require('../middleware/moderation');
 // Protect all post routes
