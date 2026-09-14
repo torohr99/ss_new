@@ -146,6 +146,179 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   GET /api/posts/social
+// @desc    Get posts from the authenticated user and accepted friends
+router.get('/social', async (req, res) => {
+  const feedRequestStartedAt = process.hrtime.bigint();
+
+  try {
+    const cursor = req.query.cursor;
+    const take = 15;
+
+    // Find all accepted friendships involving the current user.
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          {
+            user_id: req.user.id
+          },
+          {
+            friend_id: req.user.id
+          }
+        ]
+      },
+      select: {
+        user_id: true,
+        friend_id: true
+      }
+    });
+
+    // Build the list of users whose posts belong in the Social feed.
+    const socialUserIds = new Set([req.user.id]);
+
+    for (const friendship of friendships) {
+      if (friendship.user_id === req.user.id) {
+        socialUserIds.add(friendship.friend_id);
+      } else {
+        socialUserIds.add(friendship.user_id);
+      }
+    }
+
+    // Respect the existing two-way block system.
+    const blockedUsers = await prisma.block.findMany({
+      where: {
+        OR: [
+          {
+            blockerId: req.user.id
+          },
+          {
+            blockedId: req.user.id
+          }
+        ]
+      },
+      select: {
+        blockerId: true,
+        blockedId: true
+      }
+    });
+
+    for (const block of blockedUsers) {
+      if (block.blockerId === req.user.id) {
+        socialUserIds.delete(block.blockedId);
+      }
+
+      if (block.blockedId === req.user.id) {
+        socialUserIds.delete(block.blockerId);
+      }
+    }
+
+    const queryParams = {
+      where: {
+        user_id: {
+          in: Array.from(socialUserIds)
+        },
+        content: {
+          not: {
+            startsWith: '[FORUM:'
+          }
+        }
+      },
+      take,
+      orderBy: {
+        id: 'desc'
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true
+          }
+        },
+        _count: {
+          select: {
+            likes: true,
+            comments: true
+          }
+        },
+        likes: {
+          where: {
+            user_id: req.user.id
+          },
+          select: {
+            id: true
+          }
+        }
+      }
+    };
+
+    if (cursor) {
+      const parsedCursor = parseInt(cursor, 10);
+
+      if (Number.isNaN(parsedCursor)) {
+        return res.status(400).json({
+          message: 'Invalid cursor'
+        });
+      }
+
+      queryParams.cursor = {
+        id: parsedCursor
+      };
+
+      queryParams.skip = 1;
+    }
+
+    const posts = await prisma.post.findMany(queryParams);
+
+    const formattedPosts = posts.map(post => ({
+      ...post,
+      hasLiked: post.likes.length > 0,
+      canDelete: post.user_id === req.user.id,
+      likes: undefined
+    }));
+
+    const nextCursor =
+      posts.length === take
+        ? posts[posts.length - 1].id
+        : null;
+
+    const feedRequestDurationMs =
+      Number(
+        process.hrtime.bigint() -
+          feedRequestStartedAt
+      ) / 1e6;
+
+    if (feedRequestDurationMs >= 500) {
+      console.warn(
+        {
+          route: '/api/posts/social',
+          userId: req.user.id,
+          feedRequestDurationMs:
+            Math.round(feedRequestDurationMs),
+          postCount: posts.length,
+          socialUserCount: socialUserIds.size
+        },
+        'Slow social feed request'
+      );
+    }
+
+    return res.json({
+      posts: formattedPosts,
+      nextCursor
+    });
+  } catch (error) {
+    console.error(
+      'SOCIAL FEED ERROR:',
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        'Server error fetching social feed'
+    });
+  }
+});
+
 // @route   POST /api/posts
 // @desc    Create a new post
 router.post(
