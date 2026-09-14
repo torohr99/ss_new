@@ -25,10 +25,7 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
       const res = await fetch(`${apiUrl}/api/posts`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token
-            ? { Authorization: `Bearer ${token}` }
-            : {})
+          'Content-Type': 'application/json'
         },
         credentials: 'include',
         body: JSON.stringify({
