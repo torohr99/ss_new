@@ -3,8 +3,9 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const transporter =
-  require('../lib/mailer');
+const {
+  sendMail
+} = require('../lib/mailer');
 const prisma = require('../lib/prisma');
 const authMiddleware = require('../middleware/auth');
 
@@ -32,10 +33,7 @@ const generateToken = (id, username) => {
 
 const sendVerificationEmail = async (email, verificationToken) => {
   const requiredVariables = [
-    'SMTP_HOST',
-    'SMTP_USER',
-    'SMTP_PASS',
-    'SMTP_FROM',
+    'RESEND_API_KEY',
     'FRONTEND_URL'
   ];
 
@@ -54,8 +52,10 @@ const sendVerificationEmail = async (email, verificationToken) => {
   const verifyLink =
     `${frontendUrl}/verify?token=${encodeURIComponent(verificationToken)}`;
 
-  const info = await transporter.sendMail({
-    from: `"SportSmack" <${process.env.SMTP_FROM}>`,
+  const info = await sendMail({
+    from:
+      process.env.RESEND_FROM ||
+      'SportSmack <onboarding@resend.dev>',
     to: email,
     subject: 'Verify your SportSmack account',
     text:
@@ -116,10 +116,7 @@ const sendPasswordResetEmail = async (
   resetToken
 ) => {
   const requiredVariables = [
-    'SMTP_HOST',
-    'SMTP_USER',
-    'SMTP_PASS',
-    'SMTP_FROM',
+    'RESEND_API_KEY',
     'FRONTEND_URL'
   ];
 
@@ -145,9 +142,10 @@ const sendPasswordResetEmail = async (
     encodeURIComponent(resetToken);
 
   const info =
-    await transporter.sendMail({
+    await sendMail({
       from:
-        `"SportSmack" <${process.env.SMTP_FROM}>`,
+  process.env.RESEND_FROM ||
+  'SportSmack <onboarding@resend.dev>',
       to: email,
       subject:
         'Reset your SportSmack password',
