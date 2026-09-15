@@ -23,6 +23,19 @@ const redis = require('./lib/redis');
 const app = express();
 const server = http.createServer(app);
 
+// Bound the lifetime of HTTP requests so a stalled
+// request cannot occupy a server resource indefinitely.
+// AI requests currently have downstream timeouts of
+// up to 30 seconds, so allow a small amount of margin.
+server.requestTimeout =
+  35 * 1000;
+
+server.headersTimeout =
+  40 * 1000;
+
+server.keepAliveTimeout =
+  5 * 1000;
+
 const redisUrl = process.env.REDIS_URL;
 
 if (!redisUrl) {
