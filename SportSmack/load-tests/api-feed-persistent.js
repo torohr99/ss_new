@@ -17,16 +17,19 @@ export const options = {
 const BASE_URL = __ENV.BASE_URL;
 const TEST_PASSWORD = __ENV.TEST_PASSWORD;
 const FRONTEND_URL = __ENV.FRONTEND_URL;
+const LOAD_TEST_SECRET =
+  __ENV.LOAD_TEST_SECRET;
 const TEST_EMAIL_PREFIX =
   __ENV.TEST_EMAIL_PREFIX || 'loadtest';
 
 if (
   !BASE_URL ||
   !FRONTEND_URL ||
-  !TEST_PASSWORD
+  !TEST_PASSWORD ||
+  !LOAD_TEST_SECRET
 ) {
   throw new Error(
-    'BASE_URL, FRONTEND_URL, and TEST_PASSWORD are required.'
+    'BASE_URL, FRONTEND_URL, TEST_PASSWORD, and LOAD_TEST_SECRET are required.'
   );
 }
 
@@ -52,7 +55,9 @@ export function setup() {
             'Content-Type':
               'application/json',
             'Origin':
-              FRONTEND_URL
+              FRONTEND_URL,
+            'X-Load-Test-Secret':
+              LOAD_TEST_SECRET
           }
         }
       );
@@ -120,7 +125,9 @@ export default function (data) {
   const headers = {
     Cookie:
       `smack_auth=${user.authCookie}`,
-    Origin: FRONTEND_URL
+    Origin: FRONTEND_URL,
+    'X-Load-Test-Secret':
+      LOAD_TEST_SECRET
   };
 
   // ----------------------------------------------------------
