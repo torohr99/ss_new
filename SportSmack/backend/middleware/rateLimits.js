@@ -25,6 +25,21 @@ const standardLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+
+  // Controlled k6 load tests use a dedicated secret
+  // so the test measures API capacity rather than
+  // the normal per-IP production rate limit.
+  skip: req => {
+    const loadTestSecret =
+      process.env.LOAD_TEST_SECRET;
+
+    return (
+      loadTestSecret &&
+      req.headers['x-load-test-secret'] ===
+        loadTestSecret
+    );
+  },
+
   store: redisStore('rl:standard:'),
   message: {
     error:
