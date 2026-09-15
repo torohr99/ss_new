@@ -29,56 +29,101 @@ const getBaseUrl = (type, sport, league) => {
 };
 
 async function getScoreboard(leagueKey) {
-  const mapping = LEAGUE_MAP[leagueKey];
-  if (!mapping) throw new Error('Invalid league');
+  const mapping =
+    LEAGUE_MAP[leagueKey];
 
-  const cacheKey = `scoreboard_${leagueKey}`;
-  const cachedData = await cache.getJson(cacheKey);
-  if (cachedData) return cachedData;
-
-  try {
-    const response = await espnClient.get(getBaseUrl('scoreboard', mapping.sport, mapping.league));
-    const events = response.data.events || [];
-    
-    // Normalize data for frontend
-    const games = events.map(event => {
-      const competition = event.competitions[0];
-      const status = event.status.type.shortDetail; // e.g., "Final", "3rd Qtr", "10:00 PM"
-      const isLive = event.status.type.state === 'in';
-      const isCompleted = event.status.type.state === 'post';
-      
-      const homeTeamInfo = competition.competitors.find(c => c.homeAway === 'home');
-      const awayTeamInfo = competition.competitors.find(c => c.homeAway === 'away');
-
-      return {
-        id: event.id,
-        date: event.date,
-        name: event.name,
-        shortName: event.shortName,
-        status,
-        isLive,
-        isCompleted,
-        homeTeam: {
-          name: homeTeamInfo.team.displayName,
-          logo: homeTeamInfo.team.logo,
-          score: homeTeamInfo.score,
-          winner: homeTeamInfo.winner
-        },
-        awayTeam: {
-          name: awayTeamInfo.team.displayName,
-          logo: awayTeamInfo.team.logo,
-          score: awayTeamInfo.score,
-          winner: awayTeamInfo.winner
-        }
-      };
-    });
-
-    await cache.setJson(cacheKey, games, 60); // Cache for 60s
-    return games;
-  } catch (error) {
-    console.error(`ESPN API Error fetching scoreboard for ${leagueKey}:`, error.message);
-    return [];
+  if (!mapping) {
+    throw new Error(
+      'Invalid league'
+    );
   }
+
+  const cacheKey =
+    `scoreboard_${leagueKey}`;
+
+  return cache.getOrSetJson(
+    cacheKey,
+    60,
+    async () => {
+      try {
+        const response =
+          await espnClient.get(
+            getBaseUrl(
+              'scoreboard',
+              mapping.sport,
+              mapping.league
+            )
+          );
+
+        const events =
+          response.data.events || [];
+
+        const games =
+          events.map(event => {
+            const competition =
+              event.competitions[0];
+
+            const status =
+              event.status.type.shortDetail;
+
+            const isLive =
+              event.status.type.state === 'in';
+
+            const isCompleted =
+              event.status.type.state === 'post';
+
+            const homeTeamInfo =
+              competition.competitors.find(
+                c => c.homeAway === 'home'
+              );
+
+            const awayTeamInfo =
+              competition.competitors.find(
+                c => c.homeAway === 'away'
+              );
+
+            return {
+              id: event.id,
+              date: event.date,
+              name: event.name,
+              shortName: event.shortName,
+              status,
+              isLive,
+              isCompleted,
+              homeTeam: {
+                name:
+                  homeTeamInfo.team.displayName,
+                logo:
+                  homeTeamInfo.team.logo,
+                score:
+                  homeTeamInfo.score,
+                winner:
+                  homeTeamInfo.winner
+              },
+              awayTeam: {
+                name:
+                  awayTeamInfo.team.displayName,
+                logo:
+                  awayTeamInfo.team.logo,
+                score:
+                  awayTeamInfo.score,
+                winner:
+                  awayTeamInfo.winner
+              }
+            };
+          });
+
+        return games;
+      } catch (error) {
+        console.error(
+          `ESPN API Error fetching scoreboard for ${leagueKey}:`,
+          error.message
+        );
+
+        return [];
+      }
+    }
+  );
 }
 
 async function getStandings(leagueKey) {
@@ -378,20 +423,34 @@ async function getRecentTeamGames(sport, league, espnId, count = 5) {
     }
 }
 
-async function getLeagueNews(sport, league) {
-  const cacheKey = `news_${league}`;
-  const cached = await cache.getJson(cacheKey);
-  if (cached) return cached;
+async function getLeagueNews(
+  sport,
+  league
+) {
+  const cacheKey =
+    `news_${league}`;
 
-  try {
-    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`);
-    const articles = response.data.articles || [];
-    await cache.setJson(cacheKey, articles, 300); // cache for 5 minutes
-    return articles;
-  } catch (error) {
-    console.error(`ESPN API Error fetching news for ${league}:`, error.message);
-    return [];
-  }
+  return cache.getOrSetJson(
+    cacheKey,
+    300,
+    async () => {
+      try {
+        const response =
+          await espnClient.get(
+            `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`
+          );
+
+        return response.data.articles || [];
+      } catch (error) {
+        console.error(
+          `ESPN API Error fetching news for ${league}:`,
+          error.message
+        );
+
+        return [];
+      }
+    }
+  );
 }
 
 async function getTeamNews(
