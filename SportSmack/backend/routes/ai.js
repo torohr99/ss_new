@@ -4,6 +4,10 @@ const authMiddleware = require('../middleware/auth');
 const {
   aiLimiter
 } = require('../middleware/rateLimits');
+
+const {
+  aiConcurrencyLimiter
+} = require('../middleware/concurrency');
 const entityDb = require('../services/entityDb');
 const sportsApi = require('../services/sportsApi');
 
@@ -133,6 +137,7 @@ router.post(
   '/meme',
   authMiddleware,
   aiLimiter,
+  aiConcurrencyLimiter,
   async (req, res) => {
   try {
     const {
