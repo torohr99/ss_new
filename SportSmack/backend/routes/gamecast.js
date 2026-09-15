@@ -10,11 +10,16 @@ const {
   aiLimiter
 } = require('../middleware/rateLimits');
 
+const {
+  aiConcurrencyLimiter
+} = require('../middleware/concurrency');
+
 // @route GET /api/gamecast/:league/:gameId/postgame-analysis
 // @desc Generate AI post-game analysis
 router.get(
   '/:league/:gameId/postgame-analysis',
   aiLimiter,
+  aiConcurrencyLimiter,
   async (req, res) => {
     const { league, gameId } = req.params;
 
@@ -75,6 +80,7 @@ router.get(
 router.post(
   '/:league/:gameId/assistant',
   aiLimiter,
+  aiConcurrencyLimiter,
   async (req, res) => {
     const {
       league,
@@ -130,6 +136,7 @@ router.post(
 router.get(
   '/:league/:gameId/pregame-analysis',
   aiLimiter,
+  aiConcurrencyLimiter,
   async (req, res) => {
     const { league, gameId } = req.params;
 
