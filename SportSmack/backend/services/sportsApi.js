@@ -461,42 +461,32 @@ async function getTeamNews(
   const cacheKey =
     `teamNews_${sport}_${league}_${teamId}`;
 
-  const cached =
-    await cache.getJson(cacheKey);
+  return cache.getOrSetJson(
+    cacheKey,
+    300,
+    async () => {
+      try {
+        const response =
+          await espnClient.get(
+            `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`,
+            {
+              params: {
+                team: teamId
+              }
+            }
+          );
 
-  if (cached) {
-    return cached;
-  }
+        return response.data.articles || [];
+      } catch (error) {
+        console.error(
+          `Error fetching team news for ${sport}/${league} team ${teamId}:`,
+          error.message
+        );
 
-  try {
-    const response =
-      await espnClient.get(
-        `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/news`,
-        {
-          params: {
-            team: teamId
-          }
-        }
-      );
-
-    const articles =
-      response.data.articles || [];
-
-    await cache.setJson(
-      cacheKey,
-      articles,
-      300
-    );
-
-    return articles;
-  } catch (error) {
-    console.error(
-      `Error fetching team news for ${sport}/${league} team ${teamId}:`,
-      error.message
-    );
-
-    return [];
-  }
+        return [];
+      }
+    }
+  );
 }
 
 async function getTeamSocialFeeds(teamName) {
