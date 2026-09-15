@@ -138,7 +138,7 @@ export default function (data) {
   check(feedResponse, {
     'normal feed returns 200': (r) =>
       r.status === 200,
-
+  
     'normal feed contains posts array': (r) => {
       try {
         return Array.isArray(
@@ -149,6 +149,14 @@ export default function (data) {
       }
     }
   });
+  
+  if (feedResponse.status !== 200) {
+    console.log(
+      `NORMAL FEED FAILURE: ` +
+      `${feedResponse.status} ` +
+      `${feedResponse.body}`
+    );
+  }
 
   // ----------------------------------------------------------
   // SOCIAL FEED
@@ -165,7 +173,7 @@ export default function (data) {
   check(socialResponse, {
     'social feed returns 200': (r) =>
       r.status === 200,
-
+  
     'social feed contains posts array': (r) => {
       try {
         return Array.isArray(
@@ -175,11 +183,11 @@ export default function (data) {
         return false;
       }
     },
-
+  
     'social feed contains nextCursor field': (r) => {
       try {
         const body = r.json();
-
+  
         return (
           Object.prototype.hasOwnProperty.call(
             body,
@@ -191,6 +199,14 @@ export default function (data) {
       }
     }
   });
+  
+  if (socialResponse.status !== 200) {
+    console.log(
+      `SOCIAL FEED FAILURE: ` +
+      `${socialResponse.status} ` +
+      `${socialResponse.body}`
+    );
+  }
 
   sleep(4);
 }
