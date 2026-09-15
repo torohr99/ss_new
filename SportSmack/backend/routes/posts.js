@@ -57,6 +57,9 @@ router.get('/', async (req, res) => {
       ) / 1e6;
     
     // Find accepted friendships involving the current user.
+    const friendshipsStartedAt =
+      process.hrtime.bigint();
+
     const friendships =
       await prisma.friendship.findMany({
         where: {
@@ -75,6 +78,12 @@ router.get('/', async (req, res) => {
           friend_id: true
         }
       });
+
+    const friendshipsDurationMs =
+      Number(
+        process.hrtime.bigint() -
+          friendshipsStartedAt
+      ) / 1e6;
     
     // All Updates contains the current user
     // plus accepted friends.
@@ -180,22 +189,29 @@ router.get('/', async (req, res) => {
           feedRequestStartedAt
       ) / 1e6;
     
-    if (feedRequestDurationMs >= 500) {
-      console.warn(
-        {
-          route: '/api/posts',
-          userId: req.user.id,
-          feedRequestDurationMs:
-            Math.round(feedRequestDurationMs),
-          blockedUsersDurationMs:
-            Math.round(blockedUsersDurationMs),
-          postsQueryDurationMs:
-            Math.round(postsQueryDurationMs),
-          postCount: posts.length
-        },
-        'Slow feed request'
-      );
-    }
+        if (feedRequestDurationMs >= 500) {
+          console.warn(
+            {
+              route: '/api/posts',
+              userId: req.user.id,
+              feedRequestDurationMs:
+                Math.round(feedRequestDurationMs),
+              friendshipsDurationMs:
+                Math.round(friendshipsDurationMs),
+              blockedUsersDurationMs:
+                Math.round(blockedUsersDurationMs),
+              postsQueryDurationMs:
+                Math.round(postsQueryDurationMs),
+              friendshipCount:
+                friendships.length,
+              allowedUserCount:
+                allowedUserIds.size,
+              postCount:
+                posts.length
+            },
+            'Slow feed request'
+          );
+        }
     
     res.json({
       posts: formattedPosts,
@@ -217,23 +233,34 @@ router.get('/social', async (req, res) => {
     const take = 15;
 
     // Find all accepted friendships involving the current user.
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        status: 'ACCEPTED',
-        OR: [
-          {
-            user_id: req.user.id
-          },
-          {
-            friend_id: req.user.id
-          }
-        ]
-      },
-      select: {
-        user_id: true,
-        friend_id: true
-      }
-    });
+        // Find all accepted friendships involving the current user.
+        const friendshipsStartedAt =
+          process.hrtime.bigint();
+    
+        const friendships =
+          await prisma.friendship.findMany({
+            where: {
+              status: 'ACCEPTED',
+              OR: [
+                {
+                  user_id: req.user.id
+                },
+                {
+                  friend_id: req.user.id
+                }
+              ]
+            },
+            select: {
+              user_id: true,
+              friend_id: true
+            }
+          });
+    
+        const friendshipsDurationMs =
+          Number(
+            process.hrtime.bigint() -
+              friendshipsStartedAt
+          ) / 1e6;
 
     // Build the list of users whose posts belong in the Social feed.
     const socialUserIds = new Set([req.user.id]);
@@ -246,23 +273,33 @@ router.get('/social', async (req, res) => {
       }
     }
 
-    // Respect the existing two-way block system.
-    const blockedUsers = await prisma.block.findMany({
-      where: {
-        OR: [
-          {
-            blockerId: req.user.id
-          },
-          {
-            blockedId: req.user.id
-          }
-        ]
-      },
-      select: {
-        blockerId: true,
-        blockedId: true
-      }
-    });
+        // Respect the existing two-way block system.
+        const blockedUsersStartedAt =
+          process.hrtime.bigint();
+    
+        const blockedUsers =
+          await prisma.block.findMany({
+            where: {
+              OR: [
+                {
+                  blockerId: req.user.id
+                },
+                {
+                  blockedId: req.user.id
+                }
+              ]
+            },
+            select: {
+              blockerId: true,
+              blockedId: true
+            }
+          });
+    
+        const blockedUsersDurationMs =
+          Number(
+            process.hrtime.bigint() -
+              blockedUsersStartedAt
+          ) / 1e6;
 
     for (const block of blockedUsers) {
       if (block.blockerId === req.user.id) {
@@ -329,7 +366,19 @@ router.get('/social', async (req, res) => {
       queryParams.skip = 1;
     }
 
-    const posts = await prisma.post.findMany(queryParams);
+        const postsQueryStartedAt =
+          process.hrtime.bigint();
+    
+        const posts =
+          await prisma.post.findMany(
+            queryParams
+          );
+    
+        const postsQueryDurationMs =
+          Number(
+            process.hrtime.bigint() -
+              postsQueryStartedAt
+          ) / 1e6;
 
     const formattedPosts = posts.map(post => ({
       ...post,
@@ -349,19 +398,29 @@ router.get('/social', async (req, res) => {
           feedRequestStartedAt
       ) / 1e6;
 
-    if (feedRequestDurationMs >= 500) {
-      console.warn(
-        {
-          route: '/api/posts/social',
-          userId: req.user.id,
-          feedRequestDurationMs:
-            Math.round(feedRequestDurationMs),
-          postCount: posts.length,
-          socialUserCount: socialUserIds.size
-        },
-        'Slow social feed request'
-      );
-    }
+        if (feedRequestDurationMs >= 500) {
+          console.warn(
+            {
+              route: '/api/posts/social',
+              userId: req.user.id,
+              feedRequestDurationMs:
+                Math.round(feedRequestDurationMs),
+              friendshipsDurationMs:
+                Math.round(friendshipsDurationMs),
+              blockedUsersDurationMs:
+                Math.round(blockedUsersDurationMs),
+              postsQueryDurationMs:
+                Math.round(postsQueryDurationMs),
+              friendshipCount:
+                friendships.length,
+              socialUserCount:
+                socialUserIds.size,
+              postCount:
+                posts.length
+            },
+            'Slow social feed request'
+          );
+        }
 
     return res.json({
       posts: formattedPosts,
