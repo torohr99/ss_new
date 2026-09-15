@@ -34,32 +34,37 @@ export function setup() {
   const users = [];
 
   for (let i = 1; i <= 25; i++) {
-    const suffix = String(i).padStart(2, '0');
+    const suffix =
+      String(i).padStart(2, '0');
 
     const email =
       `${TEST_EMAIL_PREFIX}${suffix}@sportsmack.local`;
 
-    const login = http.post(
-      `${BASE_URL}/api/auth/login`,
-      JSON.stringify({
-        email,
-        password: TEST_PASSWORD
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Origin': FRONTEND_URL
+    const login =
+      http.post(
+        `${BASE_URL}/api/auth/login`,
+        JSON.stringify({
+          email,
+          password: TEST_PASSWORD
+        }),
+        {
+          headers: {
+            'Content-Type':
+              'application/json',
+            'Origin':
+              FRONTEND_URL
+          }
         }
-      }
-    );
+      );
 
     check(login, {
-      'setup login returns 200': (r) =>
-        r.status === 200,
+      'setup login returns 200':
+        (r) => r.status === 200,
 
-      'setup login returns auth cookie': (r) =>
-        r.cookies.smack_auth &&
-        r.cookies.smack_auth.length > 0
+      'setup login returns auth cookie':
+        (r) =>
+          r.cookies.smack_auth &&
+          r.cookies.smack_auth.length > 0
     });
 
     if (login.status !== 200) {
@@ -84,8 +89,14 @@ export function setup() {
 
     users.push({
       email,
-      authCookie: authCookies[0].value
+      authCookie:
+        authCookies[0].value
     });
+
+    // Prevent the load-test setup itself
+    // from triggering the production auth
+    // rate limiter.
+    sleep(1);
   }
 
   return { users };
