@@ -37,6 +37,24 @@ jobs:
       - name: Check authentication middleware
         run: node --check middleware/auth.js
 
+      - name: Check users routes
+        run: node --check routes/users.js
+
+      - name: Check posts routes
+        run: node --check routes/posts.js
+
+      - name: Check rate-limit middleware
+        run: node --check middleware/rateLimits.js
+
+      - name: Check CSRF middleware
+        run: node --check middleware/csrf.js
+
+      - name: Check concurrency middleware
+        run: node --check middleware/concurrency.js
+
+      - name: Check cache service
+        run: node --check services/cache.js
+
       - name: Check authentication routes
         run: node --check routes/auth.js
 
