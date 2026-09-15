@@ -1,9 +1,12 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
+const VUS = Number(__ENV.VUS || 25);
+const DURATION = __ENV.DURATION || '60s';
+
 export const options = {
-  vus: 25,
-  duration: '60s',
+  vus: VUS,
+  duration: DURATION,
 
   thresholds: {
     http_req_failed: ['rate<0.01'],
@@ -89,14 +92,19 @@ export function setup() {
 }
 
 export default function (data) {
-  const user =
-    data.users[__VU - 1];
-
-  if (!user) {
-    throw new Error(
-      `No test user configured for VU ${__VU}.`
-    );
-  }
+    if (
+      !data.users ||
+      data.users.length === 0
+    ) {
+      throw new Error(
+        'No authenticated load-test users available.'
+      );
+    }
+  
+    const user =
+      data.users[
+        (__VU - 1) % data.users.length
+      ];
 
   const headers = {
     Cookie:
