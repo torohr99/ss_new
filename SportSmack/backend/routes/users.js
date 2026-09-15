@@ -565,7 +565,7 @@ router.get('/feed/news', async (req, res) => {
 
             return [];
           }
-        })
+        }
       );
 
     const uniqueNews = [];
