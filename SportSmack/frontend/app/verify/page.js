@@ -152,7 +152,7 @@ export default function VerifyPage() {
               marginTop: '1.5rem'
             }}
           >
-            Don't see it? Check your spam
+            Don&apos;t see it? Check your spam
             or junk folder.
           </p>
 
