@@ -153,7 +153,7 @@ export default function RightSidebar() {
         </div>
       ) : (
         <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          You aren't following any teams yet. Head over to <Link href="/explore" style={{ color: 'var(--accent-color)' }}>Explore</Link> to find your favorites!
+          You aren&apos;t following any teams yet. Head over to <Link href="/explore" style={{ color: 'var(--accent-color)' }}>Explore</Link> to find your favorites!
         </div>
       )}
 
