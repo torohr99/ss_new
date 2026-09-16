@@ -89,7 +89,7 @@ export default function GlobalSearch() {
               );
             })
           ) : (
-            <div className="search-no-results">No results found for "{query}"</div>
+            <div className="search-no-results">No results found for &quot;...&quot;</div>
           )}
         </div>
       )}
