@@ -673,7 +673,7 @@ export default function GameHubPage({ params }) {
               <>
                 <h2 style={{marginTop: 0}}>AI Meme Generator</h2>
                 <p style={{ color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                  Describe the meme you want. SportSmack will automatically use the current game's teams, score, situation, and identified players to make the image more accurate.
+                  Describe the meme you want. SportSmack will automatically use the current game&apos;s teams, score, situation, and identified players to make the image more accurate.
                 </p>
                 <form onSubmit={handleGenerateMeme} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
                   <input 
