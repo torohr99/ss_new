@@ -106,7 +106,7 @@ export default function Explore() {
                 </div>
               ))
             ) : query ? (
-              <p style={{ color: 'var(--text-secondary)' }}>No users found matching "{query}"</p>
+              <p style={{ color: 'var(--text-secondary)' }}>No users found matching &quot;{query}&quot;</p>
             ) : (
               <p style={{ color: 'var(--text-secondary)' }}>Start typing to search for users.</p>
             )}
