@@ -179,7 +179,7 @@ export default function ResetPasswordPage() {
               Enter the email address
               associated with your
               SportSmack account and
-              we'll send you a password
+              we&apos;ll send you a password
               reset link.
             </p>
 
