@@ -27,5 +27,6 @@ jobs:
       - name: Run production smoke tests
         working-directory: SportSmack/backend
         env:
-          BACKEND_URL: ${{ secrets.SPORTSMACK_BACKEND_URL }}
+          BACKEND_URL: https://ssnew-production.up.railway.app
+          FRONTEND_URL: https://ss-new-backendfromr.vercel.app
         run: npm run test:smoke
