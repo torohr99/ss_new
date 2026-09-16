@@ -29,7 +29,7 @@ export default function SportsHubs() {
           <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏀</div>
           <h2>March Madness Bracket</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', flex: 1 }}>
-            Create custom bracket leagues, invite your friends, and make your picks for the NCAA Men's and Women's Basketball tournaments.
+            Create custom bracket leagues, invite your friends, and make your picks for the NCAA Men&apos;s and Women&apos;s Basketball tournaments.
           </p>
           <Link href="/hubs/brackets" className="btn-primary" style={{ width: '100%', textDecoration: 'none', background: 'var(--brand-red)' }}>
             Enter Bracket Challenge
