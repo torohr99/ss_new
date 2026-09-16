@@ -241,7 +241,7 @@ export default function FantasyDashboard() {
               <p style={{
                 color: 'var(--text-secondary)'
               }}>
-                You haven't joined any leagues yet.
+                You haven&apos;t joined any leagues yet.
               </p>
             ) : (
               <div style={{
