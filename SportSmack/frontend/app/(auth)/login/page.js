@@ -69,7 +69,7 @@ export default function Login() {
           <button type="submit" className="auth-button">Login</button>
         </form>
         <p className="auth-link">
-          Don't have an account? <Link href="/signup">Sign up</Link>
+          Don&apos;t have an account? <Link href="/signup">Sign up</Link>
         </p>
       </div>
     </div>
