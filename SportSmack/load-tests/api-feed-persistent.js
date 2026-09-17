@@ -161,6 +161,7 @@ export default function (data) {
     console.log(
       `NORMAL FEED FAILURE: ` +
       `${feedResponse.status} ` +
+      `replica=${feedResponse.headers['X-Replica-ID'] || 'NONE'} ` +
       `${feedResponse.body}`
     );
   }
@@ -211,6 +212,7 @@ export default function (data) {
     console.log(
       `SOCIAL FEED FAILURE: ` +
       `${socialResponse.status} ` +
+      `replica=${socialResponse.headers['X-Replica-ID'] || 'NONE'} ` +
       `${socialResponse.body}`
     );
   }
