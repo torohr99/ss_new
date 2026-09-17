@@ -200,6 +200,13 @@ app.use((req, res, next) => {
     requestId
   );
 
+  res.setHeader(
+    'X-Replica-ID',
+    process.env.RAILWAY_REPLICA_ID ||
+      process.env.RENDER_INSTANCE_ID ||
+      'local'
+  );
+
   res.on('finish', () => {
     metrics.recordRequest(
       res.statusCode
