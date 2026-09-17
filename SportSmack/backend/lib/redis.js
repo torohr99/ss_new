@@ -11,7 +11,8 @@ if (!redisUrl) {
 const redis = new Redis(redisUrl, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
-  lazyConnect: false
+  lazyConnect: false,
+  family: 0
 });
 
 redis.on('connect', () => {
