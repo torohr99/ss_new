@@ -43,7 +43,8 @@ if (!redisUrl) {
 }
 
 const pubClient = new Redis(redisUrl, {
-  maxRetriesPerRequest: null
+  maxRetriesPerRequest: null,
+  family: 0
 });
 
 const subClient = pubClient.duplicate();
