@@ -619,6 +619,76 @@ export default function GameHubPage({ params }) {
                     ? new Date(msg.createdAt).toLocaleTimeString()
                     : ''}
                 </span>
+                {msg.user?.id !== user?.id &&
+                  msg.type !== 'poll' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const apiUrl =
+                            process.env.NEXT_PUBLIC_API_URL ||
+                            'http://localhost:5000';
+                
+                          const response =
+                            await fetch(
+                              `${apiUrl}/api/moderation/report`,
+                              {
+                                method: 'POST',
+                                credentials: 'include',
+                                headers: {
+                                  'Content-Type':
+                                    'application/json'
+                                },
+                                body: JSON.stringify({
+                                  targetType:
+                                    'GAME_MESSAGE',
+                                  targetId:
+                                    String(msg.id),
+                                  reason:
+                                    'HARASSMENT',
+                                  details:
+                                    'Reported from game chat.'
+                                })
+                              }
+                            );
+                
+                          const data =
+                            await response.json();
+                
+                          if (!response.ok) {
+                            alert(
+                              data.message ||
+                              'Unable to submit report.'
+                            );
+                            return;
+                          }
+                
+                          alert(
+                            'Report submitted. The message will be automatically reviewed.'
+                          );
+                        } catch (error) {
+                          console.error(
+                            'Chat report error:',
+                            error
+                          );
+                
+                          alert(
+                            'Unable to submit report.'
+                          );
+                        }
+                      }}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.65rem',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      Report
+                    </button>
+                )}
               </div>
               
               {msg.type === 'poll' ? (
