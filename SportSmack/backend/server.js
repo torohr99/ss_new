@@ -190,17 +190,19 @@ app.use('/api', csrfProtection);
 app.use((req, res, next) => {
   const requestId =
     req.headers['x-request-id'] ||
-    `${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
+    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
   req.requestId = requestId;
 
-  res.setHeader(
-    'X-Request-ID',
-    requestId
-  );
+  const railwayRequestId = req.headers['x-railway-request-id'] || null;
+  const railwayEdge = req.headers['x-railway-edge'] || null;
+  const railwayRequestStart = req.headers['x-request-start'] || null;
 
+  req.railwayRequestId = railwayRequestId;
+  req.railwayEdge = railwayEdge;
+  req.railwayRequestStart = railwayRequestStart;
+
+  res.setHeader('X-Request-ID', requestId);
   res.setHeader(
     'X-Replica-ID',
     process.env.RAILWAY_REPLICA_ID ||
@@ -209,38 +211,39 @@ app.use((req, res, next) => {
   );
 
   res.on('finish', () => {
-    metrics.recordRequest(
-      res.statusCode
-    );
+    metrics.recordRequest(res.statusCode);
   });
 
   next();
 });
 
 app.use('/api', (req, res, next) => {
-  const startedAt =
-    process.hrtime.bigint();
+  const startedAt = process.hrtime.bigint();
 
   res.on('finish', () => {
     const durationMs =
-      Number(
-        process.hrtime.bigint() -
-          startedAt
-      ) / 1e6;
+      Number(process.hrtime.bigint() - startedAt) / 1e6;
 
     if (durationMs >= 500) {
       logger.warn(
         {
-          requestId:
-            req.requestId,
-          method:
-            req.method,
-          path:
-            req.path,
-          statusCode:
-            res.statusCode,
-          durationMs:
-            Math.round(durationMs)
+          requestId: req.requestId,
+          railwayRequestId: req.railwayRequestId,
+          railwayEdge: req.railwayEdge,
+          railwayRequestStart: req.railwayRequestStart,
+          railwayUpstreamZone:
+            req.headers['x-railway-upstream-zone'] || null,
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          replicaId:
+            process.env.RAILWAY_REPLICA_ID ||
+            process.env.RENDER_INSTANCE_ID ||
+            'local',
+          region:
+            process.env.RAILWAY_REPLICA_REGION ||
+            'local',
+          durationMs: Math.round(durationMs)
         },
         'Slow API request'
       );
