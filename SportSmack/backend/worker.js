@@ -20,6 +20,10 @@ const {
   stopFantasyScheduler
 } = require('./services/fantasyScheduler');
 
+const {
+  processPendingChatReports
+} = require('./services/chatModeration');
+
 const prisma =
   require('./lib/prisma');
 
@@ -101,6 +105,25 @@ async function startWorker() {
    * scheduler.
    */
   startFantasyScheduler();
+
+  const runChatModeration =
+    async () => {
+      try {
+        await processPendingChatReports(25);
+      } catch (error) {
+        console.error(
+          'Chat moderation worker error:',
+          error.message
+        );
+      }
+    };
+  
+  runChatModeration();
+  
+  setInterval(
+    runChatModeration,
+    30 * 1000
+  );
 
   console.log(
     `SportSmack worker ${workerId} started successfully.`
