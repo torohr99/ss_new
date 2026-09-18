@@ -18,10 +18,10 @@ async function scoreActiveLeagues() {
 
     const seasonStart =
       new Date('2026-09-09T00:00:00Z');
-    
+
     const now = new Date();
-    
-    const week =
+
+    const currentWeek =
       Math.min(
         18,
         Math.max(
@@ -35,19 +35,63 @@ async function scoreActiveLeagues() {
 
     for (const league of leagues) {
       try {
-        await generateMissingMatchups(
-          league.id,
-          week
-        );
-    
-        const weekComplete =
-          await fantasyStats.isWeekComplete(week);
-        
-        await fantasyStats.scoreLeagueWeek(
-          league.id,
-          week,
-          !weekComplete
-        );
+        /*
+         * Process every week through the current week,
+         * but skip weeks that have already been finalized.
+         *
+         * This allows a league drafted late in Week 1
+         * to catch up without repeatedly hitting ESPN
+         * for already-finalized weeks.
+         */
+        for (
+          let week = 1;
+          week <= currentWeek;
+          week++
+        ) {
+          const existingFinal =
+            await prisma.fantasyMatchup.count({
+              where: {
+                leagueId: league.id,
+                weekNumber: week,
+                status: 'FINAL'
+              }
+            });
+
+          const matchupCount =
+            await prisma.fantasyMatchup.count({
+              where: {
+                leagueId: league.id,
+                weekNumber: week
+              }
+            });
+
+          /*
+           * If every matchup for this week is already
+           * FINAL, there is nothing left to do.
+           */
+          if (
+            matchupCount > 0 &&
+            existingFinal === matchupCount
+          ) {
+            continue;
+          }
+
+          await generateMissingMatchups(
+            league.id,
+            week
+          );
+
+          const weekComplete =
+            await fantasyStats.isWeekComplete(
+              week
+            );
+
+          await fantasyStats.scoreLeagueWeek(
+            league.id,
+            week,
+            !weekComplete
+          );
+        }
       } catch (error) {
         console.error(
           `Fantasy scoring failed for league ${league.id}:`,
