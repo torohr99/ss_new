@@ -262,47 +262,85 @@ async function scoreLeagueWeek(
     let total = 0;
 
     for (const rosterPlayer of team.players) {
-      if (rosterPlayer.status !== 'STARTER') {
-        continue;
-      }
-
       const playerStats =
         stats.get(
           String(
             rosterPlayer.player.espnId
           )
-        );
-
-      if (!playerStats) {
-        continue;
-      }
+        ) || {
+          passingYards: 0,
+          passingTD: 0,
+          interceptions: 0,
+          rushingYards: 0,
+          rushingTD: 0,
+          receptions: 0,
+          receivingYards: 0,
+          receivingTD: 0,
+          fumbles: 0,
+          twoPointConversions: 0,
+          extraPoints: 0,
+          fieldGoals: 0,
+          sacks: 0,
+          defensiveInterceptions: 0,
+          fumbleRecoveries: 0,
+          defensiveTD: 0
+        };
 
       const playerPoints =
-        calculatePlayerPoints(playerStats);
-      
+        calculatePlayerPoints(
+          playerStats
+        );
+
+      /*
+       * Store the player's weekly NFL fantasy
+       * score regardless of whether the player
+       * is currently a starter or bench player.
+       *
+       * FantasyPlayerWeeklyScore is global player/week
+       * data and is therefore reusable across leagues.
+       */
       await prisma.fantasyPlayerWeeklyScore.upsert({
         where: {
           playerId_weekNumber: {
-            playerId: rosterPlayer.playerId,
+            playerId:
+              rosterPlayer.playerId,
             weekNumber
           }
         },
         update: {
           points: playerPoints,
           isLive,
-          statsJson: JSON.stringify(playerStats)
+          statsJson:
+            JSON.stringify(playerStats)
         },
         create: {
-          playerId: rosterPlayer.playerId,
+          playerId:
+            rosterPlayer.playerId,
           weekNumber,
           points: playerPoints,
           isLive,
-          statsJson: JSON.stringify(playerStats)
+          statsJson:
+            JSON.stringify(playerStats)
         }
       });
-      
-      total += playerPoints;
 
+      /*
+       * Only starters contribute to the team's
+       * weekly fantasy score.
+       */
+      if (
+        rosterPlayer.status ===
+        'STARTER'
+      ) {
+        total += playerPoints;
+      }
+    }
+
+    /*
+     * IMPORTANT:
+     * Save the team's weekly score exactly once,
+     * after every rostered player has been processed.
+     */
     const score =
       await prisma.fantasyWeeklyScore.upsert({
         where: {
@@ -330,7 +368,11 @@ async function scoreLeagueWeek(
       scoreId: score.id
     });
   }
-  }
+
+  /*
+   * Once all teams have their weekly scores,
+   * update the corresponding fantasy matchups.
+   */
   await updateMatchups(
     leagueId,
     weekNumber
@@ -351,26 +393,59 @@ async function updateMatchups(
       }
     });
 
+  if (matchups.length === 0) {
+    return;
+  }
+
+  const teamIds = [
+    ...new Set(
+      matchups.flatMap(matchup => [
+        matchup.homeTeamId,
+        matchup.awayTeamId
+      ])
+    )
+  ];
+
+  const scores =
+    await prisma.fantasyWeeklyScore.findMany({
+      where: {
+        weekNumber,
+        teamId: {
+          in: teamIds
+        }
+      },
+      select: {
+        teamId: true,
+        points: true,
+        isLive: true
+      }
+    });
+
+  const scoreByTeamId =
+    new Map(
+      scores.map(score => [
+        score.teamId,
+        score
+      ])
+    );
+
   for (const matchup of matchups) {
     const home =
-      await prisma.fantasyWeeklyScore.findUnique({
-        where: {
-          teamId_weekNumber: {
-            teamId: matchup.homeTeamId,
-            weekNumber
-          }
-        }
-      });
+      scoreByTeamId.get(
+        matchup.homeTeamId
+      );
 
     const away =
-      await prisma.fantasyWeeklyScore.findUnique({
-        where: {
-          teamId_weekNumber: {
-            teamId: matchup.awayTeamId,
-            weekNumber
-          }
-        }
-      });
+      scoreByTeamId.get(
+        matchup.awayTeamId
+      );
+
+    const hasBothScores =
+      Boolean(home && away);
+
+    const isLive =
+      home?.isLive !== false ||
+      away?.isLive !== false;
 
     await prisma.fantasyMatchup.update({
       where: {
@@ -382,7 +457,7 @@ async function updateMatchups(
         awayScore:
           away?.points || 0,
         status:
-          home && away
+          hasBothScores && !isLive
             ? 'FINAL'
             : 'LIVE'
       }
