@@ -83,8 +83,18 @@ export default function LeaguePage({ params }) {
       `${API}/api/fantasy/league/${id}`,
       { withCredentials: true }
     );
-
+  
     setLeague(res.data);
+  
+    if (
+      Number.isInteger(
+        res.data?.currentFantasyWeek
+      )
+    ) {
+      setWeek(
+        res.data.currentFantasyWeek
+      );
+    }
   };
 
   const fetchTrades = async () => {
@@ -538,17 +548,42 @@ export default function LeaguePage({ params }) {
                       status="STARTER"
                       currentWeek={league.currentFantasyWeek}
                       action={
-                        <button
-                          className="fantasy-button fantasy-button-secondary"
-                          onClick={() =>
-                            setRosterStatus(
-                              tp.id,
-                              'BENCH'
-                            )
-                          }
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            flexWrap: 'wrap'
+                          }}
                         >
-                          Move to Bench
-                        </button>
+                          <button
+                            className="fantasy-button fantasy-button-secondary"
+                            onClick={() =>
+                              setRosterStatus(
+                                tp.id,
+                                'BENCH'
+                              )
+                            }
+                          >
+                            Move to Bench
+                          </button>
+                      
+                          <button
+                            className="fantasy-button fantasy-button-secondary"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Drop ${tp.player.name}?`
+                                )
+                              ) {
+                                dropPlayer(
+                                  tp.player.id
+                                );
+                              }
+                            }}
+                          >
+                            Drop Player
+                          </button>
+                        </div>
                       }
                     />
                   ))}
@@ -583,17 +618,42 @@ export default function LeaguePage({ params }) {
                       status="BENCH"
                       currentWeek={league.currentFantasyWeek}
                       action={
-                        <button
-                          className="fantasy-button fantasy-button-primary"
-                          onClick={() =>
-                            setRosterStatus(
-                              tp.id,
-                              'STARTER'
-                            )
-                          }
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            flexWrap: 'wrap'
+                          }}
                         >
-                          Start Player
-                        </button>
+                          <button
+                            className="fantasy-button fantasy-button-primary"
+                            onClick={() =>
+                              setRosterStatus(
+                                tp.id,
+                                'STARTER'
+                              )
+                            }
+                          >
+                            Start Player
+                          </button>
+                      
+                          <button
+                            className="fantasy-button fantasy-button-secondary"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Drop ${tp.player.name}?`
+                                )
+                              ) {
+                                dropPlayer(
+                                  tp.player.id
+                                );
+                              }
+                            }}
+                          >
+                            Drop Player
+                          </button>
+                        </div>
                       }
                     />
                   ))}
@@ -1525,9 +1585,9 @@ function FantasyPlayerCard({
               color: 'var(--text-secondary)'
             }}
           >
-            {player.projectedPoints != null
+            {tp.weeklyProjectedPoints != null
               ? `${Number(
-                  player.projectedPoints
+                  tp.weeklyProjectedPoints
                 ).toFixed(1)} projected`
               : 'Projection unavailable'}
           </span>
