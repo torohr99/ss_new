@@ -16,6 +16,15 @@ async function loadWeeklyProjections(
   const fantasyFilter = {
     players: {
       limit: 3000,
+  
+      filterStatsForSourceIds: {
+        value: [1]
+      },
+  
+      filterStatsForSplitTypeIds: {
+        value: [1]
+      },
+  
       sortPercOwned: {
         sortPriority: 4,
         sortAsc: false
@@ -67,7 +76,13 @@ async function loadWeeklyProjections(
     const candidate =
       weeklyStats.find(
         stat =>
-          Number(stat.statSourceId) === 1
+          Number(stat.statSourceId) === 1 &&
+          (
+            stat.statSplitTypeId == null ||
+            Number(
+              stat.statSplitTypeId
+            ) === 1
+          )
       ) ||
       weeklyStats.find(
         stat =>
