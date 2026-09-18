@@ -87,14 +87,11 @@ class LiveGameEngine {
           continue;
         }
 
-        const liveGames =
-          scoreboard.filter(game => {
-            const liveGames =
-              scoreboard.filter(game => {
-                // sportsApi.getScoreboard() already normalizes
-                // ESPN's authoritative competition status into isLive.
-                return game?.isLive === true;
-              });
+        // sportsApi.getScoreboard() already normalizes
+        // ESPN's authoritative competition status into isLive.
+        const liveGames = scoreboard.filter(
+          game => game?.isLive === true
+        );
 
         for (const game of liveGames) {
           await this.processGame(
