@@ -1946,10 +1946,69 @@ router.post(
   authenticateToken,
   async (req, res) => {
     try {
+      const leagueId =
+        Number(req.params.id);
+      
+      const weekNumber =
+        Number(
+          req.body.weekNumber || 1
+        );
+      
+      if (
+        !Number.isInteger(leagueId) ||
+        !Number.isInteger(weekNumber) ||
+        weekNumber < 1 ||
+        weekNumber > 18
+      ) {
+        return res.status(400).json({
+          error:
+            'Invalid league or week number.'
+        });
+      }
+      
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          }
+        });
+      
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found.'
+        });
+      }
+      
+      if (
+        league.ownerId !==
+        req.user.id
+      ) {
+        return res.status(403).json({
+          error:
+            'Only the league owner can generate matchups.'
+        });
+      }
+      
+      const existing =
+        await prisma.fantasyMatchup.count({
+          where: {
+            leagueId,
+            weekNumber
+          }
+        });
+      
+      if (existing > 0) {
+        return res.status(409).json({
+          error:
+            `Week ${weekNumber} matchups already exist.`,
+          count: existing
+        });
+      }
+      
       const matchups =
         await generateWeeklyMatchups(
-          Number(req.params.id),
-          Number(req.body.weekNumber || 1)
+          leagueId,
+          weekNumber
         );
 
       res.json(matchups);
