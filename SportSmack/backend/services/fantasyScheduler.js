@@ -4,6 +4,9 @@ const fantasyStats =
 const {
   processAllDueWaivers
 } = require('./fantasyWaivers');
+const {
+  processBotTransactions
+} = require('./fantasyBotManager');
 
 let intervalId = null;
 
@@ -113,12 +116,14 @@ function startFantasyScheduler() {
   // Run immediately.
   scoreActiveLeagues();
   processDueWaivers();
+  processBotTransactions();
 
   // Then every 5 minutes.
   intervalId = setInterval(
     async () => {
       await scoreActiveLeagues();
       await processDueWaivers();
+      await processBotTransactions();
     },
     5 * 60 * 1000
   );
