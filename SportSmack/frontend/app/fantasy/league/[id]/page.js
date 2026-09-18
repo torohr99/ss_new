@@ -970,7 +970,9 @@ export default function LeaguePage({ params }) {
                     </div>
       
                     <div className="fantasy-matchup-score">
-                      {matchup.homeScore ?? 0}
+                      {Number(
+                        matchup.homeScore ?? 0
+                      ).toFixed(1)}
                     </div>
                   </div>
       
@@ -984,8 +986,31 @@ export default function LeaguePage({ params }) {
                     </div>
       
                     <div className="fantasy-matchup-score">
-                      {matchup.awayScore ?? 0}
+                      {Number(
+                        matchup.awayScore ?? 0
+                      ).toFixed(1)}
                     </div>
+                  </div>
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      marginTop: '0.75rem',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-secondary)',
+                      fontWeight: 700
+                    }}
+                  >
+                    {matchup.status === 'FINAL'
+                      ? (
+                          matchup.homeScore >
+                          matchup.awayScore
+                            ? 'FINAL'
+                            : matchup.homeScore <
+                              matchup.awayScore
+                              ? 'FINAL'
+                              : 'TIE'
+                        )
+                      : 'LIVE'}
                   </div>
                 </div>
               </div>
