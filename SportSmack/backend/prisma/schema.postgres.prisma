@@ -32,6 +32,7 @@ model User {
   gameMessages   GameMessage[]
   fantasyLeagues FantasyLeague[] @relation("LeagueOwner")
   fantasyTeams   FantasyTeam[]
+  chatDisciplines GameChatDiscipline[]
 
   // Bracket features
   bracketLeagues BracketLeague[]
@@ -207,6 +208,28 @@ model GameMessage {
 
   @@index([gameId, createdAt])
   @@index([league, gameId, createdAt])
+}
+
+model GameChatDiscipline {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  league      String
+  gameId      String
+  yellowCards Int      @default(0)
+  redCards    Int      @default(0)
+  banned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(
+    fields: [userId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@unique([userId, league, gameId])
+  @@index([league, gameId, banned])
+  @@index([userId, createdAt])
 }
 
 // =======================
