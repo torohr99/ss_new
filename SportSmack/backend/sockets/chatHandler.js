@@ -419,6 +419,25 @@ module.exports = function(io) {
         });
       }
 
+      const discipline =
+        await prisma.gameChatDiscipline.findUnique({
+          where: {
+            userId_league_gameId: {
+              userId: socket.user.id,
+              league,
+              gameId
+            }
+          }
+        });
+      
+      if (discipline?.banned) {
+        return callback({
+          success: false,
+          message:
+            'You have received a red card and are banned from this chat.'
+        });
+      }
+
       // Re-verify read only (simplified for speed, relying on join validation for simplicity, 
       // but in prod we should re-fetch game state to prevent cheating. For this demo, we trust the connection state)
       // Basic XSS sanitization: strip HTML tags
