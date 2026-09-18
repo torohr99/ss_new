@@ -64,7 +64,8 @@ function getSeasonFantasyPoints(
     stats.filter(
       stat =>
         Number(stat.seasonId) ===
-        Number(season)
+        Number(season) &&
+        Number(stat.scoringPeriodId) === 0
     );
 
   if (!seasonStats.length) {
@@ -74,24 +75,27 @@ function getSeasonFantasyPoints(
   let candidate;
 
   if (preferProjection) {
+    // ESPN uses statSourceId:
+    // 0 = actual
+    // 1 = projected
     candidate =
       seasonStats.find(
         stat =>
-          Number(stat.statTypeId) === 1
+          Number(stat.statSourceId) === 1
       ) ||
       seasonStats.find(
         stat =>
-          Number(stat.statTypeId) === 0
+          Number(stat.statTypeId) === 1
       );
   } else {
     candidate =
       seasonStats.find(
         stat =>
-          Number(stat.statTypeId) === 0
+          Number(stat.statSourceId) === 0
       ) ||
       seasonStats.find(
         stat =>
-          Number(stat.statTypeId) === 1
+          Number(stat.statTypeId) === 0
       );
   }
 
