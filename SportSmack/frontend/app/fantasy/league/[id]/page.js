@@ -536,6 +536,7 @@ export default function LeaguePage({ params }) {
                       key={tp.id}
                       tp={tp}
                       status="STARTER"
+                      currentWeek={league.currentFantasyWeek}
                       action={
                         <button
                           className="fantasy-button fantasy-button-secondary"
@@ -580,6 +581,7 @@ export default function LeaguePage({ params }) {
                       key={tp.id}
                       tp={tp}
                       status="BENCH"
+                      currentWeek={league.currentFantasyWeek}
                       action={
                         <button
                           className="fantasy-button fantasy-button-primary"
@@ -1388,9 +1390,18 @@ export default function LeaguePage({ params }) {
 function FantasyPlayerCard({
   tp,
   status,
-  action
+  action,
+  currentWeek
 }) {
   const player = tp.player;
+
+  const fantasyPoints =
+    Number(
+      tp.fantasyPoints || 0
+    );
+
+  const pointsLive =
+    tp.fantasyPointsLive;
 
   return (
     <div className="fantasy-player-card">
@@ -1403,6 +1414,37 @@ function FantasyPlayerCard({
           loading="lazy"
         />
       ) : (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.75rem',
+            borderRadius: '10px',
+            background:
+              'rgba(255,255,255,0.04)'
+          }}
+        >
+          <span
+            style={{
+              fontSize: '0.75rem',
+              color:
+                'var(--text-secondary)'
+            }}
+          >
+            Week {currentWeek || 1} Points
+          </span>
+
+          <strong
+            style={{
+              fontSize: '1rem'
+            }}
+          >
+            {fantasyPoints.toFixed(1)}
+            {pointsLive ? ' LIVE' : ''}
+          </strong>
+        </div>     
         <div
           className="fantasy-player-image"
           style={{
