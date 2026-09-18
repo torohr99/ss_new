@@ -134,6 +134,146 @@ Return ONLY valid JSON:
 `.trim();
 }
 
+function buildFallbackPoll(gameState, league) {
+  const home =
+    gameState?.teams?.home?.name ||
+    'the home team';
+
+  const away =
+    gameState?.teams?.away?.name ||
+    'the away team';
+
+  const situation =
+    gameState?.sportSituation || {};
+
+  const latestPlay =
+    gameState?.plays?.[
+      gameState.plays.length - 1
+    ];
+
+  const leagueKey =
+    String(league || '').toLowerCase();
+
+  if (
+    leagueKey === 'nfl' ||
+    leagueKey === 'ncaaf'
+  ) {
+    const possession =
+      situation.possessionText ||
+      situation.possession ||
+      home;
+
+    if (
+      situation.down != null &&
+      situation.distance != null
+    ) {
+      return {
+        question:
+          `Will ${possession} convert this ${situation.down}th-and-${situation.distance} situation?`,
+        options: [
+          'Yes',
+          'No'
+        ],
+        reason:
+          `Live poll based on the current down-and-distance situation between ${home} and ${away}.`
+      };
+    }
+
+    return {
+      question:
+        `Will ${possession} score on this drive?`,
+      options: [
+        'Yes',
+        'No'
+      ],
+      reason:
+        `Live poll based on the current possession in ${home} vs. ${away}.`
+    };
+  }
+
+  if (
+    leagueKey === 'mlb' ||
+    leagueKey === 'baseball'
+  ) {
+    const batter =
+      situation.batter ||
+      'the current batter';
+
+    return {
+      question:
+        `Will ${batter} reach base in this at-bat?`,
+      options: [
+        'Yes',
+        'No'
+      ],
+      reason:
+        `Live poll based on the current MLB at-bat and baserunner situation.`
+    };
+  }
+
+  if (
+    leagueKey === 'nba' ||
+    leagueKey === 'ncaab'
+  ) {
+    const possession =
+      situation.possessionText ||
+      situation.possession ||
+      home;
+
+    return {
+      question:
+        `Will ${possession} score on this possession?`,
+      options: [
+        'Yes',
+        'No'
+      ],
+      reason:
+        `Live poll based on the current possession in ${home} vs. ${away}.`
+    };
+  }
+
+  if (leagueKey === 'nhl') {
+    const possession =
+      situation.possession ||
+      home;
+
+    return {
+      question:
+        `Will ${possession} score before the next stoppage?`,
+      options: [
+        'Yes',
+        'No'
+      ],
+      reason:
+        `Live poll based on the current NHL game situation.`
+    };
+  }
+
+  if (latestPlay?.text) {
+    return {
+      question:
+        `Will the next major development favor ${home} or ${away}?`,
+      options: [
+        home,
+        away
+      ],
+      reason:
+        `Poll generated from the latest play in the game.`
+    };
+  }
+
+  return {
+    question:
+      `Who will have the next major advantage in this game?`,
+    options: [
+      home,
+      away
+    ],
+    reason:
+      `Fallback game-specific poll.`
+  };
+}
+
 async function generateGamePoll(
   summary,
   league,
@@ -183,79 +323,94 @@ async function generateGamePoll(
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error(
-      'GEMINI_API_KEY is not configured'
+    return buildFallbackPoll(
+      gameState,
+      league
     );
   }
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      contents: [
+  try {
+    const response =
+      await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {
-          parts: [
+          contents: [
             {
-              text: buildPrompt(
-                gameState,
-                previousQuestions
-              )
+              parts: [
+                {
+                  text: buildPrompt(
+                    gameState,
+                    previousQuestions
+                  )
+                }
+              ]
             }
-          ]
+          ],
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 300,
+            responseMimeType: 'application/json'
+          }
+        },
+        {
+          timeout: 20000
         }
-      ],
-      generationConfig: {
-        temperature: 0.9,
-        maxOutputTokens: 300,
-        responseMimeType: 'application/json'
-      }
-    },
-    {
-      timeout: 20000
+      );
+  
+    const raw =
+      response.data?.candidates?.[0]
+        ?.content?.parts?.[0]?.text;
+  
+    if (!raw) {
+      throw new Error(
+        'Gemini returned an empty response'
+      );
     }
-  );
-
-  const raw =
-    response.data?.candidates?.[0]
-      ?.content?.parts?.[0]?.text;
-
-  if (!raw) {
-    throw new Error(
-      'Gemini returned an empty response'
+  
+    const poll = JSON.parse(
+      raw
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim()
+    );
+  
+    if (
+      !poll.question ||
+      !Array.isArray(poll.options) ||
+      poll.options.length < 2
+    ) {
+      throw new Error(
+        'Invalid poll format'
+      );
+    }
+  
+    const result = {
+      question: poll.question,
+      options: poll.options,
+      reason: poll.reason || '',
+      gameId,
+      league
+    };
+  
+    pollCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: result
+    });
+  
+    return result;
+  
+  } catch (error) {
+    console.error(
+      `AI poll generation failed for ${league}/${gameId}:`,
+      error.message
+    );
+  
+    return buildFallbackPoll(
+      gameState,
+      league
     );
   }
-
-  const poll = JSON.parse(
-    raw
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim()
-  );
-
-  if (
-    !poll.question ||
-    !Array.isArray(poll.options) ||
-    poll.options.length < 2
-  ) {
-    throw new Error(
-      'Invalid poll format'
-    );
-  }
-
-  const result = {
-    question: poll.question,
-    options: poll.options,
-    reason: poll.reason || '',
-    gameId,
-    league
-  };
-
-  pollCache.set(cacheKey, {
-    timestamp: Date.now(),
-    data: result
-  });
-
-  return result;
 }
 
 module.exports = {
