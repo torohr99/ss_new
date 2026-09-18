@@ -17,7 +17,15 @@ function normalizeChatMessage(message) {
     if (!message) return null;
 
     const normalized = {
-        ...message
+        ...message,
+
+        // Backend Prisma field is createdAt.
+        // Normalize both old and new shapes so the UI
+        // remains compatible with existing messages.
+        createdAt:
+            message.createdAt ||
+            message.created_at ||
+            null
     };
 
     // Poll data is stored inside content as:
@@ -55,7 +63,6 @@ function normalizeChatMessage(message) {
         }
     }
 
-    // Always guarantee arrays/objects expected by the UI.
     if (!Array.isArray(normalized.poll_options)) {
         normalized.poll_options = [];
     }
@@ -69,7 +76,6 @@ function normalizeChatMessage(message) {
 
     return normalized;
 }
-
 // Per-image component with loading skeleton and error fallback
 function MemeCandidate({ src, index, onSelect }) {
   const [loaded, setLoaded] = useState(false);
@@ -608,7 +614,11 @@ export default function GameHubPage({ params }) {
                     {msg.userTeamBadge.abbreviation}
                   </span>
                 )}
-                <span>• {new Date(msg.created_at).toLocaleTimeString()}</span>
+                <span>
+                  • {msg.createdAt
+                    ? new Date(msg.createdAt).toLocaleTimeString()
+                    : ''}
+                </span>
               </div>
               
               {msg.type === 'poll' ? (
