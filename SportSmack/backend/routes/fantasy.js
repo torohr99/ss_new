@@ -709,7 +709,75 @@ router.get(
         });
       }
 
-      res.json(league);
+            /*
+             * Fetch weekly player scores in one query for the
+             * entire league instead of querying once per player.
+             *
+             * This avoids an N+1 query pattern.
+             */
+            const playerIds = [
+              ...new Set(
+                league.teams.flatMap(team =>
+                  team.players.map(
+                    rosterPlayer =>
+                      rosterPlayer.playerId
+                  )
+                )
+              )
+            ];
+      
+            const currentWeek =
+              getCurrentFantasyWeek();
+      
+            const playerWeeklyScores =
+              playerIds.length > 0
+                ? await prisma.fantasyPlayerWeeklyScore.findMany({
+                    where: {
+                      playerId: {
+                        in: playerIds
+                      },
+                      weekNumber: currentWeek
+                    },
+                    select: {
+                      playerId: true,
+                      weekNumber: true,
+                      points: true,
+                      isLive: true
+                    }
+                  })
+                : [];
+      
+            const playerScoreMap =
+              new Map(
+                playerWeeklyScores.map(score => [
+                  score.playerId,
+                  score
+                ])
+              );
+      
+            const teamsWithPlayerScores =
+              league.teams.map(team => ({
+                ...team,
+                players: team.players.map(
+                  rosterPlayer => ({
+                    ...rosterPlayer,
+                    fantasyPoints:
+                      playerScoreMap.get(
+                        rosterPlayer.playerId
+                      )?.points || 0,
+                    fantasyPointsLive:
+                      playerScoreMap.get(
+                        rosterPlayer.playerId
+                      )?.isLive ?? false
+                  })
+                )
+              }));
+      
+      res.json({
+        ...league,
+        teams: teamsWithPlayerScores,
+        currentFantasyWeek: currentWeek
+      });
     } catch (err) {
       console.error('League details error:', err);
 
