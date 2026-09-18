@@ -308,9 +308,35 @@ export default function DraftRoom({ params }) {
       };
     })
     .sort(
-      (a, b) =>
-        b.bestAvailableScore -
-        a.bestAvailableScore
+      (a, b) => {
+        const bestDifference =
+          b.bestAvailableScore -
+          a.bestAvailableScore;
+    
+        if (bestDifference !== 0) {
+          return bestDifference;
+        }
+    
+        const projectionDifference =
+          (Number(b.projectedPoints) || 0) -
+          (Number(a.projectedPoints) || 0);
+    
+        if (projectionDifference !== 0) {
+          return projectionDifference;
+        }
+    
+        const lastYearDifference =
+          (Number(b.lastYearPoints) || 0) -
+          (Number(a.lastYearPoints) || 0);
+    
+        if (lastYearDifference !== 0) {
+          return lastYearDifference;
+        }
+    
+        return a.name.localeCompare(
+          b.name
+        );
+      }
     );
 
   return (
