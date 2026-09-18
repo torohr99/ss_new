@@ -89,22 +89,12 @@ class LiveGameEngine {
 
         const liveGames =
           scoreboard.filter(game => {
-            const status =
-              String(game.status || '')
-                .toLowerCase();
-
-            return (
-              status === 'in' ||
-              status.includes('half') ||
-              status.includes('quarter') ||
-              status.includes('q1') ||
-              status.includes('q2') ||
-              status.includes('q3') ||
-              status.includes('q4') ||
-              status.includes('period') ||
-              status.includes('live')
-            );
-          });
+            const liveGames =
+              scoreboard.filter(game => {
+                // sportsApi.getScoreboard() already normalizes
+                // ESPN's authoritative competition status into isLive.
+                return game?.isLive === true;
+              });
 
         for (const game of liveGames) {
           await this.processGame(
