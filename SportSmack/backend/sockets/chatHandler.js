@@ -265,19 +265,15 @@ module.exports = function(io) {
           // Make sure the game gets an AI-generated poll when a user
           // enters the room, rather than waiting for the background
           // polling cycle.
-          if (!readOnly && state === 'in') {
-            try {
-              await liveGameEngine.processGame(
-                league,
-                gameId
-              );
-            } catch (pollError) {
-              console.error(
-                `Unable to generate initial game poll for ${league}/${gameId}:`,
-                pollError.message
-              );
-            }
-          }
+          /*
+           * LiveGameEngine runs in the single authoritative
+           * background worker. Do not run the engine from an
+           * API replica when a user joins a room.
+           *
+           * The worker checks live games every 30 seconds and
+           * persists polls to GameMessage, so users joining
+           * afterward still receive the latest persisted polls.
+           */
 
           if (state === 'post') {
             const homeWinner = comp.competitors.find(c => c.homeAway === 'home').winner;
