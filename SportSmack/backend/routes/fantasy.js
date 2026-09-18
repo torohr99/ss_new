@@ -23,6 +23,10 @@ const {
 
 const authenticateToken = require('../middleware/auth');
 
+const {
+  getWeeklyProjectedPoints
+} = require('../services/fantasyProjections');
+
 const VALID_POSITIONS = new Set([
   'QB',
   'RB',
@@ -728,6 +732,11 @@ router.get(
       
             const currentWeek =
               getCurrentFantasyWeek();
+
+            const weeklyProjections =
+              await getWeeklyProjectedPoints(
+                currentWeek
+              );
       
             const playerWeeklyScores =
               playerIds.length > 0
@@ -758,19 +767,31 @@ router.get(
             const teamsWithPlayerScores =
               league.teams.map(team => ({
                 ...team,
-                players: team.players.map(
-                  rosterPlayer => ({
-                    ...rosterPlayer,
-                    fantasyPoints:
-                      playerScoreMap.get(
-                        rosterPlayer.playerId
-                      )?.points || 0,
-                    fantasyPointsLive:
-                      playerScoreMap.get(
-                        rosterPlayer.playerId
-                      )?.isLive ?? false
-                  })
-                )
+            
+                players:
+                  team.players.map(
+                    rosterPlayer => ({
+                      ...rosterPlayer,
+            
+                      fantasyPoints:
+                        playerScoreMap.get(
+                          rosterPlayer.playerId
+                        )?.points || 0,
+            
+                      fantasyPointsLive:
+                        playerScoreMap.get(
+                          rosterPlayer.playerId
+                        )?.isLive ?? false,
+            
+                      weeklyProjectedPoints:
+                        weeklyProjections?.[
+                          String(
+                            rosterPlayer.player
+                              .espnId
+                          )
+                        ] ?? null
+                    })
+                  )
               }));
       
       res.json({
