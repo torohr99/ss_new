@@ -30,6 +30,25 @@ async function getFantasyPlayers(season) {
   const fantasyFilter = {
     players: {
       limit: 3000,
+  
+      /*
+       * Request both actual and projected fantasy stats.
+       *
+       * statSourceId:
+       * 0 = actual
+       * 1 = projected
+       *
+       * statSplitTypeId:
+       * 0 = season
+       */
+      filterStatsForSourceIds: {
+        value: [0, 1]
+      },
+  
+      filterStatsForSplitTypeIds: {
+        value: [0]
+      },
+  
       sortPercOwned: {
         sortPriority: 4,
         sortAsc: false
@@ -57,45 +76,66 @@ function getSeasonFantasyPoints(
   season,
   preferProjection = false
 ) {
-  const stats =
-    player?.stats || [];
+  const stats = [
+    ...(Array.isArray(player?.stats)
+      ? player.stats
+      : []),
+
+    ...(Array.isArray(
+      player?.playerPoolEntry?.stats
+    )
+      ? player.playerPoolEntry.stats
+      : [])
+  ];
 
   const seasonStats =
-    stats.filter(
-      stat =>
+    stats.filter(stat => {
+      const seasonMatch =
         Number(stat.seasonId) ===
-        Number(season) &&
-        Number(stat.scoringPeriodId) === 0
-    );
+        Number(season);
+
+      const splitMatch =
+        stat.statSplitTypeId == null ||
+        Number(
+          stat.statSplitTypeId
+        ) === 0;
+
+      return (
+        seasonMatch &&
+        splitMatch
+      );
+    });
 
   if (!seasonStats.length) {
     return null;
   }
 
-  let candidate;
+  const desiredSource =
+    preferProjection ? 1 : 0;
 
-  if (preferProjection) {
-    // ESPN uses statSourceId:
-    // 0 = actual
-    // 1 = projected
+  let candidate =
+    seasonStats.find(
+      stat =>
+        Number(
+          stat.statSourceId
+        ) === desiredSource
+    );
+
+  /*
+   * Some ESPN responses expose the projected/actual
+   * distinction through statTypeId instead.
+   */
+  if (!candidate) {
     candidate =
       seasonStats.find(
         stat =>
-          Number(stat.statSourceId) === 1
-      ) ||
-      seasonStats.find(
-        stat =>
-          Number(stat.statTypeId) === 1
-      );
-  } else {
-    candidate =
-      seasonStats.find(
-        stat =>
-          Number(stat.statSourceId) === 0
-      ) ||
-      seasonStats.find(
-        stat =>
-          Number(stat.statTypeId) === 0
+          preferProjection
+            ? Number(
+                stat.statTypeId
+              ) === 1
+            : Number(
+                stat.statTypeId
+              ) === 0
       );
   }
 
