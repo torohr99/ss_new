@@ -24,8 +24,8 @@ class LiveGameEngine {
     // Prevent excessive AI poll generation.
     this.lastPollTimes = new Map();
 
-    // Only generate a new poll at most once every 5 minutes.
-    this.POLL_COOLDOWN_MS = 5 * 60 * 1000;
+    // Only generate a new poll at most once every 10 minutes.
+    this.POLL_COOLDOWN_MS = 10 * 60 * 1000;
   }
 
   init(io) {
@@ -304,6 +304,34 @@ class LiveGameEngine {
        * Ask the centralized poll generator to
        * create a matchup/situation-specific poll.
        */
+      const recentPoll =
+        await prisma.gameMessage.findFirst({
+          where: {
+            gameId: String(gameId),
+            league: String(league),
+            type: 'poll',
+            createdAt: {
+              gte:
+                new Date(
+                  Date.now() -
+                  10 * 60 * 1000
+                )
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+      
+      if (recentPoll) {
+        this.lastPollTimes.set(
+          trackingKey,
+          Date.now()
+        );
+      
+        return;
+      }
+      
       const poll =
         await gamePolls.generateGamePoll(
           summary,
