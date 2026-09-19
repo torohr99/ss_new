@@ -183,7 +183,7 @@ async function getGameSummary(league, gameId) {
 
   return sportsApi.getGameSummary(
     mapping.sport,
-    league.toLowerCase(),
+    mapping.league,
     gameId
   );
 }
