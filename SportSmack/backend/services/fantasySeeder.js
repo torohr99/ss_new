@@ -24,36 +24,122 @@ const POSITION_IDS = {
 
 async function getFantasyPlayers(season) {
   const url =
-    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/players`;
+    `https://fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leaguedefaults/3`;
 
+  /*
+   * ESPN's kona_player_info endpoint uses the
+   * X-Fantasy-Filter header to select the player pool.
+   *
+   * PPR league defaults are used here because SportSmack's
+   * fantasy scoring is PPR-oriented.
+   *
+   * Position slot IDs:
+   * QB  = 0
+   * RB  = 2
+   * WR  = 4
+   * TE  = 6
+   * K   = 17
+   * DST = 16
+   */
   const fantasyFilter = {
-    filterActive: {
-      value: true
+    players: {
+      filterSlotIds: {
+        value: [
+          0,
+          2,
+          4,
+          6,
+          17,
+          16
+        ]
+      },
+
+      /*
+       * ESPN requires a sort when using a player limit.
+       */
+      sortPercOwned: {
+        sortPriority: 1,
+        sortAsc: false
+      },
+
+      limit: 2000
     }
   };
 
   try {
     const response =
-      await axios.get(url, {
-        params: {
-          view: 'kona_player_info',
-          scoringPeriodId: 0
-        },
-        headers: {
-          'X-Fantasy-Filter':
-            JSON.stringify(
-              fantasyFilter
-            )
-        },
-        timeout: 30000
-      });
+      await axios.get(
+        url,
+        {
+          params: {
+            view: 'kona_player_info',
+            scoringPeriodId: 0
+          },
 
+          headers: {
+            'X-Fantasy-Filter':
+              JSON.stringify(
+                fantasyFilter
+              )
+          },
+
+          timeout: 30000
+        }
+      );
+
+    /*
+     * ESPN's response should contain:
+     *
+     * {
+     *   players: [...]
+     * }
+     *
+     * Keep the fallback in place because ESPN has
+     * returned slightly different structures for
+     * different endpoints/seasons.
+     */
     const players =
-      response.data?.players || [];
+      Array.isArray(
+        response.data?.players
+      )
+        ? response.data.players
+        : Array.isArray(
+            response.data
+          )
+          ? response.data
+          : [];
 
     console.log(
       `ESPN fantasy endpoint returned ${players.length} players for ${season}.`
     );
+
+    /*
+     * Diagnostic information. This is intentionally
+     * temporary/useful because we need to confirm that
+     * ESPN is actually returning stats for the players.
+     */
+    if (players.length > 0) {
+      const first =
+        players[0]?.player;
+
+      console.log(
+        `ESPN fantasy sample ${season}:`,
+        JSON.stringify({
+          id:
+            first?.id,
+          name:
+            first?.fullName,
+          position:
+            first?.defaultPositionId,
+          stats:
+            Array.isArray(
+              first?.stats
+            )
+              ? first.stats.length
+              : 0
+        })
+      );
+    }
 
     return players;
 
@@ -69,7 +155,7 @@ async function getFantasyPlayers(season) {
         'ESPN response:',
         JSON.stringify(
           error.response.data
-        ).slice(0, 1000)
+        ).slice(0, 1500)
       );
     }
 
@@ -144,24 +230,6 @@ function getSeasonFantasyPoints(
   /*
    * Some ESPN responses expose the same
    * information through statTypeId.
-   */
-  if (!candidate) {
-    candidate =
-      seasonStats.find(
-        stat =>
-          preferProjection
-            ? Number(
-                stat.statTypeId
-              ) === 1
-            : Number(
-                stat.statTypeId
-              ) === 0
-      );
-  }
-
-  /*
-   * Some ESPN responses expose the projected/actual
-   * distinction through statTypeId instead.
    */
   if (!candidate) {
     candidate =
