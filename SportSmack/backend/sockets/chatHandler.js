@@ -193,10 +193,10 @@ module.exports = function(io) {
         const gameSummary =
           await sportsApi.getGameSummary(
             leagueMapping.sport,
-            league,
+            leagueMapping.league,
             gameId
           );
-        
+                
         let readOnly = false;
         let readOnlyReason = '';
         
