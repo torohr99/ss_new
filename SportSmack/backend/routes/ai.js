@@ -167,10 +167,10 @@ router.post(
           ];
     
         if (mapping) {
-          const summary =
+          const gameSummary =
             await sportsApi.getGameSummary(
-              mapping.sport,
-              league,
+              leagueMapping.sport,
+              leagueMapping.league,
               gameId
             );
     
