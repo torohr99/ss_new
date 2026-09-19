@@ -764,13 +764,52 @@ export default function GameHubPage({ params }) {
               {msg.type === 'poll' ? (
                 <div>
                   <strong>{msg.poll_question}</strong>
-                  <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    {(Array.isArray(msg.poll_options) ? msg.poll_options : []).map((opt, i) => (
-                      <button key={i} onClick={() => handleVotePoll(msg.id, opt)} className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}>
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
+                  {!msg.poll_voted && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem'
+                        }}
+                      >
+                        {(
+                          Array.isArray(msg.poll_options)
+                            ? msg.poll_options
+                            : []
+                        ).map((opt, i) => (
+                          <button
+                            key={i}
+                            onClick={() =>
+                              handleVotePoll(
+                                msg.id,
+                                opt
+                              )
+                            }
+                            className="btn-secondary"
+                            style={{
+                              padding:
+                                '0.4rem 0.8rem',
+                              fontSize:
+                                '0.85rem'
+                            }}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {msg.poll_voted && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          fontSize: '0.8rem',
+                          opacity: 0.7
+                        }}
+                      >
+                        You voted in this poll.
+                      </div>
+                    )}
                   <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                     {(Array.isArray(msg.poll_options) ? msg.poll_options : []).map(o => {
                       const votes = (msg.poll_results || {})[o] || 0;
