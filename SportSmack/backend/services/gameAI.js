@@ -1,37 +1,15 @@
 'use strict';
 
 const axios = require('axios');
+const cache = require('./cache');
 
-const analysisCache = new Map();
-
-const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const SUCCESS_CACHE_TTL_SECONDS = 30 * 60;
+const FAILURE_CACHE_TTL_SECONDS = 5 * 60;
 
 function cacheKey(league, gameId) {
-  return `${String(league).toLowerCase()}:${String(gameId)}`;
-}
-
-function getCachedAnalysis(league, gameId) {
-  const key = cacheKey(league, gameId);
-  const cached = analysisCache.get(key);
-
-  if (!cached) return null;
-
-  if (Date.now() - cached.timestamp > CACHE_TTL) {
-    analysisCache.delete(key);
-    return null;
-  }
-
-  return cached.data;
-}
-
-function setCachedAnalysis(league, gameId, data) {
-  analysisCache.set(
-    cacheKey(league, gameId),
-    {
-      timestamp: Date.now(),
-      data
-    }
-  );
+  return `ai:pregame-analysis:${String(
+    league
+  ).toLowerCase()}:${String(gameId)}`;
 }
 
 function buildAnalysisPrompt(gameState) {
@@ -92,40 +70,58 @@ Return ONLY valid JSON:
 
 async function generateWithGemini(gameState) {
   if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not configured');
+    throw new Error(
+      'GEMINI_API_KEY is not configured'
+    );
   }
 
   const model =
-    process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+    process.env.GEMINI_MODEL ||
+    'gemini-2.5-flash';
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      contents: [
-        {
-          parts: [
-            {
-              text: buildAnalysisPrompt(gameState)
-            }
-          ]
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent` +
+    `?key=${process.env.GEMINI_API_KEY}`;
+
+  const response =
+    await axios.post(
+      url,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text:
+                  buildAnalysisPrompt(
+                    gameState
+                  )
+              }
+            ]
+          }
+        ],
+
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 900,
+          responseMimeType:
+            'application/json'
         }
-      ],
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 900,
-        responseMimeType: 'application/json'
+      },
+      {
+        timeout: 30000
       }
-    },
-    {
-      timeout: 30000
-    }
-  );
+    );
 
   const raw =
-    response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    response.data
+      ?.candidates?.[0]
+      ?.content?.parts?.[0]
+      ?.text;
 
   if (!raw) {
-    throw new Error('AI returned an empty response');
+    throw new Error(
+      'AI returned an empty response'
+    );
   }
 
   return JSON.parse(
@@ -137,13 +133,105 @@ async function generateWithGemini(gameState) {
   );
 }
 
-async function getPregameAnalysis(gameState, league, gameId) {
-  const cached = getCachedAnalysis(league, gameId);
+async function generateCachedAnalysis(
+  gameState,
+  league,
+  gameId
+) {
+  const key =
+    cacheKey(
+      league,
+      gameId
+    );
+
+  return cache.getOrSetJson(
+    key,
+    SUCCESS_CACHE_TTL_SECONDS,
+    async () => {
+      try {
+        const analysis =
+          await generateWithGemini(
+            gameState
+          );
+
+        return {
+          success: true,
+          league,
+          gameId,
+          analysis
+        };
+      } catch (error) {
+        const status =
+          error.response?.status ||
+          'unknown';
+
+        const providerMessage =
+          error.response?.data
+            ? JSON.stringify(
+                error.response.data
+              ).slice(0, 500)
+            : '';
+
+        console.error(
+          `Gemini AI generation failed for ${league}/${gameId}: ` +
+          `HTTP ${status} ${error.message}` +
+          `${providerMessage ? ` | ${providerMessage}` : ''}`
+        );
+
+        /*
+         * IMPORTANT:
+         * A 429 should not cause every connected
+         * user/replica to immediately retry Gemini.
+         *
+         * Returning a failure object allows Redis
+         * to cache the failure temporarily.
+         */
+        return {
+          success: false,
+          league,
+          gameId,
+          analysis: null,
+          error:
+            status === 429
+              ? 'AI rate limit temporarily reached'
+              : 'AI analysis temporarily unavailable',
+          retryAfterSeconds:
+            status === 429
+              ? FAILURE_CACHE_TTL_SECONDS
+              : 60
+        };
+      }
+    },
+    {
+      lockTtlSeconds: 45,
+      waitMs: 250,
+      maxWaitMs: 5000
+    }
+  );
+}
+
+async function getPregameAnalysis(
+  gameState,
+  league,
+  gameId
+) {
+  const key =
+    cacheKey(
+      league,
+      gameId
+    );
+
+  /*
+   * First check Redis directly.
+   */
+  const cached =
+    await cache.getJson(key);
 
   if (cached) {
     console.log(
       `Using cached AI analysis for ${league}/${gameId}`
     );
+
     return cached;
   }
 
@@ -151,37 +239,13 @@ async function getPregameAnalysis(gameState, league, gameId) {
     `Generating new AI analysis for ${league}/${gameId}`
   );
 
-  try {
-    const analysis = await generateWithGemini(gameState);
-
-    const result = {
-      success: true,
-      league,
-      gameId,
-      analysis
-    };
-
-    setCachedAnalysis(league, gameId, result);
-
-    return result;
-  } catch (error) {
-    console.error(
-      `AI analysis generation failed for ${league}/${gameId}:`,
-      error.message
-    );
-
-    return {
-      success: false,
-      league,
-      gameId,
-      analysis: null,
-      error: 'AI analysis temporarily unavailable'
-    };
-  }
+  return generateCachedAnalysis(
+    gameState,
+    league,
+    gameId
+  );
 }
 
 module.exports = {
-  getPregameAnalysis,
-  getCachedAnalysis,
-  setCachedAnalysis
+  getPregameAnalysis
 };
