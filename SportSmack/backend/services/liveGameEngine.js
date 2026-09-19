@@ -134,7 +134,7 @@ class LiveGameEngine {
       const summary =
         await sportsApi.getGameSummary(
           mapping.sport,
-          league,
+          mapping.league,
           gameId
         );
 
