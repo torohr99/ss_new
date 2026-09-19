@@ -14,67 +14,137 @@ import {
 } from '../../../../components/gamecast';
 
 function normalizeChatMessage(message) {
-    if (!message) return null;
+  if (!message) return null;
 
-    const normalized = {
-        ...message,
+  const normalized = {
+    ...message,
 
-        // Backend Prisma field is createdAt.
-        // Normalize both old and new shapes so the UI
-        // remains compatible with existing messages.
-        createdAt:
-            message.createdAt ||
-            message.created_at ||
-            null
-    };
+    createdAt:
+      message.createdAt ||
+      message.created_at ||
+      null,
 
-    // Poll data is stored inside content as:
-    // [POLL_JSON]{...}
-    if (
-        message.type === 'poll' &&
-        typeof message.content === 'string' &&
-        message.content.startsWith('[POLL_JSON]')
-    ) {
-        try {
-            const pollData = JSON.parse(
-                message.content.substring('[POLL_JSON]'.length)
-            );
+    poll_question:
+      message.poll_question ||
+      null,
 
-            normalized.poll_question =
-                pollData.question || 'Poll';
+    poll_options:
+      Array.isArray(message.poll_options)
+        ? message.poll_options
+        : [],
 
-            normalized.poll_options =
-                Array.isArray(pollData.options)
-                    ? pollData.options
-                    : [];
+    poll_results: {},
 
-            normalized.poll_results =
-                pollData.votes || {};
+    poll_voted: false
+  };
 
-        } catch (error) {
-            console.error(
-                'Failed to parse poll data:',
-                error
-            );
+  /*
+   * Poll state is stored in content as:
+   * [POLL_JSON]{...}
+   */
+  if (
+    message.type === 'poll' &&
+    typeof message.content === 'string' &&
+    message.content.startsWith('[POLL_JSON]')
+  ) {
+    try {
+      const pollData =
+        JSON.parse(
+          message.content.substring(
+            '[POLL_JSON]'.length
+          )
+        );
 
-            normalized.poll_question = 'Poll';
-            normalized.poll_options = [];
-            normalized.poll_results = {};
-        }
+      normalized.poll_question =
+        pollData.question ||
+        message.poll_question ||
+        'Poll';
+
+      normalized.poll_options =
+        Array.isArray(
+          pollData.options
+        )
+          ? pollData.options
+          : [];
+
+      /*
+       * IMPORTANT:
+       *
+       * poll_results is the authoritative
+       * vote-count field after a vote.
+       *
+       * Fall back to the original content
+       * votes only when poll_results does
+       * not exist yet.
+       */
+      let databaseResults = {};
+
+      try {
+        databaseResults =
+          JSON.parse(
+            message.poll_results ||
+              '{}'
+          );
+      } catch (error) {
+        databaseResults = {};
+      }
+
+      const contentVotes =
+        pollData.votes &&
+        typeof pollData.votes === 'object'
+          ? pollData.votes
+          : {};
+
+      normalized.poll_results =
+        Object.keys(databaseResults).length > 0
+          ? databaseResults
+          : contentVotes;
+
+      /*
+       * Determine whether the current user
+       * has already voted.
+       *
+       * The backend stores voted user IDs
+       * inside the poll JSON.
+       */
+      const votedUsers =
+        Array.isArray(
+          pollData.votedUsers
+        )
+          ? pollData.votedUsers
+          : [];
+
+      normalized.poll_voted =
+        user?.id != null &&
+        votedUsers.some(
+          id =>
+            String(id) ===
+            String(user.id)
+        );
+
+    } catch (error) {
+      console.error(
+        'Failed to parse poll data:',
+        error
+      );
     }
+  }
 
-    if (!Array.isArray(normalized.poll_options)) {
-        normalized.poll_options = [];
-    }
+  if (!Array.isArray(
+    normalized.poll_options
+  )) {
+    normalized.poll_options = [];
+  }
 
-    if (
-        !normalized.poll_results ||
-        typeof normalized.poll_results !== 'object'
-    ) {
-        normalized.poll_results = {};
-    }
+  if (
+    !normalized.poll_results ||
+    typeof normalized.poll_results !==
+      'object'
+  ) {
+    normalized.poll_results = {};
+  }
 
-    return normalized;
+  return normalized;
 }
 // Per-image component with loading skeleton and error fallback
 function MemeCandidate({ src, index, onSelect }) {
