@@ -596,37 +596,229 @@ module.exports = function(io) {
             'You are voting too quickly.'
         });
       }
-      const { messageId, option } = data;
+    
+      const {
+        messageId,
+        option
+      } = data;
+    
       try {
-        const msg = await prisma.gameMessage.findUnique({ where: { id: messageId } });
-        if (!msg || msg.type !== 'poll') return;
-
+        const msg =
+          await prisma.gameMessage.findUnique({
+            where: {
+              id: messageId
+            }
+          });
+    
+        if (
+          !msg ||
+          msg.type !== 'poll'
+        ) {
+          return callback?.({
+            success: false,
+            message:
+              'Poll not found.'
+          });
+        }
+    
+        /*
+         * Parse the poll definition/state
+         * stored in content.
+         */
+        let pollData = {};
+    
+        try {
+          if (
+            typeof msg.content === 'string' &&
+            msg.content.startsWith(
+              '[POLL_JSON]'
+            )
+          ) {
+            pollData =
+              JSON.parse(
+                msg.content.substring(
+                  '[POLL_JSON]'.length
+                )
+              );
+          }
+        } catch (error) {
+          pollData = {};
+        }
+    
+        const options =
+          Array.isArray(
+            pollData.options
+          )
+            ? pollData.options
+            : [];
+    
+        /*
+         * Reject invalid options.
+         */
+        if (
+          !options.includes(option)
+        ) {
+          return callback?.({
+            success: false,
+            message:
+              'Invalid poll option.'
+          });
+        }
+    
+        /*
+         * Track which users have voted.
+         */
+        const votedUsers =
+          Array.isArray(
+            pollData.votedUsers
+          )
+            ? pollData.votedUsers
+            : [];
+    
+        const currentUserId =
+          String(socket.user.id);
+    
+        /*
+         * Prevent the same user from
+         * voting more than once.
+         */
+        if (
+          votedUsers.some(
+            id =>
+              String(id) ===
+              currentUserId
+          )
+        ) {
+          return callback?.({
+            success: false,
+            message:
+              'You have already voted in this poll.'
+          });
+        }
+    
+        /*
+         * Read existing vote totals.
+         *
+         * Prefer the database poll_results
+         * field because it is the authoritative
+         * count after previous votes.
+         */
         let results = {};
+    
         try {
-          results = JSON.parse(msg.poll_results || '{}');
-        } catch(e) {}
-        
-        let votedUsers = [];
-        try {
-          votedUsers = JSON.parse(msg.content || '[]'); // Storing voted users in content field since it's unused for polls, or better yet, just let anyone vote for demo
-        } catch(e) {}
-
-        // Allow multiple votes for demo or check votedUsers if strict
-        // For simplicity, we just increment
-        results[option] = (results[option] || 0) + 1;
-
-        const updatedMsg = await prisma.gameMessage.update({
-          where: { id: messageId },
-          data: { poll_results: JSON.stringify(results) },
-          include: { user: { select: { id: true, username: true } } }
-        });
-
-        // Broadcast the updated message
-        io.to(`game_${msg.league}_${msg.gameId}`).emit('poll_updated', updatedMsg);
-        if (callback) callback({ success: true });
+          results =
+            JSON.parse(
+              msg.poll_results ||
+                '{}'
+            );
+        } catch (error) {
+          results = {};
+        }
+    
+        /*
+         * Initialize all options.
+         */
+        for (
+          const pollOption of options
+        ) {
+          if (
+            typeof results[pollOption] !==
+            'number'
+          ) {
+            results[pollOption] = 0;
+          }
+        }
+    
+        /*
+         * Record the vote.
+         */
+        results[option] += 1;
+    
+        votedUsers.push(
+          currentUserId
+        );
+    
+        /*
+         * Keep the content JSON synchronized
+         * so newly loaded chatrooms see the
+         * same vote state.
+         */
+        pollData.votes =
+          results;
+    
+        pollData.votedUsers =
+          votedUsers;
+    
+        const updatedContent =
+          `[POLL_JSON]${JSON.stringify(
+            pollData
+          )}`;
+    
+        /*
+         * Persist both:
+         *
+         * 1. content -> complete poll state
+         * 2. poll_results -> authoritative counts
+         */
+        const updatedMsg =
+          await prisma.gameMessage.update({
+            where: {
+              id: messageId
+            },
+    
+            data: {
+              content:
+                updatedContent,
+    
+              poll_results:
+                JSON.stringify(
+                  results
+                )
+            },
+    
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true
+                }
+              }
+            }
+          });
+    
+        /*
+         * Send the fully updated poll to
+         * every connected user in the room.
+         */
+        io
+          .to(
+            `game_${msg.league}_${msg.gameId}`
+          )
+          .emit(
+            'poll_updated',
+            updatedMsg
+          );
+    
+        if (callback) {
+          callback({
+            success: true,
+            poll: updatedMsg
+          });
+        }
+    
       } catch (err) {
-        console.error('Error voting on poll:', err);
-        if (callback) callback({ success: false });
+        console.error(
+          'Error voting on poll:',
+          err
+        );
+    
+        if (callback) {
+          callback({
+            success: false,
+            message:
+              'Unable to record vote.'
+          });
+        }
       }
     });
 
