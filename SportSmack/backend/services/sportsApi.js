@@ -495,25 +495,76 @@ async function getTeamSocialFeeds(teamName) {
 }
 
 async function getGameSummary(sport, league, gameId) {
-  const cacheKey = `gameSummary_${sport}_${league}_${gameId}`;
-  const cached = await cache.getJson(cacheKey);
-  if (cached) return cached;
+  const cacheKey =
+    `gameSummary_${sport}_${league}_${gameId}`;
+
+  const cached =
+    await cache.getJson(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const url =
+    `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/summary?event=${encodeURIComponent(gameId)}`;
 
   try {
-    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/summary?event=${gameId}`);
-    
-    // Determine caching time based on game status
-    const isCompleted = response.data?.header?.competitions?.[0]?.status?.type?.state === 'post';
-    const isLive = response.data?.header?.competitions?.[0]?.status?.type?.state === 'in';
-    
-    let ttl = 60; // default 60s
-    if (isCompleted) ttl = 86400; // cache finished games for 24 hours
-    else if (isLive) ttl = 15; // cache live games for 15s to keep them snappy but reduce load
+    const response =
+      await espnClient.get(url);
 
-    await cache.setJson(cacheKey, response.data, ttl);
+    const isCompleted =
+      response.data?.header
+        ?.competitions?.[0]
+        ?.status?.type
+        ?.state === 'post';
+
+    const isLive =
+      response.data?.header
+        ?.competitions?.[0]
+        ?.status?.type
+        ?.state === 'in';
+
+    let ttl = 60;
+
+    if (isCompleted) {
+      ttl = 86400;
+    } else if (isLive) {
+      ttl = 15;
+    }
+
+    await cache.setJson(
+      cacheKey,
+      response.data,
+      ttl
+    );
+
     return response.data;
+
   } catch (error) {
-    console.error(`ESPN API Error fetching game summary for ${gameId}:`, error.message);
+    const status =
+      error.response?.status || 'unknown';
+
+    const responseMessage =
+      error.response?.data
+        ? JSON.stringify(
+            error.response.data
+          ).slice(0, 500)
+        : '';
+
+    console.error(
+      `ESPN API Error fetching game summary for ` +
+      `${sport}/${league}/${gameId}: ` +
+      `HTTP ${status} ${error.message}` +
+      `${responseMessage ? ` | ${responseMessage}` : ''}`
+    );
+
+    /*
+     * A single ESPN event can occasionally be
+     * unavailable through the summary endpoint.
+     *
+     * Do not allow that event to crash or interrupt
+     * live-game processing.
+     */
     return null;
   }
 }
