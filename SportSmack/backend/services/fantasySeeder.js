@@ -24,51 +24,57 @@ const POSITION_IDS = {
 
 async function getFantasyPlayers(season) {
   const url =
-    `https://fantasy.espn.com/apis/v3/games/ffl/seasons/${season}` +
-    `/segments/0/leaguedefaults/3`;
+    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/players`;
 
   const fantasyFilter = {
-    players: {
-      limit: 3000,
-  
-      /*
-       * Request both actual and projected fantasy stats.
-       *
-       * statSourceId:
-       * 0 = actual
-       * 1 = projected
-       *
-       * statSplitTypeId:
-       * 0 = season
-       */
-      filterStatsForSourceIds: {
-        value: [0, 1]
-      },
-  
-      filterStatsForSplitTypeIds: {
-        value: [0]
-      },
-  
-      sortPercOwned: {
-        sortPriority: 4,
-        sortAsc: false
-      }
+    filterActive: {
+      value: true
     }
   };
 
-  const response = await axios.get(url, {
-    params: {
-      view: 'kona_player_info',
-      scoringPeriodId: 0
-    },
-    headers: {
-      'X-Fantasy-Filter':
-        JSON.stringify(fantasyFilter)
-    },
-    timeout: 30000
-  });
+  try {
+    const response =
+      await axios.get(url, {
+        params: {
+          view: 'kona_player_info',
+          scoringPeriodId: 0
+        },
+        headers: {
+          'X-Fantasy-Filter':
+            JSON.stringify(
+              fantasyFilter
+            )
+        },
+        timeout: 30000
+      });
 
-  return response.data?.players || [];
+    const players =
+      response.data?.players || [];
+
+    console.log(
+      `ESPN fantasy endpoint returned ${players.length} players for ${season}.`
+    );
+
+    return players;
+
+  } catch (error) {
+    console.error(
+      `ESPN fantasy player endpoint failed for ${season}:`,
+      error.response?.status ||
+        error.message
+    );
+
+    if (error.response?.data) {
+      console.error(
+        'ESPN response:',
+        JSON.stringify(
+          error.response.data
+        ).slice(0, 1000)
+      );
+    }
+
+    return [];
+  }
 }
 
 function getSeasonFantasyPoints(
@@ -112,14 +118,46 @@ function getSeasonFantasyPoints(
 
   const desiredSource =
     preferProjection ? 1 : 0;
-
+  
+  /*
+   * Prefer the exact source/split combination.
+   *
+   * ESPN:
+   * statSourceId 0 = actual
+   * statSourceId 1 = projected
+   * statSplitTypeId 0 = season
+   */
   let candidate =
     seasonStats.find(
       stat =>
         Number(
           stat.statSourceId
-        ) === desiredSource
+        ) === desiredSource &&
+        (
+          stat.statSplitTypeId == null ||
+          Number(
+            stat.statSplitTypeId
+          ) === 0
+        )
     );
+  
+  /*
+   * Some ESPN responses expose the same
+   * information through statTypeId.
+   */
+  if (!candidate) {
+    candidate =
+      seasonStats.find(
+        stat =>
+          preferProjection
+            ? Number(
+                stat.statTypeId
+              ) === 1
+            : Number(
+                stat.statTypeId
+              ) === 0
+      );
+  }
 
   /*
    * Some ESPN responses expose the projected/actual
