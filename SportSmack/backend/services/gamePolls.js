@@ -65,7 +65,14 @@ ABSOLUTE REQUIREMENTS:
 9. NEVER invent a player, statistic, injury, play, score,
    situation, or event.
 10. NEVER use information not contained in GAME STATE.
-11. Make the poll different from previous polls.
+11. When GAME STATE contains a player as an object, use the
+    player's actual name/displayName/fullName rather than
+    rendering the object itself.
+12. Never output "[object Object]" or any JSON/object
+    representation as part of the poll question or options.
+13. Before returning the JSON, verify that every player/team
+    reference in the question is human-readable text.
+14. Make the poll different from previous polls.
 
 SPORT-SPECIFIC GUIDANCE:
 
@@ -195,10 +202,19 @@ function buildFallbackPoll(gameState, league) {
     leagueKey === 'mlb' ||
     leagueKey === 'baseball'
   ) {
+    const batterValue =
+      situation.batter;
+    
     const batter =
-      situation.batter ||
-      'the current batter';
-
+      typeof batterValue === 'string'
+        ? batterValue
+        : batterValue?.displayName ||
+          batterValue?.fullName ||
+          batterValue?.name ||
+          batterValue?.athlete?.displayName ||
+          batterValue?.athlete?.fullName ||
+          'the current batter';
+    
     return {
       question:
         `Will ${batter} reach base in this at-bat?`,
