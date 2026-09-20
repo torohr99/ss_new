@@ -146,55 +146,6 @@ function normalizeChatMessage(message) {
 
   return normalized;
 }
-// Per-image component with loading skeleton and error fallback
-function MemeCandidate({ src, index, onSelect }) {
-  const [loaded, setLoaded] = useState(false);
-  const [errored, setErrored] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-
-  const retrySrc = errored && retryCount < 2 
-    ? `${src}&retry=${retryCount}` 
-    : src;
-
-  return (
-    <div 
-      onClick={!errored ? onSelect : undefined} 
-      style={{ flex: 1, cursor: errored ? 'not-allowed' : 'pointer', borderRadius: '10px', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.1)', transition: 'border 0.2s, transform 0.15s', position: 'relative', minHeight: '160px' }}
-      onMouseEnter={e => { if (!errored) e.currentTarget.style.borderColor = 'var(--brand-color)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; }}
-    >
-      {!loaded && !errored && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-          <div style={{ width: '28px', height: '28px', border: '3px solid var(--brand-color)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Loading image {index + 1}...</span>
-        </div>
-      )}
-      {errored && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.8rem', padding: '1rem', textAlign: 'center' }}>
-          <span style={{ fontSize: '1.5rem' }}>⚠️</span>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Image failed to load</span>
-          {retryCount < 2 && (
-            <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }} onClick={(e) => { e.stopPropagation(); setErrored(false); setLoaded(false); setRetryCount(r => r + 1); }}>
-              Retry
-            </button>
-          )}
-        </div>
-      )}
-      <img 
-        src={retrySrc}
-        alt={`Meme option ${index + 1}`}
-        onLoad={() => setLoaded(true)}
-        onError={() => setErrored(true)}
-        style={{ width: '100%', height: '160px', objectFit: 'cover', display: loaded ? 'block' : 'none', borderRadius: '8px' }}
-      />
-      {loaded && (
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent, rgba(0,0,0,0.7))', padding: '0.5rem', textAlign: 'center', fontSize: '0.85rem', fontWeight: 'bold' }}>
-          Select Option {index + 1}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function GameHubPage({ params }) {
   const { league, id: gameId } = params;
@@ -216,8 +167,8 @@ export default function GameHubPage({ params }) {
   // Meme State
   const [memeInput, setMemeInput] = useState('');
   const [memeGenerating, setMemeGenerating] = useState(false);
-  const [generatedCandidates, setGeneratedCandidates] = useState([]);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [generatedMeme, setGeneratedMeme] =
+    useState(null);
   
   // Game & Stats Data
   const [gameData, setGameData] = useState(null);
@@ -477,118 +428,151 @@ export default function GameHubPage({ params }) {
     });
   };
 
-  const handleGenerateMeme = async (e) => {
-      e.preventDefault();
+  const handleGenerateMeme =
+      async (e) => {
+        e.preventDefault();
     
-      if (!memeInput.trim()) return;
-    
-      setMemeGenerating(true);
-      setGeneratedCandidates([]);
-      setSelectedCandidate(null);
-    
-      try {
-        const competitors =
-          gameData?.header?.competitions?.[0]?.competitors ||
-          gameData?.competitors ||
-          [];
-    
-        const home = competitors.find(
-          c => c.homeAway === 'home'
-        );
-    
-        const away = competitors.find(
-          c => c.homeAway === 'away'
-        );
-    
-        const gameContext = {
-          league,
-    
-          homeTeam:
-            home?.team?.displayName ||
-            home?.team?.name ||
-            gameData?.homeTeam ||
-            null,
-    
-          awayTeam:
-            away?.team?.displayName ||
-            away?.team?.name ||
-            gameData?.awayTeam ||
-            null,
-    
-          score:
-            home?.score != null && away?.score != null
-              ? `${away?.team?.displayName || 'Away'} ${away.score} - ${home?.team?.displayName || 'Home'} ${home.score}`
-              : null,
-    
-          status:
-            gameData?.status ||
-            gameData?.statusDetail ||
-            null,
-    
-          situation:
-            gameData?.situation ||
-            null
-        };
-    
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/ai/meme`,
-          {
-            method: 'POST',
-        
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-        
-            body: JSON.stringify({
-              prompt: memeInput,
-              league,
-              gameId,
-              gameContext
-            })
-          }
-        );
-    
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-    
-          throw new Error(
-            errorData.message ||
-            'Failed to generate meme'
-          );
+        if (!memeInput.trim()) {
+          return;
         }
     
-        const data = await res.json();
+        setMemeGenerating(true);
+        setGeneratedMeme(null);
     
-        setGeneratedCandidates(
-          Array.isArray(data.candidates)
-            ? data.candidates
-            : []
-        );
+        try {
+          const competitors =
+            gameData?.header?.competitions?.[0]
+              ?.competitors ||
+            gameData?.competitors ||
+            [];
     
-      } catch (err) {
-        console.error(
-          'AI meme generation error:',
-          err
-        );
+          const home =
+            competitors.find(
+              c =>
+                c.homeAway === 'home'
+            );
     
-        alert(
-          err.message ||
-          'Failed to generate meme'
-        );
+          const away =
+            competitors.find(
+              c =>
+                c.homeAway === 'away'
+            );
     
-      } finally {
-        setMemeGenerating(false);
-      }
-    };
+          const gameContext = {
+            league,
+    
+            homeTeam:
+              home?.team?.displayName ||
+              home?.team?.name ||
+              gameData?.homeTeam ||
+              null,
+    
+            awayTeam:
+              away?.team?.displayName ||
+              away?.team?.name ||
+              gameData?.awayTeam ||
+              null,
+    
+            score:
+              home?.score != null &&
+              away?.score != null
+                ? `${
+                    away?.team?.displayName ||
+                    'Away'
+                  } ${away.score} - ${
+                    home?.team?.displayName ||
+                    'Home'
+                  } ${home.score}`
+                : null,
+    
+            status:
+              gameData?.status ||
+              gameData?.statusDetail ||
+              null,
+    
+            situation:
+              gameData?.situation ||
+              null
+          };
+    
+          const res =
+            await fetch(
+              `${
+                process.env
+                  .NEXT_PUBLIC_API_URL ||
+                'http://localhost:5000'
+              }/api/ai/meme`,
+              {
+                method: 'POST',
+    
+                headers: {
+                  'Content-Type':
+                    'application/json'
+                },
+    
+                credentials:
+                  'include',
+    
+                body:
+                  JSON.stringify({
+                    prompt:
+                      memeInput,
+                    league,
+                    gameId,
+                    gameContext
+                  })
+              }
+            );
+    
+          if (!res.ok) {
+            const errorData =
+              await res
+                .json()
+                .catch(
+                  () => ({})
+                );
+    
+            throw new Error(
+              errorData.message ||
+              'Failed to generate meme'
+            );
+          }
+    
+          const data =
+            await res.json();
+    
+          setGeneratedMeme(
+            data.image || null
+          );
+    
+        } catch (err) {
+          console.error(
+            'AI meme generation error:',
+            err
+          );
+    
+          alert(
+            err.message ||
+            'Failed to generate meme'
+          );
+    
+        } finally {
+          setMemeGenerating(false);
+        }
+      };
 
-  const publishMeme = (dataUrl) => {
-    handleSendMessage(null, `[MEME] ${dataUrl}`);
-    setShowMemeModal(false);
-    setGeneratedCandidates([]);
-    setSelectedCandidate(null);
-    setMemeInput('');
-  };
+  const publishMeme = (
+      dataUrl
+    ) => {
+      handleSendMessage(
+        null,
+        `[MEME] ${dataUrl}`
+      );
+    
+      setShowMemeModal(false);
+      setGeneratedMeme(null);
+      setMemeInput('');
+    };
 
   const handleVotePoll = (messageId, option) => {
     if (readOnly) return;
@@ -858,7 +842,7 @@ export default function GameHubPage({ params }) {
       {showMemeModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
           <div style={{ background: 'var(--glass-bg)', padding: '2rem', borderRadius: '12px', maxWidth: '860px', width: '100%', border: '1px solid var(--glass-border)', maxHeight: '90vh', overflowY: 'auto' }}>
-            {!selectedCandidate ? (
+            {!generatedMeme ? (
               <>
                 <h2 style={{marginTop: 0}}>AI Meme Generator</h2>
                 <p style={{ color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
@@ -879,33 +863,81 @@ export default function GameHubPage({ params }) {
                 </form>
 
                 {memeGenerating && (
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                    {[1,2,3].map(i => (
-                      <div key={i} style={{ flex: 1, height: '160px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px dashed rgba(255,255,255,0.15)' }}>
-                        <div style={{ width: '28px', height: '28px', border: '3px solid var(--brand-color)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Generating option {i}...</span>
-                      </div>
-                    ))}
+                  <div
+                    style={{
+                      marginBottom: '1.5rem'
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '320px',
+                        background:
+                          'rgba(255,255,255,0.05)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        flexDirection:
+                          'column',
+                        alignItems:
+                          'center',
+                        justifyContent:
+                          'center',
+                        gap: '0.75rem',
+                        border:
+                          '1px dashed rgba(255,255,255,0.15)'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          border:
+                            '3px solid var(--brand-color)',
+                          borderTopColor:
+                            'transparent',
+                          borderRadius:
+                            '50%',
+                          animation:
+                            'spin 1s linear infinite'
+                        }}
+                      />
+                
+                      <span
+                        style={{
+                          color:
+                            'var(--text-secondary)',
+                          fontSize:
+                            '0.85rem'
+                        }}
+                      >
+                        Generating your meme...
+                      </span>
+                    </div>
                   </div>
                 )}
-
-                {generatedCandidates.length > 0 && !memeGenerating && (
-                  <>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '0.8rem' }}>Select a meme to add text and publish to chat:</p>
-                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                      {generatedCandidates.map((c, i) => (
-                        <MemeCandidate key={`${c}-${i}`} src={c} index={i} onSelect={() => setSelectedCandidate(c)} />
-                      ))}
-                    </div>
-                  </>
-                )}
+                
+                {generatedMeme &&
+                  !memeGenerating && (
+                    <MemeEditor
+                      sourceImage={
+                        generatedMeme
+                      }
+                      onPublish={
+                        publishMeme
+                      }
+                      onCancel={() => {
+                        setGeneratedMeme(
+                          null
+                        );
+                      }}
+                    />
+                  )}
 
                 <div style={{ textAlign: 'right' }}>
-                  <button className="btn-secondary" onClick={() => { setShowMemeModal(false); setGeneratedCandidates([]); setMemeInput(''); }}>Close</button>
+                  <button className="btn-secondary" onClick={() => { setShowMemeModal(false); setGeneratedMeme(null); setMemeInput(''); }}>Close</button>
                 </div>
               </>
             ) : (
-              <MemeEditor sourceImage={selectedCandidate} onPublish={publishMeme} onCancel={() => setSelectedCandidate(null)} />
+              <MemeEditor sourceImage={generatedMeme} onPublish={publishMeme} onCancel={() => setGeneratedMeme(null)} />
             )}
           </div>
         </div>
