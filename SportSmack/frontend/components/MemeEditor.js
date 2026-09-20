@@ -6,16 +6,48 @@ export default function MemeEditor({ sourceImage, onPublish, onCancel }) {
   const [topText, setTopText] = useState('');
   const [bottomText, setBottomText] = useState('');
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] =
+    useState(false);
   const imgRef = useRef(null);
 
   useEffect(() => {
+    if (!sourceImage) {
+      setImageLoaded(false);
+      setImageError(false);
+      imgRef.current = null;
+      return;
+    }
+  
+    setImageLoaded(false);
+    setImageError(false);
+    imgRef.current = null;
+  
     const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = sourceImage;
+    img.crossOrigin = 'anonymous';
+  
     img.onload = () => {
       imgRef.current = img;
       setImageLoaded(true);
+      setImageError(false);
       drawCanvas();
+    };
+  
+    img.onerror = () => {
+      console.error(
+        'Failed to load generated meme image:',
+        sourceImage
+      );
+  
+      setImageLoaded(false);
+      setImageError(true);
+      imgRef.current = null;
+    };
+  
+    img.src = sourceImage;
+  
+    return () => {
+      img.onload = null;
+      img.onerror = null;
     };
   }, [sourceImage]);
 
@@ -93,8 +125,45 @@ export default function MemeEditor({ sourceImage, onPublish, onCancel }) {
         />
       </div>
 
-      <div style={{ border: '1px solid var(--glass-border)', borderRadius: '8px', overflow: 'hidden', display: 'flex', justifyContent: 'center', background: '#000' }}>
-        <canvas ref={canvasRef} style={{ maxWidth: '100%', maxHeight: '500px', objectFit: 'contain' }}></canvas>
+      <div
+        style={{
+          border: '1px solid var(--glass-border)',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: '#000',
+          minHeight: '320px',
+          padding: '0.5rem'
+        }}
+      >
+        {imageError ? (
+          <div
+            style={{
+              padding: '2rem',
+              textAlign: 'center',
+              color: 'var(--text-secondary)'
+            }}
+          >
+            <p style={{ marginTop: 0 }}>
+              The generated meme could not be loaded.
+            </p>
+      
+            <p style={{ fontSize: '0.85rem' }}>
+              Please try generating the meme again.
+            </p>
+          </div>
+        ) : (
+          <canvas
+            ref={canvasRef}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '500px',
+              objectFit: 'contain'
+            }}
+          />
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
