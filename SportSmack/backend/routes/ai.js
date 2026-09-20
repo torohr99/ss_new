@@ -213,52 +213,69 @@ router.post(
         enrichedGameContext
       );
 
-    const seeds = [
-      Math.floor(Math.random() * 9000000) + 1000000,
-      Math.floor(Math.random() * 9000000) + 1000000,
-      Math.floor(Math.random() * 9000000) + 1000000
-    ];
-
-    const variants = [
+    /*
+     * Generate exactly one meme image.
+     *
+     * Keep the existing verified entity pipeline,
+     * game-context enrichment, authentication,
+     * rate limiting, and AI concurrency limiting.
+     *
+     * Only the number of generated image variants
+     * is being reduced from three to one.
+     */
+    const seed =
+      Math.floor(
+        Math.random() * 9000000
+      ) + 1000000;
+    
+    const imagePrompt =
       `${basePrompt}
-Variant: classic sports photograph, tight reaction shot.`,
-
-      `${basePrompt}
-Variant: dramatic sideline photograph, wider environmental composition.`,
-
-      `${basePrompt}
-Variant: exaggerated comedic sports moment while remaining photorealistic.`
-    ];
-
-    const makeUrl = (promptText, seed) => {
+    Style: polished, photorealistic sports meme image with a strong comedic composition when appropriate.`;
+    
+    const makeUrl = (
+      promptText,
+      imageSeed
+    ) => {
       return (
         'https://image.pollinations.ai/prompt/' +
-        encodeURIComponent(promptText) +
-        `?width=800&height=500&nologo=true&seed=${seed}&model=flux`
+        encodeURIComponent(
+          promptText
+        ) +
+        `?width=800&height=500&nologo=true&seed=${imageSeed}&model=flux`
       );
     };
-
-    const candidates = variants.map(
-      (variant, index) =>
-        makeUrl(variant, seeds[index])
-    );
+    
+    const image =
+      makeUrl(
+        imagePrompt,
+        seed
+      );
 
     const primaryEntity = entities[0] || null;
 
     res.json({
-      type: primaryEntity ? primaryEntity.type : 'generic',
-      sourceImage: primaryEntity?.image || null,
-
+      type:
+        primaryEntity
+          ? primaryEntity.type
+          : 'generic',
+    
+      sourceImage:
+        primaryEntity?.image ||
+        null,
+    
       entityName:
-        primaryEntity?.name || null,
-
+        primaryEntity?.name ||
+        null,
+    
       entities,
-
+    
       prompt,
-      league: league || null,
-      gameId: gameId || null,
-
-      candidates
+      league:
+        league || null,
+      gameId:
+        gameId || null,
+    
+      image
     });
 
   } catch (error) {
