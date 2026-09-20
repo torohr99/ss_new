@@ -1,6 +1,10 @@
 'use strict';
 
 const axios = require('axios');
+const crypto = require('crypto');
+
+const redis = require('../lib/redis');
+const cache = require('./cache');
 
 const GEMINI_MODEL =
   process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -11,6 +15,82 @@ const POLL_CACHE_TTL =
   5 * 60 * 1000;
 
 const sportsApi = require('./sportsApi');
+
+const POLL_AI_GLOBAL_COOLDOWN_SECONDS = 10;
+
+const POLL_AI_THROTTLE_KEY =
+  'ss:ai:poll:global-throttle';
+
+const POLL_REDIS_CACHE_TTL_SECONDS = 300;
+
+async function acquirePollAiSlot() {
+  try {
+    const result =
+      await redis.set(
+        POLL_AI_THROTTLE_KEY,
+        String(Date.now()),
+        'EX',
+        POLL_AI_GLOBAL_COOLDOWN_SECONDS,
+        'NX'
+      );
+
+    return result === 'OK';
+  } catch (error) {
+    /*
+     * Redis is part of the production coordination
+     * layer, but a Redis failure should not crash
+     * the entire poll system.
+     *
+     * Fail open here so poll generation can continue.
+     */
+    console.error(
+      'Poll AI throttle Redis error:',
+      error.message
+    );
+
+    return true;
+  }
+}
+
+function buildPollCacheKey(
+  gameState,
+  league,
+  gameId
+) {
+  const latestPlay =
+    gameState?.plays?.[
+      gameState.plays.length - 1
+    ] || null;
+
+  const state = {
+    league:
+      String(league).toLowerCase(),
+
+    gameId:
+      String(gameId),
+
+    status:
+      gameState?.status || null,
+
+    teams:
+      gameState?.teams || null,
+
+    situation:
+      gameState?.sportSituation || null,
+
+    latestPlay
+  };
+
+  const hash =
+    crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify(state)
+      )
+      .digest('hex');
+
+  return `poll:${String(league).toLowerCase()}:${gameId}:${hash}`;
+}
 
 function getTeamName(competitor) {
   return (
@@ -198,34 +278,165 @@ function buildFallbackPoll(gameState, league) {
     };
   }
 
-  if (
-    leagueKey === 'mlb' ||
-    leagueKey === 'baseball'
-  ) {
-    const batterValue =
-      situation.batter;
-    
-    const batter =
-      typeof batterValue === 'string'
-        ? batterValue
-        : batterValue?.displayName ||
-          batterValue?.fullName ||
-          batterValue?.name ||
-          batterValue?.athlete?.displayName ||
-          batterValue?.athlete?.fullName ||
-          'the current batter';
-    
-    return {
-      question:
-        `Will ${batter} reach base in this at-bat?`,
-      options: [
-        'Yes',
-        'No'
-      ],
-      reason:
-        `Live poll based on the current MLB at-bat and baserunner situation.`
-    };
-  }
+    if (
+      leagueKey === 'mlb' ||
+      leagueKey === 'baseball'
+    ) {
+      const batterValue =
+        situation.batter;
+  
+      const batter =
+        typeof batterValue === 'string'
+          ? batterValue
+          : batterValue?.displayName ||
+            batterValue?.fullName ||
+            batterValue?.name ||
+            batterValue?.athlete?.displayName ||
+            batterValue?.athlete?.fullName ||
+            'the current batter';
+  
+      const pitcherValue =
+        situation.pitcher;
+  
+      const pitcher =
+        typeof pitcherValue === 'string'
+          ? pitcherValue
+          : pitcherValue?.displayName ||
+            pitcherValue?.fullName ||
+            pitcherValue?.name ||
+            pitcherValue?.athlete?.displayName ||
+            pitcherValue?.athlete?.fullName ||
+            'the current pitcher';
+  
+      const runners =
+        situation.runners ||
+        situation.baserunners ||
+        [];
+  
+      const runnerCount =
+        Array.isArray(runners)
+          ? runners.length
+          : Number(situation.runnerCount || 0);
+  
+      const bases =
+        situation.bases ||
+        situation.baseState ||
+        '';
+  
+      const pitchCount =
+        situation.pitchCount ||
+        situation.pitches ||
+        null;
+  
+      const inning =
+        gameState?.status?.period ||
+        gameState?.status?.inning ||
+        '';
+  
+      const score =
+        `${home} ${gameState?.teams?.home?.score ?? 0} - ` +
+        `${away} ${gameState?.teams?.away?.score ?? 0}`;
+  
+      const fallbackQuestions = [];
+  
+      fallbackQuestions.push({
+        question:
+          `Will ${batter} reach base in this at-bat?`,
+        options: [
+          'Yes',
+          'No'
+        ],
+        reason:
+          `Current MLB at-bat: ${batter} against ${pitcher}.`
+      });
+  
+      if (pitcher !== 'the current pitcher') {
+        fallbackQuestions.push({
+          question:
+            `Will ${pitcher} win this matchup against ${batter}?`,
+          options: [
+            'Yes',
+            'No'
+          ],
+          reason:
+            `Current pitcher-batter matchup in ${home} vs. ${away}.`
+        });
+      }
+  
+      if (runnerCount > 0) {
+        fallbackQuestions.push({
+          question:
+            `Will the current at-bat move a runner into scoring position?`,
+          options: [
+            'Yes',
+            'No'
+          ],
+          reason:
+            `There are currently ${runnerCount} runner(s) on base.`
+        });
+      }
+  
+      if (bases) {
+        fallbackQuestions.push({
+          question:
+            `Will the current baserunner situation produce a run before the inning ends?`,
+          options: [
+            'Yes',
+            'No'
+          ],
+          reason:
+            `Current base situation: ${bases}.`
+        });
+      }
+  
+      if (pitchCount) {
+        fallbackQuestions.push({
+          question:
+            `Will ${batter} put the ball in play before the next two pitches?`,
+          options: [
+            'Yes',
+            'No'
+          ],
+          reason:
+            `Current pitch count is ${pitchCount}.`
+        });
+      }
+  
+      fallbackQuestions.push({
+        question:
+          `Which side will have the edge in the next meaningful MLB event?`,
+        options: [
+          home,
+          away
+        ],
+        reason:
+          `Current score: ${score}.`
+      });
+  
+      /*
+       * Use the current game state to deterministically
+       * vary the fallback instead of always returning
+       * the same question.
+       */
+      const index =
+        Math.abs(
+          Number(
+            String(gameId)
+              .split('')
+              .reduce(
+                (sum, char) =>
+                  sum + char.charCodeAt(0),
+                0
+              )
+          ) +
+          Number(
+            gameState?.plays?.length || 0
+          )
+        ) %
+        fallbackQuestions.length;
+  
+      return fallbackQuestions[index];
+    }
 
   if (
     leagueKey === 'nba' ||
@@ -329,13 +540,24 @@ async function generateGamePoll(
     JSON.stringify(latestPlay || {})
   ].join(':');
 
-  const cached = pollCache.get(cacheKey);
+    /*
+   * Use Redis as the shared cache so all Railway
+   * replicas see the same generated poll.
+   */
+  const redisCacheKey =
+    buildPollCacheKey(
+      gameState,
+      league,
+      gameId
+    );
 
-  if (
-    cached &&
-    Date.now() - cached.timestamp < POLL_CACHE_TTL
-  ) {
-    return cached.data;
+  const cached =
+    await cache.getJson(
+      redisCacheKey
+    );
+
+  if (cached) {
+    return cached;
   }
 
   if (!process.env.GEMINI_API_KEY) {
@@ -343,6 +565,24 @@ async function generateGamePoll(
       gameState,
       league
     );
+  }
+
+  /*
+   * Only allow a small, globally coordinated
+   * number of Gemini poll requests.
+   *
+   * This protects the Gemini project-level
+   * rate limit across all Railway replicas.
+   */
+  const aiSlot =
+    await acquirePollAiSlot();
+
+  if (!aiSlot) {
+    console.log(
+      `Poll AI throttle active; skipping Gemini poll for ${league}/${gameId}`
+    );
+
+    return null;
   }
 
   try {
@@ -409,24 +649,51 @@ async function generateGamePoll(
       league
     };
   
-    pollCache.set(cacheKey, {
-      timestamp: Date.now(),
-      data: result
-    });
+        /*
+         * Store the successful poll in Redis so
+         * every application replica can reuse it.
+         */
+        await cache.setJson(
+          redisCacheKey,
+          result,
+          POLL_REDIS_CACHE_TTL_SECONDS
+        );
+    
+        /*
+         * Keep the local cache as a fast path too.
+         */
+        pollCache.set(cacheKey, {
+          timestamp: Date.now(),
+          data: result
+        });
+    
+        return result;
   
-    return result;
+    } catch (error) {
+      const status =
+        error.response?.status;
   
-  } catch (error) {
-    console.error(
-      `AI poll generation failed for ${league}/${gameId}:`,
-      error.message
-    );
+      if (status === 429) {
+        console.warn(
+          `Gemini rate limit reached for poll ${league}/${gameId}; using local fallback.`
+        );
+      } else {
+        console.error(
+          `AI poll generation failed for ${league}/${gameId}:`,
+          error.message
+        );
+      }
   
-    return buildFallbackPoll(
-      gameState,
-      league
-    );
-  }
+      /*
+       * Gemini failure should not make the chatroom
+       * unusable. Use the deterministic fallback,
+       * but do not retry immediately.
+       */
+      return buildFallbackPoll(
+        gameState,
+        league
+      );
+    }
 }
 
 module.exports = {
