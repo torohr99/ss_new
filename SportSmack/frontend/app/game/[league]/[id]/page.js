@@ -844,100 +844,79 @@ export default function GameHubPage({ params }) {
           <div style={{ background: 'var(--glass-bg)', padding: '2rem', borderRadius: '12px', maxWidth: '860px', width: '100%', border: '1px solid var(--glass-border)', maxHeight: '90vh', overflowY: 'auto' }}>
             {!generatedMeme ? (
               <>
-                <h2 style={{marginTop: 0}}>AI Meme Generator</h2>
-                <p style={{ color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                  Describe the meme you want. SportSmack will automatically use the current game&apos;s teams, score, situation, and identified players to make the image more accurate.
+                <h2 style={{ marginTop: 0 }}>
+                  AI Meme Generator
+                </h2>
+            
+                <p
+                  style={{
+                    color: 'var(--text-secondary)',
+                    marginTop: '-0.5rem',
+                    marginBottom: '1.5rem',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  Describe the meme you want. SportSmack will
+                  automatically use the current game's teams,
+                  score, situation, and identified players to
+                  make the image more accurate.
                 </p>
-                <form onSubmit={handleGenerateMeme} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g., Aaron Judge pointing after a home run, celebrating wildly in Yankee Stadium" 
-                    value={memeInput} 
-                    onChange={e => setMemeInput(e.target.value)} 
-                    style={{ flex: 1 }} 
+            
+                <form
+                  onSubmit={handleGenerateMeme}
+                  style={{
+                    display: 'flex',
+                    gap: '1rem',
+                    marginBottom: '2rem'
+                  }}
+                >
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g., Aaron Judge pointing after a home run, celebrating wildly in Yankee Stadium"
+                    value={memeInput}
+                    onChange={e =>
+                      setMemeInput(e.target.value)
+                    }
+                    style={{ flex: 1 }}
                   />
-                  <button type="submit" className="btn-primary" disabled={memeGenerating}>
-                    {memeGenerating ? 'Generating...' : 'Generate'}
+            
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={memeGenerating}
+                  >
+                    {memeGenerating
+                      ? 'Generating...'
+                      : 'Generate'}
                   </button>
                 </form>
-
+            
                 {memeGenerating && (
-                  <div
-                    style={{
-                      marginBottom: '1.5rem'
+                  // existing loading UI
+                )}
+            
+                <div style={{ textAlign: 'right' }}>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => {
+                      setShowMemeModal(false);
+                      setGeneratedMeme(null);
+                      setMemeInput('');
                     }}
                   >
-                    <div
-                      style={{
-                        height: '320px',
-                        background:
-                          'rgba(255,255,255,0.05)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        flexDirection:
-                          'column',
-                        alignItems:
-                          'center',
-                        justifyContent:
-                          'center',
-                        gap: '0.75rem',
-                        border:
-                          '1px dashed rgba(255,255,255,0.15)'
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          border:
-                            '3px solid var(--brand-color)',
-                          borderTopColor:
-                            'transparent',
-                          borderRadius:
-                            '50%',
-                          animation:
-                            'spin 1s linear infinite'
-                        }}
-                      />
-                
-                      <span
-                        style={{
-                          color:
-                            'var(--text-secondary)',
-                          fontSize:
-                            '0.85rem'
-                        }}
-                      >
-                        Generating your meme...
-                      </span>
-                    </div>
-                  </div>
-                )}
-                
-                {generatedMeme &&
-                  !memeGenerating && (
-                    <MemeEditor
-                      sourceImage={
-                        generatedMeme
-                      }
-                      onPublish={
-                        publishMeme
-                      }
-                      onCancel={() => {
-                        setGeneratedMeme(
-                          null
-                        );
-                      }}
-                    />
-                  )}
-
-                <div style={{ textAlign: 'right' }}>
-                  <button className="btn-secondary" onClick={() => { setShowMemeModal(false); setGeneratedMeme(null); setMemeInput(''); }}>Close</button>
+                    Close
+                  </button>
                 </div>
               </>
             ) : (
-              <MemeEditor sourceImage={generatedMeme} onPublish={publishMeme} onCancel={() => setGeneratedMeme(null)} />
+              <MemeEditor
+                sourceImage={generatedMeme}
+                onPublish={publishMeme}
+                onCancel={() =>
+                  setGeneratedMeme(null)
+                }
+              />
             )}
           </div>
         </div>
