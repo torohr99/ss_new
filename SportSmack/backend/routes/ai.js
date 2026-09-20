@@ -169,32 +169,38 @@ router.post(
         if (mapping) {
           const gameSummary =
             await sportsApi.getGameSummary(
-              leagueMapping.sport,
-              leagueMapping.league,
+              mapping.sport,
+              mapping.league,
               gameId
             );
-    
+        
           const liveState =
             sportsApi.buildSportSpecificState(
-              summary,
-              league,
-              gameId
+              gameSummary,
+              league
             );
-    
+        
           if (liveState) {
             enrichedGameContext = {
               ...(gameContext || {}),
               league,
               gameId,
-              teams: liveState.teams,
-              status: liveState.status,
-              situation: liveState.situation,
+              teams:
+                liveState.teams,
+              status:
+                liveState.status,
+              situation:
+                liveState.situation,
               sportSituation:
                 liveState.sportSituation,
-              leaders: liveState.leaders,
-              recentPlays: liveState.plays,
-              venue: liveState.venue,
-              odds: liveState.odds
+              leaders:
+                liveState.leaders,
+              recentPlays:
+                liveState.plays,
+              venue:
+                liveState.venue,
+              odds:
+                liveState.odds
             };
           }
         }
