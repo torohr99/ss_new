@@ -133,13 +133,60 @@ async function updateGamePoll(
       return;
     }
 
+    /*
+     * Do not create another poll if this game already
+     * received one recently.
+     *
+     * This protects against duplicate polls when both
+     * LiveGameEngine and LiveGamePoller observe the
+     * same state change.
+     */
+    const recentPoll =
+      await prisma.gameMessage.findFirst({
+        where: {
+          gameId: String(gameId),
+          league: String(league),
+          type: 'poll',
+          createdAt: {
+            gte:
+              new Date(
+                Date.now() -
+                10 * 60 * 1000
+              )
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    
+    if (recentPoll) {
+      return;
+    }
+    
     const poll =
       await gamePolls.generateGamePoll(
         summary,
         league,
         gameId
       );
-
+    
+    /*
+     * A null poll means the shared Gemini guard
+     * intentionally skipped this generation.
+     *
+     * Do not create a database message and do not
+     * treat this as an error.
+     */
+    if (
+      !poll ||
+      !poll.question ||
+      !Array.isArray(poll.options) ||
+      poll.options.length < 2
+    ) {
+      return;
+    }
+    
     const pollData = {
       isPoll: true,
       question: poll.question,
