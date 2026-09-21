@@ -104,45 +104,99 @@ export default function RightSidebar() {
                       {game.status}
                     </div>
                     <div>{game.shortName}</div>
-                    {(game.homeTeam?.score !== undefined || game.awayTeam?.score !== undefined) && (
-                      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: awayLeading ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: awayLeading ? 'bold' : 'normal' }}>
-                          <span>{game.awayTeam.name}</span>
-                          <span>{game.awayTeam.score}</span>
+                    {(game.homeTeam?.score !== undefined ||
+                      game.awayTeam?.score !== undefined) && (
+                      <div
+                        style={{
+                          marginTop: '0.5rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.25rem'
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            color: awayLeading
+                              ? 'var(--text-primary)'
+                              : 'var(--text-secondary)',
+                            fontWeight:
+                              awayLeading
+                                ? 'bold'
+                                : 'normal'
+                          }}
+                        >
+                          <span>
+                            {game.awayTeam.name}
+                          </span>
+                          <span>
+                            {game.awayTeam.score}
+                          </span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: homeLeading ? 'var(--text-primary)' : 'var(--text-secondary)', fontWeight: homeLeading ? 'bold' : 'normal' }}>
-                          <span>{game.homeTeam.name}</span>
-                          <span>{game.homeTeam.score}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <Link 
-                            href={`/game/${team.leagueKey}/${game.id}`}
-                            className="btn-primary"
-                            style={{
-                              flex: 1,
-                              padding: '0.4rem 0',
-                              textAlign: 'center',
-                              textDecoration: 'none',
-                              fontSize: '0.85rem'
-                            }}
-                          >
-                            Live Chat
-                          </Link>
-                          <button
-                            onClick={() => handleFetchAnalysis(team.leagueKey, game.id)}
-                            className="btn-secondary"
-                            style={{
-                              flex: 1,
-                              padding: '0.4rem 0',
-                              textAlign: 'center',
-                              fontSize: '0.85rem'
-                            }}
-                          >
-                            AI Analysis
-                          </button>
+                    
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            color: homeLeading
+                              ? 'var(--text-primary)'
+                              : 'var(--text-secondary)',
+                            fontWeight:
+                              homeLeading
+                                ? 'bold'
+                                : 'normal'
+                          }}
+                        >
+                          <span>
+                            {game.homeTeam.name}
+                          </span>
+                          <span>
+                            {game.homeTeam.score}
+                          </span>
                         </div>
                       </div>
                     )}
+                    
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: '0.5rem',
+                        marginTop: '0.5rem'
+                      }}
+                    >
+                      <Link
+                        href={`/game/${team.leagueKey}/${game.id}`}
+                        className="btn-primary"
+                        style={{
+                          flex: 1,
+                          padding: '0.4rem 0',
+                          textAlign: 'center',
+                          textDecoration: 'none',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        Live Chat
+                      </Link>
+                    
+                      <button
+                        onClick={() =>
+                          handleFetchAnalysis(
+                            team.leagueKey,
+                            game.id
+                          )
+                        }
+                        className="btn-secondary"
+                        style={{
+                          flex: 1,
+                          padding: '0.4rem 0',
+                          textAlign: 'center',
+                          fontSize: '0.85rem'
+                        }}
+                      >
+                        AI Analysis
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>No upcoming games</div>
