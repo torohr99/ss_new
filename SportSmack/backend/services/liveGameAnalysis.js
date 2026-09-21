@@ -101,13 +101,41 @@ async function generateLiveAnalysis(
   previousState,
   currentState
 ) {
+  const fingerprint =
+    currentState?.fingerprint ||
+    JSON.stringify(currentState);
+
   const cacheKey =
-    `live-analysis-${league}-${gameId}-${currentState.fingerprint}`;
+    `live-analysis:${String(league).toLowerCase()}:${String(gameId)}:${fingerprint}`;
 
-  const cached = getCached(cacheKey);
+  /*
+   * Fast process-local cache.
+   */
+  const localKey = cacheKey;
 
-  if (cached) {
-    return cached;
+  const localCached =
+    getCached(localKey);
+
+  if (localCached) {
+    return localCached;
+  }
+
+  /*
+   * Shared Redis cache.
+   *
+   * This prevents different Railway replicas from
+   * generating the same live analysis independently.
+   */
+  const redisCached =
+    await cache.getJson(cacheKey);
+
+  if (redisCached) {
+    setCached(
+      localKey,
+      redisCached
+    );
+
+    return redisCached;
   }
 
   if (!process.env.GEMINI_API_KEY) {
@@ -116,114 +144,181 @@ async function generateLiveAnalysis(
     );
   }
 
+  /*
+   * Use the same global Gemini coordinator as
+   * live polls.
+   *
+   * This is shared across every Railway replica.
+   */
+  const aiSlot =
+    await geminiGuard.acquireSlot();
+
+  if (!aiSlot) {
+    console.log(
+      `Gemini guard active; skipping live AI analysis for ${league}/${gameId}`
+    );
+
+    return null;
+  }
+
   const context = {
     league,
     gameId,
-
     previousState,
-
     currentState
   };
 
-  const prompt = buildLivePrompt(context);
+  const prompt =
+    buildLivePrompt(context);
 
   const model =
     process.env.GEMINI_MODEL ||
     'gemini-2.5-flash';
 
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: prompt
-            }
-          ]
-        }
-      ],
-
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1000,
-        responseMimeType: 'application/json'
-      }
-    },
-    {
-      timeout: 30000
-    }
-  );
-
-  const content =
-    response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!content) {
-    throw new Error(
-      'AI returned an empty live analysis.'
-    );
-  }
-
-  let analysis;
-
   try {
-    analysis = JSON.parse(content);
-  } catch (error) {
-    console.error(
-      'Failed to parse live AI analysis:',
-      content
-    );
+    const response =
+      await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
 
-    throw new Error(
-      'AI returned invalid live-analysis JSON.'
-    );
-  }
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 1000,
+            responseMimeType:
+              'application/json'
+          }
+        },
+        {
+          timeout: 30000
+        }
+      );
 
-  if (
-    !analysis ||
-    typeof analysis !== 'object' ||
-    !analysis.headline ||
-    !analysis.update ||
-    !analysis.advantage
-  ) {
-    throw new Error(
-      'AI returned incomplete live analysis.'
-    );
-  }
+    const content =
+      response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-  if (
-    typeof analysis.advantage.confidence !==
-    'number'
-  ) {
-    analysis.advantage.confidence = 50;
-  }
+    if (!content) {
+      throw new Error(
+        'AI returned an empty live analysis.'
+      );
+    }
 
-  analysis.advantage.confidence = Math.max(
-    0,
-    Math.min(
-      100,
-      Math.round(
-        analysis.advantage.confidence
+    let analysis;
+
+    try {
+      analysis =
+        JSON.parse(content);
+    } catch (error) {
+      console.error(
+        'Failed to parse live AI analysis:',
+        content
+      );
+
+      throw new Error(
+        'AI returned invalid live-analysis JSON.'
+      );
+    }
+
+    if (
+      !analysis ||
+      typeof analysis !== 'object' ||
+      !analysis.headline ||
+      !analysis.update ||
+      !analysis.advantage
+    ) {
+      throw new Error(
+        'AI returned incomplete live analysis.'
+      );
+    }
+
+    if (
+      typeof analysis.advantage.confidence !==
+      'number'
+    ) {
+      analysis.advantage.confidence = 50;
+    }
+
+    analysis.advantage.confidence =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            analysis.advantage.confidence
+          )
+        )
+      );
+
+    if (
+      !Array.isArray(
+        analysis.watchNext
       )
-    )
-  );
+    ) {
+      analysis.watchNext = [];
+    }
 
-  if (!Array.isArray(analysis.watchNext)) {
-    analysis.watchNext = [];
+    const result = {
+      status: 'live',
+      league,
+      gameId,
+      generatedAt: Date.now(),
+      analysis
+    };
+
+    /*
+     * Store the successful result in Redis.
+     *
+     * 2 minutes matches the existing live-analysis
+     * generation cooldown in liveGameEngine.
+     */
+    await cache.setJson(
+      cacheKey,
+      result,
+      2 * 60
+    );
+
+    setCached(
+      localKey,
+      result
+    );
+
+    return result;
+
+  } catch (error) {
+    const status =
+      error.response?.status;
+
+    if (status === 429) {
+      await geminiGuard.recordRateLimit();
+
+      console.warn(
+        `Gemini rate limit reached for live analysis ${league}/${gameId}; global AI backoff activated.`
+      );
+
+      /*
+       * Do not retry and do not generate a fake
+       * analysis. The next engine cycle can retry
+       * after the distributed backoff expires.
+       */
+      return null;
+    }
+
+    console.error(
+      `Live AI generation failed for ${league}/${gameId}:`,
+      error.message
+    );
+
+    return null;
   }
-
-  const result = {
-    status: 'live',
-    league,
-    gameId,
-    generatedAt: Date.now(),
-    analysis
-  };
-
-  setCached(cacheKey, result);
-
-  return result;
 }
 
 module.exports = {
