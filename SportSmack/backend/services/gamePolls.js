@@ -3,8 +3,8 @@
 const axios = require('axios');
 const crypto = require('crypto');
 
-const redis = require('../lib/redis');
 const cache = require('./cache');
+const geminiGuard = require('./geminiGuard');
 
 const GEMINI_MODEL =
   process.env.GEMINI_MODEL || 'gemini-2.5-flash';
@@ -14,43 +14,9 @@ const pollCache = new Map();
 const POLL_CACHE_TTL =
   5 * 60 * 1000;
 
-const sportsApi = require('./sportsApi');
-
-const POLL_AI_GLOBAL_COOLDOWN_SECONDS = 10;
-
-const POLL_AI_THROTTLE_KEY =
-  'ss:ai:poll:global-throttle';
-
 const POLL_REDIS_CACHE_TTL_SECONDS = 300;
 
-async function acquirePollAiSlot() {
-  try {
-    const result =
-      await redis.set(
-        POLL_AI_THROTTLE_KEY,
-        String(Date.now()),
-        'EX',
-        POLL_AI_GLOBAL_COOLDOWN_SECONDS,
-        'NX'
-      );
-
-    return result === 'OK';
-  } catch (error) {
-    /*
-     * Redis is part of the production coordination
-     * layer, but a Redis failure should not crash
-     * the entire poll system.
-     *
-     * Fail open here so poll generation can continue.
-     */
-    console.error(
-      'Poll AI throttle Redis error:',
-      error.message
-    );
-
-    return true;
-  }
-}
+const sportsApi = require('./sportsApi');
 
 function buildPollCacheKey(
   gameState,
@@ -221,7 +187,11 @@ Return ONLY valid JSON:
 `.trim();
 }
 
-function buildFallbackPoll(gameState, league) {
+function buildFallbackPoll(
+  gameState,
+  league,
+  gameId
+) {
   const home =
     gameState?.teams?.home?.name ||
     'the home team';
@@ -332,110 +302,171 @@ function buildFallbackPoll(gameState, league) {
         gameState?.status?.period ||
         gameState?.status?.inning ||
         '';
+      
+      const outs =
+        situation.outs ??
+        situation.outsCount ??
+        null;
   
       const score =
         `${home} ${gameState?.teams?.home?.score ?? 0} - ` +
         `${away} ${gameState?.teams?.away?.score ?? 0}`;
   
-      const fallbackQuestions = [];
-  
-      fallbackQuestions.push({
-        question:
-          `Will ${batter} reach base in this at-bat?`,
-        options: [
-          'Yes',
-          'No'
-        ],
-        reason:
-          `Current MLB at-bat: ${batter} against ${pitcher}.`
-      });
-  
-      if (pitcher !== 'the current pitcher') {
-        fallbackQuestions.push({
-          question:
-            `Will ${pitcher} win this matchup against ${batter}?`,
-          options: [
-            'Yes',
-            'No'
-          ],
-          reason:
-            `Current pitcher-batter matchup in ${home} vs. ${away}.`
-        });
-      }
-  
-      if (runnerCount > 0) {
-        fallbackQuestions.push({
-          question:
-            `Will the current at-bat move a runner into scoring position?`,
-          options: [
-            'Yes',
-            'No'
-          ],
-          reason:
-            `There are currently ${runnerCount} runner(s) on base.`
-        });
-      }
-  
-      if (bases) {
-        fallbackQuestions.push({
-          question:
-            `Will the current baserunner situation produce a run before the inning ends?`,
-          options: [
-            'Yes',
-            'No'
-          ],
-          reason:
-            `Current base situation: ${bases}.`
-        });
-      }
-  
-      if (pitchCount) {
-        fallbackQuestions.push({
-          question:
-            `Will ${batter} put the ball in play before the next two pitches?`,
-          options: [
-            'Yes',
-            'No'
-          ],
-          reason:
-            `Current pitch count is ${pitchCount}.`
-        });
-      }
-  
-      fallbackQuestions.push({
-        question:
-          `Which side will have the edge in the next meaningful MLB event?`,
-        options: [
-          home,
-          away
-        ],
-        reason:
-          `Current score: ${score}.`
-      });
-  
-      /*
-       * Use the current game state to deterministically
-       * vary the fallback instead of always returning
-       * the same question.
-       */
-      const index =
-        Math.abs(
-          Number(
-            String(gameId)
-              .split('')
-              .reduce(
-                (sum, char) =>
-                  sum + char.charCodeAt(0),
-                0
-              )
-          ) +
-          Number(
-            gameState?.plays?.length || 0
-          )
-        ) %
-        fallbackQuestions.length;
-  
-      return fallbackQuestions[index];
+            const fallbackQuestions = [];
+
+            /*
+             * 1. Batter-specific question.
+             */
+            fallbackQuestions.push({
+              question:
+                `Will ${batter} reach base in this at-bat?`,
+              options: [
+                'Yes',
+                'No'
+              ],
+              reason:
+                `Current MLB at-bat: ${batter} against ${pitcher}.`
+            });
+      
+            /*
+             * 2. Pitcher/batter matchup.
+             */
+            if (
+              pitcher !== 'the current pitcher'
+            ) {
+              fallbackQuestions.push({
+                question:
+                  `Will ${pitcher} win this matchup against ${batter}?`,
+                options: [
+                  'Yes',
+                  'No'
+                ],
+                reason:
+                  `Current pitcher-batter matchup in ${home} vs. ${away}.`
+              });
+            }
+      
+            /*
+             * 3. Baserunner situation.
+             */
+            if (runnerCount > 0) {
+              fallbackQuestions.push({
+                question:
+                  `Will the current at-bat move a runner into scoring position?`,
+                options: [
+                  'Yes',
+                  'No'
+                ],
+                reason:
+                  `There are currently ${runnerCount} runner(s) on base.`
+              });
+            }
+      
+            /*
+             * 4. Base-state question.
+             */
+            if (bases) {
+              fallbackQuestions.push({
+                question:
+                  `Will the current baserunner situation produce a run before the inning ends?`,
+                options: [
+                  'Yes',
+                  'No'
+                ],
+                reason:
+                  `Current base situation: ${bases}.`
+              });
+            }
+      
+            /*
+             * 5. Pitch-count question.
+             */
+            if (pitchCount) {
+              fallbackQuestions.push({
+                question:
+                  `Will ${batter} put the ball in play before the next two pitches?`,
+                options: [
+                  'Yes',
+                  'No'
+                ],
+                reason:
+                  `Current pitch count is ${pitchCount}.`
+              });
+            }
+      
+            /*
+             * 6. Outs/inning-specific question.
+             */
+            if (
+              inning &&
+              outs !== null
+            ) {
+              fallbackQuestions.push({
+                question:
+                  `Will ${batter} drive in a run before the inning ends?`,
+                options: [
+                  'Yes',
+                  'No'
+                ],
+                reason:
+                  `Current situation: inning ${inning}, ${outs} out(s), score ${score}.`
+              });
+            }
+      
+            /*
+             * 7. Score-based question.
+             */
+            fallbackQuestions.push({
+              question:
+                `Which side will have the edge in the next meaningful MLB event?`,
+              options: [
+                home,
+                away
+              ],
+              reason:
+                `Current score: ${score}.`
+            });
+      
+            /*
+             * Deterministically vary the fallback based on
+             * the actual game state.
+             *
+             * This means different plays/states can produce
+             * different questions without requiring Gemini.
+             */
+            const stateHash =
+              crypto
+                .createHash('sha256')
+                .update(
+                  JSON.stringify({
+                    gameId: String(gameId),
+                    score,
+                    inning,
+                    outs,
+                    pitchCount,
+                    bases,
+                    runnerCount,
+                    latestPlay:
+                      latestPlay?.text ||
+                      latestPlay?.id ||
+                      null,
+                    playsCount:
+                      gameState?.plays?.length || 0
+                  })
+                )
+                .digest('hex');
+      
+            const numericHash =
+              parseInt(
+                stateHash.slice(0, 8),
+                16
+              );
+      
+            const index =
+              numericHash %
+              fallbackQuestions.length;
+      
+            return fallbackQuestions[index];
     }
 
   if (
@@ -563,7 +594,8 @@ async function generateGamePoll(
   if (!process.env.GEMINI_API_KEY) {
     return buildFallbackPoll(
       gameState,
-      league
+      league,
+      gameId
     );
   }
 
@@ -575,7 +607,7 @@ async function generateGamePoll(
    * rate limit across all Railway replicas.
    */
   const aiSlot =
-    await acquirePollAiSlot();
+    await geminiGuard.acquireSlot();
 
   if (!aiSlot) {
     console.log(
@@ -674,8 +706,10 @@ async function generateGamePoll(
         error.response?.status;
   
       if (status === 429) {
+        await geminiGuard.recordRateLimit();
+      
         console.warn(
-          `Gemini rate limit reached for poll ${league}/${gameId}; using local fallback.`
+          `Gemini rate limit reached for poll ${league}/${gameId}; global AI backoff activated.`
         );
       } else {
         console.error(
@@ -691,7 +725,8 @@ async function generateGamePoll(
        */
       return buildFallbackPoll(
         gameState,
-        league
+        league,
+        gameId
       );
     }
 }
