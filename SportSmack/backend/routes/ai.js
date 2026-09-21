@@ -185,6 +185,25 @@ router.post(
               ...(gameContext || {}),
               league,
               gameId,
+            
+              homeTeam:
+                liveState.teams?.home?.name ||
+                liveState.teams?.home?.displayName ||
+                gameContext?.homeTeam ||
+                null,
+            
+              awayTeam:
+                liveState.teams?.away?.name ||
+                liveState.teams?.away?.displayName ||
+                gameContext?.awayTeam ||
+                null,
+            
+              score:
+                liveState.teams?.home?.score != null &&
+                liveState.teams?.away?.score != null
+                  ? `${liveState.teams.home.name} ${liveState.teams.home.score} - ${liveState.teams.away.name} ${liveState.teams.away.score}`
+                  : gameContext?.score || null,
+            
               teams:
                 liveState.teams,
               status:
