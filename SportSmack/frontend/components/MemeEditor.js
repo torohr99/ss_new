@@ -96,10 +96,37 @@ export default function MemeEditor({ sourceImage, onPublish, onCancel }) {
 
   const handlePublish = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Export to base64
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-    onPublish(dataUrl);
+  
+    if (
+      !canvas ||
+      !imageLoaded ||
+      !imgRef.current
+    ) {
+      return;
+    }
+  
+    try {
+      const dataUrl =
+        canvas.toDataURL(
+          'image/jpeg',
+          0.8
+        );
+  
+      onPublish(dataUrl);
+  
+    } catch (error) {
+      /*
+       * This can occur if the image provider's
+       * response does not provide the required CORS
+       * headers and the canvas becomes tainted.
+       */
+      console.error(
+        'Failed to export generated meme:',
+        error
+      );
+  
+      setImageError(true);
+    }
   };
 
   return (
