@@ -239,42 +239,172 @@ router.post(
       );
 
     /*
-     * Generate exactly one meme image.
+     * Generate exactly ONE image through OpenAI's
+     * dedicated image-generation API.
      *
-     * Keep the existing verified entity pipeline,
-     * game-context enrichment, authentication,
-     * rate limiting, and AI concurrency limiting.
+     * Keep:
+     * - authentication
+     * - request rate limiting
+     * - AI concurrency limiting
+     * - verified entity identification
+     * - ESPN game-context enrichment
      *
-     * Only the number of generated image variants
-     * is being reduced from three to one.
+     * This intentionally does NOT generate multiple
+     * candidates. One generation keeps cost and server
+     * load bounded as SportSmack scales.
      */
-    const seed =
-      Math.floor(
-        Math.random() * 9000000
-      ) + 1000000;
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(503).json({
+        message:
+          'AI image generation is not configured.'
+      });
+    }
     
-    const imagePrompt =
-      `${basePrompt}
-    Style: polished, photorealistic sports meme image with a strong comedic composition when appropriate.`;
+    const imagePrompt = `
+    Create ONE photorealistic professional sports photograph
+    that visually represents the user's exact request.
     
-    const makeUrl = (
-      promptText,
-      imageSeed
-    ) => {
-      return (
-        'https://image.pollinations.ai/prompt/' +
-        encodeURIComponent(
-          promptText
-        ) +
-        `?width=800&height=500&nologo=true&seed=${imageSeed}&model=flux`
+    USER REQUEST:
+    ${prompt}
+    
+    ${basePrompt}
+    
+    IMAGE-GENERATION PRIORITIES:
+    
+    1. Follow the user's requested scenario exactly.
+    2. If a verified athlete is supplied, depict that athlete.
+    3. If a verified team is supplied, use that team's actual identity.
+    4. Use realistic human anatomy.
+    5. Use realistic hands, fingers, faces, limbs and body proportions.
+    6. Use realistic sport-specific equipment.
+    7. Use realistic uniforms and equipment placement.
+    8. Use realistic stadium, field, court, rink or venue details.
+    9. Use natural professional sports-photography lighting.
+    10. Make the image look like a real photograph rather than an illustration.
+    11. Make the requested comedic situation visually obvious.
+    12. Do not add meme text.
+    13. Do not add captions.
+    14. Do not add watermarks.
+    15. Do not invent unrelated athletes or teams.
+    16. Do not create a collage.
+    17. Do not create multiple panels.
+    18. Do not make the image look like a cartoon, painting or video-game screenshot.
+    
+    The final image should look like a believable photograph
+    captured by a professional sports photographer.
+    `.trim();
+    
+    try {
+      const imageResponse =
+        await axios.post(
+          'https://api.openai.com/v1/responses',
+          {
+            input: [
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'input_text',
+                    text: imagePrompt
+                  }
+                ]
+              }
+            ],
+      
+            tools: [
+              {
+                type: 'image_generation',
+      
+                model:
+                  process.env.OPENAI_IMAGE_MODEL ||
+                  'gpt-image-2',
+      
+                quality: 'high',
+      
+                size: '1536x1024',
+      
+                output_format: 'jpeg',
+      
+                output_compression: 85,
+      
+                background: 'opaque'
+              }
+            ]
+          },
+          {
+            headers: {
+              Authorization:
+                `Bearer ${process.env.OPENAI_API_KEY}`,
+      
+              'Content-Type':
+                'application/json'
+            },
+      
+            timeout: 120000
+          }
+        );
+    
+      const imageGeneration =
+        imageResponse.data?.output?.find(
+          item =>
+            item.type ===
+            'image_generation_call'
+        );
+    
+      const imageBase64 =
+        imageGeneration?.result;
+    
+      if (!imageBase64) {
+        throw new Error(
+          'OpenAI returned no generated image.'
+        );
+      }
+    
+      const image =
+        `data:image/jpeg;base64,${imageBase64}`;
+    
+      const primaryEntity =
+        entities[0] || null;
+    
+      return res.json({
+        type:
+          primaryEntity
+            ? primaryEntity.type
+            : 'generic',
+    
+        sourceImage:
+          primaryEntity?.image ||
+          null,
+    
+        entityName:
+          primaryEntity?.name ||
+          null,
+    
+        entities,
+    
+        prompt,
+    
+        league:
+          league || null,
+    
+        gameId:
+          gameId || null,
+    
+        image
+      });
+    
+    } catch (imageError) {
+      console.error(
+        'OpenAI image generation failed:',
+        imageError.response?.data ||
+        imageError.message
       );
-    };
     
-    const image =
-      makeUrl(
-        imagePrompt,
-        seed
-      );
+      return res.status(502).json({
+        message:
+          'The AI image generator could not create an image right now.'
+      });
+    }
 
     const primaryEntity = entities[0] || null;
 
