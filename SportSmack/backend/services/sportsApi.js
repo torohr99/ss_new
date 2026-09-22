@@ -361,58 +361,176 @@ async function getTeamSchedule(sport, league, espnId) {
   }
 }
 
-async function getRecentTeamGames(sport, league, espnId, count = 5) {
-    const cacheKey = `recentGames_${sport}_${league}_${espnId}_${count}`;
-    const cached = await cache.getJson(cacheKey);
+async function getRecentTeamGames(
+    sport,
+    league,
+    espnId,
+    count = 5
+) {
+    const cacheKey =
+        `recentGames_${sport}_${league}_${espnId}_${count}`;
 
-    if (cached) return cached;
+    const cached =
+        await cache.getJson(cacheKey);
+
+    if (cached) {
+        return cached;
+    }
 
     try {
-        const response = await espnClient.get(
-            `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`
+        const response =
+            await espnClient.get(
+                `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`
+            );
+
+        const events =
+            Array.isArray(response.data?.events)
+                ? response.data.events
+                : [];
+
+        const completedGames =
+            events
+                .filter(event => {
+                    return (
+                        event?.status?.type?.state ===
+                        'post'
+                    );
+                })
+                .sort(
+                    (a, b) =>
+                        new Date(b.date) -
+                        new Date(a.date)
+                )
+                .slice(0, count);
+
+        const games =
+            completedGames
+                .map(game => {
+                    const competition =
+                        game.competitions?.[0];
+
+                    if (!competition) {
+                        return null;
+                    }
+
+                    const competitors =
+                        Array.isArray(
+                            competition.competitors
+                        )
+                            ? competition.competitors
+                            : [];
+
+                    const home =
+                        competitors.find(
+                            c =>
+                                c.homeAway ===
+                                'home'
+                        );
+
+                    const away =
+                        competitors.find(
+                            c =>
+                                c.homeAway ===
+                                'away'
+                        );
+
+                    if (!home || !away) {
+                        return null;
+                    }
+
+                    const teamIsHome =
+                        String(
+                            home.team?.id
+                        ) ===
+                        String(espnId);
+
+                    const team =
+                        teamIsHome
+                            ? home
+                            : away;
+
+                    const opponent =
+                        teamIsHome
+                            ? away
+                            : home;
+
+                    const teamScore =
+                        Number(
+                            team.score
+                        );
+
+                    const opponentScore =
+                        Number(
+                            opponent.score
+                        );
+
+                    /*
+                     * Reject games where ESPN did not
+                     * actually provide usable scores.
+                     *
+                     * This prevents a missing score from
+                     * becoming 0 and producing fake
+                     * 0-0-0 / point-differential data.
+                     */
+                    if (
+                        !Number.isFinite(
+                            teamScore
+                        ) ||
+                        !Number.isFinite(
+                            opponentScore
+                        )
+                    ) {
+                        return null;
+                    }
+
+                    return {
+                        id: game.id,
+
+                        date: game.date,
+
+                        opponent:
+                            opponent.team
+                                ?.displayName ||
+                            'Unknown',
+
+                        opponentId:
+                            opponent.team?.id ||
+                            null,
+
+                        homeAway:
+                            teamIsHome
+                                ? 'home'
+                                : 'away',
+
+                        teamScore,
+
+                        opponentScore,
+
+                        result:
+                            team.winner === true
+                                ? 'W'
+                                : opponent.winner === true
+                                    ? 'L'
+                                    : 'T'
+                    };
+                })
+                .filter(Boolean);
+
+        /*
+         * Keep the existing shared Redis cache.
+         *
+         * This is important for scalability because
+         * multiple users/replicas can reuse the same
+         * recent-game data without repeatedly calling ESPN.
+         */
+        await cache.setJson(
+            cacheKey,
+            games,
+            900
         );
 
-        const events = response.data.events || [];
-
-        const completedGames = events
-            .filter(event => event.status?.type?.state === 'post')
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .slice(0, count);
-
-        const games = completedGames.map(game => {
-            const competition = game.competitions?.[0];
-
-            if (!competition) return null;
-
-            const home = competition.competitors?.find(
-                c => c.homeAway === 'home'
-            );
-
-            const away = competition.competitors?.find(
-                c => c.homeAway === 'away'
-            );
-
-            if (!home || !away) return null;
-
-            const teamIsHome = String(home.team?.id) === String(espnId);
-            const team = teamIsHome ? home : away;
-            const opponent = teamIsHome ? away : home;
-
-            return {
-                id: game.id,
-                date: game.date,
-                opponent: opponent.team?.displayName || 'Unknown',
-                opponentId: opponent.team?.id || null,
-                homeAway: teamIsHome ? 'home' : 'away',
-                teamScore: Number(team.score) || 0,
-                opponentScore: Number(opponent.score) || 0,
-                result: team.winner ? 'W' : opponent.winner ? 'L' : 'T'
-            };
-        }).filter(Boolean);
-
-        await cache.setJson(cacheKey, games, 900);
-
         return games;
+
     } catch (error) {
         console.error(
             `ESPN API Error fetching recent games for ${espnId}:`,
