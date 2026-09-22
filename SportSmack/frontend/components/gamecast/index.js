@@ -473,9 +473,65 @@ export function PregameAnalysis({ data, loading, error }) {
     };
     
     const recentRecord = (form) => {
-        if (!form) return 'Unavailable';
+      if (
+          !form ||
+          !form.gamesAvailable ||
+          !Array.isArray(form.games) ||
+          form.games.length === 0
+      ) {
+          return 'Unavailable';
+      }
+  
+      return `${form.wins ?? 0}-${form.losses ?? 0}-${form.ties ?? 0}`;
+  };
+
+    const comparisonAdvantage = (
+        comparison,
+        homeForm,
+        awayForm,
+        direction
+    ) => {
+        if (
+            comparison?.advantage &&
+            comparison.advantage !== 'Unavailable'
+        ) {
+            return comparison.advantage;
+        }
     
-        return `${form.wins || 0}-${form.losses || 0}-${form.ties || 0}`;
+        const homeValue =
+            direction === 'offense'
+                ? homeForm?.averagePointsFor
+                : homeForm?.averagePointsAgainst;
+    
+        const awayValue =
+            direction === 'offense'
+                ? awayForm?.averagePointsFor
+                : awayForm?.averagePointsAgainst;
+    
+        if (
+            typeof homeValue !== 'number' ||
+            typeof awayValue !== 'number'
+        ) {
+            return 'Unavailable';
+        }
+    
+        if (homeValue === awayValue) {
+            return 'Even';
+        }
+    
+        if (direction === 'offense') {
+            return homeValue > awayValue
+                ? home.name
+                : away.name;
+        }
+    
+        /*
+         * For defense, fewer points/runs/goals allowed
+         * is better.
+         */
+        return homeValue < awayValue
+            ? home.name
+            : away.name;
     };
 
     return (
@@ -675,8 +731,12 @@ export function PregameAnalysis({ data, loading, error }) {
           
                   <strong>
                       Advantage:{' '}
-                      {analysis.offensiveComparison.advantage ||
-                          'Unavailable'}
+                      {comparisonAdvantage(
+                          analysis.offensiveComparison,
+                          home.recentForm,
+                          away.recentForm,
+                          'offense'
+                      )}
                   </strong>
               </div>
           )}
@@ -691,8 +751,12 @@ export function PregameAnalysis({ data, loading, error }) {
           
                   <strong>
                       Advantage:{' '}
-                      {analysis.defensiveComparison.advantage ||
-                          'Unavailable'}
+                      {comparisonAdvantage(
+                          analysis.defensiveComparison,
+                          home.recentForm,
+                          away.recentForm,
+                          'defense'
+                      )}
                   </strong>
               </div>
           )}
