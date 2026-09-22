@@ -53,44 +53,82 @@ function normalizeCompetitor(competitor) {
 }
 
 function summarizeRecentGames(games) {
-    if (!games || games.length === 0) {
+    if (!Array.isArray(games) || games.length === 0) {
         return {
             games: [],
-            wins: 0,
-            losses: 0,
-            ties: 0,
+            gamesAvailable: 0,
+            wins: null,
+            losses: null,
+            ties: null,
             pointsFor: null,
             pointsAgainst: null,
-            pointDifferential: null
+            pointDifferential: null,
+            averagePointsFor: null,
+            averagePointsAgainst: null
         };
     }
 
-    const wins = games.filter(g => g.result === 'W').length;
-    const losses = games.filter(g => g.result === 'L').length;
-    const ties = games.filter(g => g.result === 'T').length;
+    const wins =
+        games.filter(
+            g => g.result === 'W'
+        ).length;
 
-    const pointsFor = games.reduce(
-        (sum, game) => sum + (Number(game.teamScore) || 0),
-        0
-    );
+    const losses =
+        games.filter(
+            g => g.result === 'L'
+        ).length;
 
-    const pointsAgainst = games.reduce(
-        (sum, game) => sum + (Number(game.opponentScore) || 0),
-        0
-    );
+    const ties =
+        games.filter(
+            g => g.result === 'T'
+        ).length;
+
+    const pointsFor =
+        games.reduce(
+            (sum, game) =>
+                sum +
+                Number(game.teamScore),
+            0
+        );
+
+    const pointsAgainst =
+        games.reduce(
+            (sum, game) =>
+                sum +
+                Number(game.opponentScore),
+            0
+        );
 
     return {
         games,
+        gamesAvailable: games.length,
+
         wins,
         losses,
         ties,
+
         pointsFor,
         pointsAgainst,
-        pointDifferential: pointsFor - pointsAgainst,
-        averagePointsFor: Number((pointsFor / games.length).toFixed(1)),
-        averagePointsAgainst: Number(
-            (pointsAgainst / games.length).toFixed(1)
-        )
+
+        pointDifferential:
+            pointsFor -
+            pointsAgainst,
+
+        averagePointsFor:
+            Number(
+                (
+                    pointsFor /
+                    games.length
+                ).toFixed(1)
+            ),
+
+        averagePointsAgainst:
+            Number(
+                (
+                    pointsAgainst /
+                    games.length
+                ).toFixed(1)
+            )
     };
 }
 
@@ -420,16 +458,34 @@ Then evaluate:
 
 A. Overall team quality
 B. Recent form
-C. Offensive strengths and weaknesses
-D. Defensive strengths and weaknesses
-E. Key players
-F. Injuries
-G. Recent team news
-H. Home/away or neutral-site context
-I. Standings
-J. Betting information
-K. ESPN predictor
-L. Any sport-specific statistics supplied by ESPN
+C. Recent scoring production
+D. Recent scoring allowed
+E. Point differential over the last five completed games
+F. Offensive strengths and weaknesses
+G. Defensive strengths and weaknesses
+H. Key players
+I. Injuries
+J. Recent team news
+K. Home/away or neutral-site context
+L. Standings
+M. Betting information
+N. ESPN predictor
+O. Any sport-specific statistics supplied by ESPN
+
+IMPORTANT RECENT-FORM RULES:
+
+- Use matchup.home.recentForm and matchup.away.recentForm.
+- "Last 5" means the actual completed games supplied in recentForm.games.
+- Never invent a recent-game result.
+- Never turn missing recent-game data into 0-0-0.
+- If gamesAvailable is 0, report the recent record as "Unavailable".
+- If fewer than five games are supplied, use the games that are actually supplied and state that fewer than five were available.
+- Use pointsFor, pointsAgainst, and pointDifferential when they are available.
+- Do not call point differential "Unavailable" if pointDifferential is present.
+- Offensive comparison should use recent scoring production when available.
+- Defensive comparison should use recent scoring allowed when available.
+- For sports where "points" are not the normal terminology, interpret pointsFor/pointsAgainst as the sport's scoring totals (for example, runs or goals).
+- Never invent a statistic merely to fill a field.
 
 Then determine:
 
@@ -502,14 +558,20 @@ Use exactly this structure:
   },
 
   "offensiveComparison": {
-    "analysis": "Evidence-based comparison of the offenses.",
-    "advantage": "Exact team name or Unavailable"
-  },
+      "analysis": "Compare the teams using supplied offensive/scoring evidence. Include the relevant numerical evidence when available.",
+      "advantage": "Exact team name or Even or Unavailable",
+      "evidence": [
+        "Specific supplied offensive/scoring evidence"
+      ]
+    },
 
   "defensiveComparison": {
-    "analysis": "Evidence-based comparison of the defenses.",
-    "advantage": "Exact team name or Unavailable"
-  },
+      "analysis": "Compare the teams using supplied defensive/scoring-allowed evidence. Include the relevant numerical evidence when available.",
+      "advantage": "Exact team name or Even or Unavailable",
+      "evidence": [
+        "Specific supplied defensive/scoring-allowed evidence"
+      ]
+    },
 
   "keyMatchup": {
     "title": "Most important matchup factor",
