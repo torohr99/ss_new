@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const {
@@ -405,33 +406,6 @@ router.post(
           'The AI image generator could not create an image right now.'
       });
     }
-
-    const primaryEntity = entities[0] || null;
-
-    res.json({
-      type:
-        primaryEntity
-          ? primaryEntity.type
-          : 'generic',
-    
-      sourceImage:
-        primaryEntity?.image ||
-        null,
-    
-      entityName:
-        primaryEntity?.name ||
-        null,
-    
-      entities,
-    
-      prompt,
-      league:
-        league || null,
-      gameId:
-        gameId || null,
-    
-      image
-    });
 
   } catch (error) {
     console.error(
