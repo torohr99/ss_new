@@ -1,9 +1,28 @@
 const axios = require('axios');
 const sportsApi = require('./sportsApi');
+const cache = require('./cache');
 
 const ANALYSIS_CACHE = new Map();
 
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+/*
+ * AI pre-game analysis is deterministic for a given
+ * matchup/context and does not need to be regenerated
+ * for every user.
+ *
+ * Redis makes this shared across Railway replicas.
+ */
+const PREGAME_ANALYSIS_CACHE_TTL = 15 * 60; // 15 minutes
+
+function getPregameAnalysisCacheKey(
+    league,
+    gameId
+) {
+    return `pregame-analysis:${String(
+        league
+    ).toLowerCase()}:${String(gameId)}`;
+}
 
 function getCached(key) {
     const item = ANALYSIS_CACHE.get(key);
@@ -632,8 +651,38 @@ Use exactly this structure:
 }
 `;
 }
-async function generatePregameAnalysis(league, gameId) {
-    const context = await buildGameContext(league, gameId);
+async function generatePregameAnalysis(
+    league,
+    gameId
+) {
+    const cacheKey =
+        getPregameAnalysisCacheKey(
+            league,
+            gameId
+        );
+
+    /*
+     * Check the shared Redis cache BEFORE doing
+     * any Gemini work.
+     *
+     * This means repeated clicks and users on
+     * different Railway replicas reuse the same
+     * completed analysis.
+     */
+    const cachedAnalysis =
+        await cache.getJson(
+            cacheKey
+        );
+
+    if (cachedAnalysis) {
+        return cachedAnalysis;
+    }
+
+    const context =
+        await buildGameContext(
+            league,
+            gameId
+        );
 
     if (context.game.status !== 'pre') {
         return {
@@ -653,6 +702,53 @@ async function generatePregameAnalysis(league, gameId) {
     const model =
         process.env.GEMINI_MODEL ||
         'gemini-2.5-flash';
+
+    const generationLock =
+        await cache.acquireLock(
+            `${cacheKey}:generation`,
+            45
+        );
+    
+    if (!generationLock) {
+        /*
+         * Another request/replica is currently generating
+         * this exact matchup's analysis.
+         *
+         * Wait briefly for it to populate Redis.
+         */
+        const startedAt =
+            Date.now();
+    
+        while (
+            Date.now() - startedAt <
+            5000
+        ) {
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        250
+                    )
+            );
+    
+            const completed =
+                await cache.getJson(
+                    cacheKey
+                );
+    
+            if (completed) {
+                return completed;
+            }
+        }
+    
+        /*
+         * Do not pile another Gemini request onto a
+         * potentially overloaded model.
+         */
+        throw new Error(
+            'Pre-game analysis is currently being generated.'
+        );
+    }
     
     const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -743,7 +839,7 @@ async function generatePregameAnalysis(league, gameId) {
         };
     }
 
-    return {
+    const result = {
         status: 'pre',
     
         game: context.game,
@@ -762,6 +858,19 @@ async function generatePregameAnalysis(league, gameId) {
     
         analysis
     };
+    
+    /*
+     * Store the completed analysis in shared Redis.
+     *
+     * All users/replicas can reuse this result.
+     */
+    await cache.setJson(
+        cacheKey,
+        result,
+        PREGAME_ANALYSIS_CACHE_TTL
+    );
+    
+    return result;
 }
 
 module.exports = {
