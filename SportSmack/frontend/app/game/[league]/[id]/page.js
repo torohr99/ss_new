@@ -7,7 +7,6 @@ import { useAuth } from '../../../context/AuthContext';
 import MemeEditor from '../../../../components/MemeEditor';
 import {
     LiveStats,
-    PregameAnalysis,
     LiveAIAnalysis,
     PostGameAnalysis,
     GameAssistant
@@ -175,9 +174,6 @@ export default function GameHubPage({ params }) {
 
   const [stats, setStats] = useState(null);
   
-  const [pregameAnalysis, setPregameAnalysis] = useState(null);
-  const [pregameAnalysisLoading, setPregameAnalysisLoading] = useState(false);
-  const [pregameAnalysisError, setPregameAnalysisError] = useState(false);
   const [postGameAnalysis, setPostGameAnalysis] =
     useState(null);
 
@@ -198,44 +194,6 @@ export default function GameHubPage({ params }) {
     };
     fetchGameSummary();
   }, [league, gameId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchPregameAnalysis = async () => {
-        setPregameAnalysisLoading(true);
-        setPregameAnalysisError(false);
-
-        try {
-            const res = await axios.get(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/gamecast/${league}/${gameId}/pregame-analysis`
-            );
-
-            if (!cancelled) {
-                setPregameAnalysis(res.data);
-            }
-        } catch (err) {
-            console.error(
-                'Failed to fetch pre-game AI analysis',
-                err
-            );
-
-            if (!cancelled) {
-                setPregameAnalysisError(true);
-            }
-        } finally {
-            if (!cancelled) {
-                setPregameAnalysisLoading(false);
-            }
-        }
-    };
-
-    fetchPregameAnalysis();
-
-    return () => {
-        cancelled = true;
-    };
-}, [league, gameId]);
 
     useEffect(() => {
         if (
@@ -593,35 +551,11 @@ export default function GameHubPage({ params }) {
         </button>
       </div>
 
-      {pregameAnalysis?.status === 'pre' && (
-          <PregameAnalysis
-              data={pregameAnalysis}
-              loading={pregameAnalysisLoading}
-              error={pregameAnalysisError}
-          />
-      )}
-
       {liveAiAnalysis && (
           <LiveAIAnalysis
             data={liveAiAnalysis}
           />
         )}
-
-      {pregameAnalysisLoading && !pregameAnalysis && (
-          <PregameAnalysis
-              data={null}
-              loading={true}
-              error={false}
-          />
-      )}
-      
-      {pregameAnalysisError && !pregameAnalysis && (
-          <PregameAnalysis
-              data={null}
-              loading={false}
-              error={true}
-          />
-      )}
 
       {postGameAnalysis && (
           <PostGameAnalysis
