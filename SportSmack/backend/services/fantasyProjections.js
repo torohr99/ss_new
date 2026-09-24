@@ -76,21 +76,28 @@ async function loadWeeklyProjections(
     const candidate =
       weeklyStats.find(
         stat =>
-          Number(stat.statSourceId) === 1 &&
-          (
-            stat.statSplitTypeId == null ||
-            Number(
-              stat.statSplitTypeId
-            ) === 1
+          Number(
+            stat.statSourceId
+          ) === 1 &&
+          Number(
+            stat.statSplitTypeId
+          ) === 1 &&
+          Number(
+            stat.scoringPeriodId
+          ) === Number(
+            weekNumber
           )
       ) ||
       weeklyStats.find(
         stat =>
-          Number(stat.statTypeId) === 2
-      ) ||
-      weeklyStats.find(
-        stat =>
-          Number(stat.statTypeId) === 1
+          Number(
+            stat.statTypeId
+          ) === 2 &&
+          Number(
+            stat.scoringPeriodId
+          ) === Number(
+            weekNumber
+          )
       );
 
     if (!candidate) {
@@ -101,17 +108,47 @@ async function loadWeeklyProjections(
       candidate.appliedTotal ??
       candidate.appliedStatTotal ??
       candidate.fantasyPoints;
-
+    
     const numericValue =
       Number(value);
-
+    
     if (
-      Number.isFinite(
+      !Number.isFinite(
         numericValue
       )
     ) {
+      continue;
+    }
+    
+    const playerId =
+      String(player.id);
+    
+    projectionMap[
+      playerId
+    ] = numericValue;
+    
+    /*
+     * ESPN represents D/ST using the NFL
+     * team's proTeamId rather than an athlete.
+     *
+     * SportSmack stores our synthetic D/ST
+     * players as DST-{teamId}. Add the same
+     * projection under that key so the
+     * existing database representation
+     * continues to work.
+     */
+    if (
+      Number(
+        player.defaultPositionId
+      ) === 16 &&
+      Number.isFinite(
+        Number(
+          player.proTeamId
+        )
+      )
+    ) {
       projectionMap[
-        String(player.id)
+        `DST-${player.proTeamId}`
       ] = numericValue;
     }
   }
