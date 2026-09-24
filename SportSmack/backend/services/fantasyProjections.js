@@ -4,7 +4,7 @@ const {
 } = require('./cache');
 
 const CURRENT_SEASON = 2026;
-const CACHE_TTL_SECONDS = 6 * 60 * 60;
+const CACHE_TTL_SECONDS = 60 * 60;
 
 async function loadWeeklyProjections(
   weekNumber
@@ -16,14 +16,6 @@ async function loadWeeklyProjections(
   const fantasyFilter = {
     players: {
       limit: 3000,
-  
-      filterStatsForSourceIds: {
-        value: [1]
-      },
-  
-      filterStatsForSplitTypeIds: {
-        value: [1]
-      },
   
       sortPercOwned: {
         sortPriority: 4,
@@ -140,16 +132,23 @@ async function loadWeeklyProjections(
     if (
       Number(
         player.defaultPositionId
-      ) === 16 &&
-      Number.isFinite(
-        Number(
-          player.proTeamId
-        )
-      )
+      ) === 16
     ) {
-      projectionMap[
-        `DST-${player.proTeamId}`
-      ] = numericValue;
+      const dstTeamId =
+        player.proTeamId ??
+        player.teamId ??
+        player.team?.id ??
+        null;
+    
+      if (
+        Number.isFinite(
+          Number(dstTeamId)
+        )
+      ) {
+        projectionMap[
+          `DST-${dstTeamId}`
+        ] = numericValue;
+      }
     }
   }
 
@@ -169,7 +168,7 @@ async function getWeeklyProjectedPoints(
     );
 
   return getOrSetJson(
-    `fantasy:weekly-projections:${CURRENT_SEASON}:${week}`,
+    `fantasy:weekly-projections:v2:${CURRENT_SEASON}:${week}`,
     CACHE_TTL_SECONDS,
     () =>
       loadWeeklyProjections(
