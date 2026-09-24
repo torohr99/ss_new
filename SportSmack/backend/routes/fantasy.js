@@ -27,6 +27,10 @@ const {
   getWeeklyProjectedPoints
 } = require('../services/fantasyProjections');
 
+const {
+  getFantasyWeekLockTime
+} = require('../services/fantasySchedule');
+
 const VALID_POSITIONS = new Set([
   'QB',
   'RB',
@@ -825,20 +829,19 @@ function getCurrentFantasyWeek() {
   );
 }
 
-function isLineupLocked(weekNumber) {
-  const seasonStart = new Date('2026-09-09T00:00:00Z');
+async function isLineupLocked(
+  weekNumber
+) {
+  const lockTime =
+    await getFantasyWeekLockTime(
+      weekNumber
+    );
 
-  const weekStart = new Date(
-    seasonStart.getTime() +
-      (weekNumber - 1) *
-      7 *
-      24 *
-      60 *
-      60 *
-      1000
-  );
+  if (!lockTime) {
+    return false;
+  }
 
-  return new Date() >= weekStart;
+  return Date.now() >= lockTime;
 }
 
 /* =========================================================
