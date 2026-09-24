@@ -976,7 +976,7 @@ router.post(
 
       const currentWeek = getCurrentFantasyWeek();
 
-      if (isLineupLocked(currentWeek)) {
+      if (await isLineupLocked(currentWeek)) {
         return res.status(409).json({
           error: `Week ${currentWeek} lineup is locked.`
         });
