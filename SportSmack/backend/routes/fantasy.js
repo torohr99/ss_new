@@ -31,6 +31,10 @@ const {
   getFantasyWeekLockTime
 } = require('../services/fantasySchedule');
 
+const {
+  getCurrentFantasySeason
+} = require('../services/fantasySeason');
+
 const VALID_POSITIONS = new Set([
   'QB',
   'RB',
@@ -150,6 +154,9 @@ router.post('/seed', authenticateToken, async (req, res) => {
 
 router.get('/players', authenticateToken, async (req, res) => {
   try {
+    const season =
+      getCurrentFantasySeason();
+    
     const cursor = req.query.cursor
       ? parseInt(req.query.cursor, 10)
       : null;
@@ -170,7 +177,9 @@ router.get('/players', authenticateToken, async (req, res) => {
       req.query.search || ''
     ).trim();
 
-    const where = {};
+    const where = {
+      season
+    };
 
     if (
       position &&
@@ -311,12 +320,17 @@ router.post('/league', authenticateToken, async (req, res) => {
   }
 
   try {
-    const league = await prisma.fantasyLeague.create({
-      data: {
-        name: name.trim(),
-        ownerId: req.user.id
-      }
-    });
+    const season =
+      getCurrentFantasySeason();
+    
+    const league =
+      await prisma.fantasyLeague.create({
+        data: {
+          name: name.trim(),
+          season,
+          ownerId: req.user.id
+        }
+      });
 
     await prisma.fantasyTeam.create({
       data: {
