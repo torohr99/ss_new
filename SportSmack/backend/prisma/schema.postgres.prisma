@@ -235,6 +235,7 @@ model GameChatDiscipline {
 model FantasyLeague {
   id               Int      @id @default(autoincrement())
   name             String
+  season           Int      @default(2026)
   ownerId          Int
   status           String   @default("PREDRAFT") // PREDRAFT, DRAFTING, SEASON, FINISHED
   currentPickIndex Int      @default(0)
@@ -281,6 +282,7 @@ model FantasyTeam {
 model FantasyPlayer {
   id       Int     @id @default(autoincrement())
   espnId   String  @unique
+  season   Int
   name     String
   position String
   team     String
@@ -297,7 +299,9 @@ model FantasyPlayer {
   weeklyScores FantasyPlayerWeeklyScore[]
   tradeItems FantasyTradeItem[]
 
- @@index([position, name])
+ @@unique([season, espnId])
+ @@index([season, position, name])
+ @@index([season, team])
 }
 
 model FantasyDraftPick {
