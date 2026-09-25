@@ -747,16 +747,6 @@ router.get(
                 )
               )
             ];
-      
-            const league =
-              await prisma.fantasyLeague.findUnique({
-                where: {
-                  id: leagueId
-                },
-                select: {
-                  season: true
-                }
-              });
 
             const weeklyProjections =
               await getWeeklyProjectedPoints(
