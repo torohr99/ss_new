@@ -1,8 +1,11 @@
 const axios = require('axios');
 const prisma = require('../lib/prisma');
 
-const CURRENT_SEASON = 2026;
-const PREVIOUS_SEASON = 2025;
+const {
+  getCurrentFantasySeason,
+  getPreviousFantasySeason,
+  validateFantasySeason
+} = require('./fantasySeason');
 
 const VALID_POSITIONS = new Set([
   'QB',
@@ -343,6 +346,17 @@ function normalizePosition(
 }
 
 async function seedFantasyPlayers() {
+  const currentSeason =
+    getCurrentFantasySeason();
+
+  const previousSeason =
+    getPreviousFantasySeason(
+      currentSeason
+    );
+
+  console.log(
+    `Synchronizing fantasy player pool for ${currentSeason}.`
+  );
   console.log(
     'Starting NFL Fantasy Player Seeding...'
   );
@@ -359,7 +373,7 @@ async function seedFantasyPlayers() {
     try {
       currentFantasyPlayers =
         await getFantasyPlayers(
-          CURRENT_SEASON
+          currentSeason
         );
 
       console.log(
@@ -383,7 +397,7 @@ async function seedFantasyPlayers() {
     try {
       previousFantasyPlayers =
         await getFantasyPlayers(
-          PREVIOUS_SEASON
+          previousSeason
         );
 
       console.log(
@@ -419,7 +433,7 @@ async function seedFantasyPlayers() {
       const points =
         getSeasonFantasyPoints(
           player,
-          CURRENT_SEASON,
+          currentSeason,
           true
         );
 
@@ -444,7 +458,7 @@ async function seedFantasyPlayers() {
       const points =
         getSeasonFantasyPoints(
           player,
-          PREVIOUS_SEASON,
+          previousSeason,
           false
         );
 
@@ -636,7 +650,10 @@ async function seedFantasyPlayers() {
           await prisma.fantasyPlayer.upsert(
             {
               where: {
-                espnId
+                season_espnId: {
+                  season: currentSeason,
+                  espnId
+                }
               },
 
               update: {
@@ -655,6 +672,8 @@ async function seedFantasyPlayers() {
               },
 
               create: {
+                season:
+                  currentSeason,
                 espnId,
                 name:
                   item.fullName,
@@ -791,7 +810,7 @@ async function seedFantasyPlayers() {
         currentDST
           ? getSeasonFantasyPoints(
               currentDST.player,
-              CURRENT_SEASON,
+              currentSeason,
               true
             )
           : null;
@@ -800,7 +819,7 @@ async function seedFantasyPlayers() {
         previousDST
           ? getSeasonFantasyPoints(
               previousDST.player,
-              PREVIOUS_SEASON,
+              previousSeason,
               false
             )
           : null;
@@ -808,7 +827,11 @@ async function seedFantasyPlayers() {
       await prisma.fantasyPlayer.upsert(
         {
           where: {
-            espnId
+            season_espnId: {
+              season:
+                currentSeason,
+              espnId
+            }
           },
 
           update: {
@@ -824,6 +847,8 @@ async function seedFantasyPlayers() {
           },
 
           create: {
+            season:
+              currentSeason,
             espnId,
             name:
               `${displayName} D/ST`,
