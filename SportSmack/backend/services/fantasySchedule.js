@@ -118,6 +118,7 @@ async function loadWeekSchedule(
  * backend replicas.
  */
 async function getFantasyWeekLockTime(
+  season,
   weekNumber
 ) {
   const week =
@@ -130,9 +131,6 @@ async function getFantasyWeekLockTime(
   ) {
     return null;
   }
-
-  const season =
-    getCurrentNFLSeason();
 
   const cacheKey =
     `fantasy:nfl:week-lock:${season}:${week}`;
