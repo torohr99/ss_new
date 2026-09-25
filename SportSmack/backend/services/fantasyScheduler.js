@@ -19,24 +19,29 @@ async function scoreActiveLeagues() {
         }
       });
 
-    const seasonStart =
-      new Date('2026-09-09T00:00:00Z');
-
-    const now = new Date();
-
-    const currentWeek =
-      Math.min(
-        18,
-        Math.max(
-          1,
-          Math.floor(
-            (now - seasonStart) /
-              (7 * 24 * 60 * 60 * 1000)
-          ) + 1
-        )
-      );
+    const now =
+      new Date();
 
     for (const league of leagues) {
+      const seasonStart =
+        new Date(
+          `${league.season}-09-01T00:00:00Z`
+        );
+      
+      const currentWeek =
+        Math.min(
+          18,
+          Math.max(
+            1,
+            Math.floor(
+              (
+                now -
+                seasonStart
+              ) /
+              (7 * 24 * 60 * 60 * 1000)
+            ) + 1
+          )
+        );
       try {
         /*
          * Process every week through the current week,
