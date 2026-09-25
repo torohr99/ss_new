@@ -30,8 +30,13 @@ async function getFantasyPlayers(season) {
     `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leaguedefaults/3`;
 
   const primaryFilter = {
+    filterActive: {
+      value: true
+    },
+  
     players: {
-      limit: 2000,
+      limit: 3000,
+  
       sortPercOwned: {
         sortPriority: 4,
         sortAsc: false
