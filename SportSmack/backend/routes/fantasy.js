@@ -748,8 +748,15 @@ router.get(
               )
             ];
       
-            const currentWeek =
-              getCurrentFantasyWeek();
+            const league =
+              await prisma.fantasyLeague.findUnique({
+                where: {
+                  id: leagueId
+                },
+                select: {
+                  season: true
+                }
+              });
 
             const weeklyProjections =
               await getWeeklyProjectedPoints(
@@ -848,7 +855,8 @@ async function isLineupLocked(
 ) {
   const lockTime =
     await getFantasyWeekLockTime(
-      weekNumber
+      league.season,
+      currentWeek
     );
 
   if (!lockTime) {
@@ -988,7 +996,15 @@ router.post(
       const status =
         String(req.body.status || '').toUpperCase();
 
-      const currentWeek = getCurrentFantasyWeek();
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          },
+          select: {
+            season: true
+          }
+        });
 
       if (await isLineupLocked(currentWeek)) {
         return res.status(409).json({
