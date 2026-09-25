@@ -1,6 +1,10 @@
 const axios = require('axios');
 const prisma = require('../lib/prisma');
 
+const {
+  getCurrentFantasySeason
+} = require('./fantasySeason');
+
 const SCORING = {
   PASSING_YARD: 0.04,
   PASSING_TD: 4,
@@ -83,9 +87,12 @@ function calculatePlayerPoints(stats) {
   );
 }
 
-async function getWeeklyStats(weekNumber) {
+async function getWeeklyStats(
+  season,
+  weekNumber
+) {
   const url =
-    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026&seasontype=2&week=${weekNumber}`;
+    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=${season}&seasontype=2&week=${weekNumber}`;
 
   const response = await axios.get(url, {
     timeout: 15000
@@ -237,6 +244,21 @@ async function scoreLeagueWeek(
   weekNumber,
   isLive = true
 ) {
+    const league =
+      await prisma.fantasyLeague.findUnique({
+        where: {
+          id: leagueId
+        },
+        select: {
+          season: true
+        }
+      });
+  
+    if (!league) {
+      throw new Error(
+        `Fantasy league ${leagueId} not found.`
+      );
+    }
   const teams =
     await prisma.fantasyTeam.findMany({
       where: {
@@ -253,6 +275,7 @@ async function scoreLeagueWeek(
 
   const stats =
     await getWeeklyStats(
+      league.season,
       weekNumber
     );
 
@@ -465,10 +488,13 @@ async function updateMatchups(
   }
 }
 
-async function isWeekComplete(weekNumber) {
+async function isWeekComplete(
+  season,
+  weekNumber
+) {
   try {
     const url =
-      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=2026&seasontype=2&week=${weekNumber}`;
+      `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=${season}&seasontype=2&week=${weekNumber}`;
 
     const response = await axios.get(url, {
       timeout: 15000
