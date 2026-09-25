@@ -8,6 +8,10 @@ const {
   processBotTransactions
 } = require('./fantasyBotManager');
 
+const {
+  syncCurrentFantasySeason
+} = require('./fantasySeasonSync');
+
 let intervalId = null;
 
 async function scoreActiveLeagues() {
@@ -122,6 +126,7 @@ function startFantasyScheduler() {
   scoreActiveLeagues();
   processDueWaivers();
   processBotTransactions();
+  syncCurrentFantasySeason();
 
   // Then every 5 minutes.
   intervalId = setInterval(
@@ -129,6 +134,7 @@ function startFantasyScheduler() {
       await scoreActiveLeagues();
       await processDueWaivers();
       await processBotTransactions();
+      await syncCurrentFantasySeason();
     },
     5 * 60 * 1000
   );
