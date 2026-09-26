@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id            Int      @id @default(autoincrement())
+  role          String   @default("USER")
   username      String   @unique
   email         String   @unique
   password_hash String
@@ -20,6 +21,10 @@ model User {
 
   friends        Friendship[]    @relation("UserFriends")
   friendOf       Friendship[]    @relation("UserFriendOf")
+  blocksMade     Block[]         @relation("UserBlocks")
+  blockedBy      Block[]         @relation("UserBlockedBy")
+  reportsMade   Report[]        @relation("ReportsMade")
+  reportsResolved Report[]      @relation("ReportsResolved")
   teams          UserTeam[]
   posts          Post[]
   likes          Like[]
@@ -27,6 +32,7 @@ model User {
   gameMessages   GameMessage[]
   fantasyLeagues FantasyLeague[] @relation("LeagueOwner")
   fantasyTeams   FantasyTeam[]
+  chatDisciplines GameChatDiscipline[]
 
   // Bracket features
   bracketLeagues BracketLeague[]
@@ -47,12 +53,15 @@ model User {
 model Notification {
   id         Int      @id @default(autoincrement())
   user_id    Int
-  type       String   // "BADGE", "SYSTEM"
+  type       String
   message    String
   read       Boolean  @default(false)
   created_at DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, created_at])
+  @@index([user_id, read])
 }
 
 model UserBadge {
@@ -64,6 +73,9 @@ model UserBadge {
   created_at  DateTime @default(now())
 
   user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, created_at])
+  @@index([user_id, badge_name])
 }
 
 model Friendship {
@@ -77,6 +89,42 @@ model Friendship {
   friend User @relation("UserFriendOf", fields: [friend_id], references: [id])
 
   @@unique([user_id, friend_id])
+  @@index([friend_id, status])
+  @@index([user_id, status])
+}
+
+model Block {
+  id         Int      @id @default(autoincrement())
+  blockerId  Int
+  blockedId  Int
+  createdAt  DateTime @default(now())
+
+  blocker User @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  reporterId  Int
+  targetType  String
+  targetId    String
+  reason      String
+  details     String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  Int?
+
+  reporter User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver User? @relation("ReportsResolved", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+  @@index([reporterId, createdAt])
 }
 
 model Team {
@@ -114,6 +162,7 @@ model Post {
   comments Comment[]
 
   @@index([user_id])
+  @@index([user_id, id])
   @@index([created_at])
 }
 
@@ -140,7 +189,7 @@ model Comment {
   user    User @relation(fields: [user_id], references: [id])
   post    Post @relation(fields: [post_id], references: [id])
 
-  @@index([post_id])
+  @@index([post_id, created_at])
 }
 
 model GameMessage {
@@ -157,7 +206,26 @@ model GameMessage {
   teamId    Int? // EspnId of the team the user supports, if any
   createdAt DateTime @default(now())
 
-  @@index([gameId])
+  @@index([gameId, createdAt])
+  @@index([league, gameId, createdAt])
+}
+
+model GameChatDiscipline {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  league      String
+  gameId      String
+  yellowCards Int      @default(0)
+  redCards    Int      @default(0)
+  banned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, league, gameId])
+  @@index([league, gameId, banned])
+  @@index([userId, createdAt])
 }
 
 // =======================
@@ -167,6 +235,7 @@ model GameMessage {
 model FantasyLeague {
   id               Int      @id @default(autoincrement())
   name             String
+  season           Int      @default(2026)
   ownerId          Int
   status           String   @default("PREDRAFT") // PREDRAFT, DRAFTING, SEASON, FINISHED
   currentPickIndex Int      @default(0)
@@ -179,6 +248,9 @@ model FantasyLeague {
   transactions  FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
   trades       FantasyTrade[]
+
+  @@index([ownerId])
+  @@index([status, createdAt])
 }
 
 model FantasyTeam {
@@ -210,6 +282,7 @@ model FantasyTeam {
 model FantasyPlayer {
   id       Int     @id @default(autoincrement())
   espnId   String  @unique
+  season   Int
   name     String
   position String
   team     String
@@ -225,6 +298,10 @@ model FantasyPlayer {
   waiverClaims FantasyWaiverClaim[]
   weeklyScores FantasyPlayerWeeklyScore[]
   tradeItems FantasyTradeItem[]
+
+ @@unique([season, espnId])
+ @@index([season, position, name])
+ @@index([season, team])
 }
 
 model FantasyDraftPick {
@@ -237,7 +314,10 @@ model FantasyDraftPick {
   league FantasyLeague @relation(fields: [leagueId], references: [id])
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@index([leagueId])
+  @@index([teamId])
+  @@index([playerId])
+  @@unique([leagueId, playerId])
+  @@unique([leagueId, pickNumber])
 }
 
 model FantasyTeamPlayer {
@@ -249,7 +329,9 @@ model FantasyTeamPlayer {
   team   FantasyTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@index([teamId])
+  @@index([teamId, status])
+  @@index([playerId])
+  @@unique([teamId, playerId])
 }
 
 model FantasyWeeklyScore {
@@ -262,6 +344,7 @@ model FantasyWeeklyScore {
   team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   @@unique([teamId, weekNumber])
+  @@index([weekNumber])
 }
 
 model FantasyPlayerWeeklyScore {
@@ -301,6 +384,10 @@ model BracketPick {
 
   league BracketLeague @relation(fields: [leagueId], references: [id])
   user   User          @relation("UserBracketPicks", fields: [userId], references: [id])
+
+  @@index([leagueId])
+  @@index([userId])
+  @@index([leagueId, userId])
 }
 
 model FantasyMatchup {
@@ -333,8 +420,9 @@ model FantasyTransaction {
   team   FantasyTeam   @relation(fields: [teamId], references: [id])
   player FantasyPlayer? @relation(fields: [playerId], references: [id])
 
-  @@index([leagueId])
-  @@index([teamId])
+  @@index([leagueId, createdAt])
+  @@index([teamId, createdAt])
+  @@index([playerId])
 }
 
 model FantasyWaiverClaim {
