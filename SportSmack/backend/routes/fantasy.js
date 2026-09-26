@@ -156,7 +156,7 @@ router.get('/players', authenticateToken, async (req, res) => {
   try {
     const season =
       getCurrentFantasySeason();
-    
+
     const cursor = req.query.cursor
       ? parseInt(req.query.cursor, 10)
       : null;
@@ -752,7 +752,6 @@ router.get(
         });
       }
 
-            /*
              * Fetch weekly player scores in one query for the
              * entire league instead of querying once per player.
              *
@@ -829,7 +828,7 @@ router.get(
                     })
                   )
               }));
-      
+
       res.json({
         ...league,
         teams: teamsWithPlayerScores,

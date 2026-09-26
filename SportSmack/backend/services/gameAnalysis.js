@@ -750,6 +750,53 @@ async function generatePregameAnalysis(
         );
     }
     
+    const generationLock =
+        await cache.acquireLock(
+            `${cacheKey}:generation`,
+            45
+        );
+    
+    if (!generationLock) {
+        /*
+         * Another request/replica is currently generating
+         * this exact matchup's analysis.
+         *
+         * Wait briefly for it to populate Redis.
+         */
+        const startedAt =
+            Date.now();
+    
+        while (
+            Date.now() - startedAt <
+            5000
+        ) {
+            await new Promise(
+                resolve =>
+                    setTimeout(
+                        resolve,
+                        250
+                    )
+            );
+    
+            const completed =
+                await cache.getJson(
+                    cacheKey
+                );
+    
+            if (completed) {
+                return completed;
+            }
+        }
+    
+        /*
+         * Do not pile another Gemini request onto a
+         * potentially overloaded model.
+         */
+        throw new Error(
+            'Pre-game analysis is currently being generated.'
+        );
+    }
+
     const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
         {

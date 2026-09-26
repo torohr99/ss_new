@@ -302,7 +302,7 @@ function buildFallbackPoll(
         gameState?.status?.period ||
         gameState?.status?.inning ||
         '';
-      
+
       const outs =
         situation.outs ??
         situation.outsCount ??
@@ -311,8 +311,8 @@ function buildFallbackPoll(
       const score =
         `${home} ${gameState?.teams?.home?.score ?? 0} - ` +
         `${away} ${gameState?.teams?.away?.score ?? 0}`;
-  
-            const fallbackQuestions = [];
+
+      const fallbackQuestions = [];
 
             /*
              * 1. Batter-specific question.
@@ -701,7 +701,7 @@ async function generateGamePoll(
     
         return result;
   
-    } catch (error) {
+  } catch (error) {
       const status =
         error.response?.status;
   

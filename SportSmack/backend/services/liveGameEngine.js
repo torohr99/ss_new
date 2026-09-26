@@ -331,7 +331,7 @@ class LiveGameEngine {
       
         return;
       }
-      
+
       const poll =
         await gamePolls.generateGamePoll(
           summary,

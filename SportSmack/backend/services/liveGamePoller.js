@@ -163,7 +163,7 @@ async function updateGamePoll(
     if (recentPoll) {
       return;
     }
-    
+
     const poll =
       await gamePolls.generateGamePoll(
         summary,

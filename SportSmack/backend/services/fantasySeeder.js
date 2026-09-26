@@ -658,7 +658,6 @@ async function seedFantasyPlayers() {
                 season_espnId: {
                   season: currentSeason,
                   espnId
-                }
               },
 
               update: {
@@ -837,6 +836,7 @@ async function seedFantasyPlayers() {
                 currentSeason,
               espnId
             }
+
           },
 
           update: {
@@ -852,7 +852,7 @@ async function seedFantasyPlayers() {
           },
 
           create: {
-            season:
+	    season:
               currentSeason,
             espnId,
             name:

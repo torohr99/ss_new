@@ -31,7 +31,7 @@ async function scoreActiveLeagues() {
         new Date(
           `${league.season}-09-01T00:00:00Z`
         );
-      
+
       const currentWeek =
         Math.min(
           18,
@@ -46,6 +46,7 @@ async function scoreActiveLeagues() {
             ) + 1
           )
         );
+
       try {
         /*
          * Process every week through the current week,
@@ -93,10 +94,10 @@ async function scoreActiveLeagues() {
             week
           );
 
-          const weekComplete = 
-            await fantasyStats.isWeekComplete( 
+          const weekComplete =
+            await fantasyStats.isWeekComplete(
               league.season,
-              week 
+              week
             );
 
           await fantasyStats.scoreLeagueWeek(

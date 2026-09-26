@@ -607,6 +607,7 @@ export default function GameHubPage({ params }) {
                     ? new Date(msg.createdAt).toLocaleTimeString()
                     : ''}
                 </span>
+
                 {msg.user?.id !== user?.id &&
                   msg.type !== 'poll' && (
                     <button
@@ -717,6 +718,7 @@ export default function GameHubPage({ params }) {
                         ))}
                       </div>
                     )}
+
                     {msg.poll_voted && (
                       <div
                         style={{
