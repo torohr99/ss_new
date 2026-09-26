@@ -281,7 +281,7 @@ model FantasyTeam {
 
 model FantasyPlayer {
   id       Int     @id @default(autoincrement())
-  espnId   String  @unique
+  espnId   String
   season   Int
   name     String
   position String
