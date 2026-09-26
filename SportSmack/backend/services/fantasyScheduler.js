@@ -93,9 +93,10 @@ async function scoreActiveLeagues() {
             week
           );
 
-          const weekComplete =
-            await fantasyStats.isWeekComplete(
-              week
+          const weekComplete = 
+            await fantasyStats.isWeekComplete( 
+              league.season,
+              week 
             );
 
           await fantasyStats.scoreLeagueWeek(
