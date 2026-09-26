@@ -351,26 +351,32 @@ router.post('/league', authenticateToken, async (req, res) => {
 
 router.post('/league/test-bots', authenticateToken, async (req, res) => {
   try {
+    const season =
+      getCurrentFantasySeason();
+    
     const existingTestLeague =
       await prisma.fantasyLeague.findFirst({
         where: {
           ownerId: req.user.id,
           name: 'Test League with Bots',
-          status: 'DRAFTING'
+          status: 'DRAFTING',
+          season
         }
       });
 
     if (existingTestLeague) {
       return res.json(existingTestLeague);
     }
-
-    const league = await prisma.fantasyLeague.create({
-      data: {
-        name: 'Test League with Bots',
-        ownerId: req.user.id,
-        status: 'DRAFTING'
-      }
-    });
+    
+    const league =
+      await prisma.fantasyLeague.create({
+        data: {
+          name: 'Test League with Bots',
+          season,
+          ownerId: req.user.id,
+          status: 'DRAFTING'
+        }
+      });
 
     const userTeam = await prisma.fantasyTeam.create({
       data: {
@@ -450,19 +456,34 @@ router.post('/league/test-bots', authenticateToken, async (req, res) => {
 
 router.get('/leagues', authenticateToken, async (req, res) => {
   try {
-    const teams = await prisma.fantasyTeam.findMany({
-      where: {
-        userId: req.user.id
-      },
-      include: {
-        league: true
-      }
-    });
+    const leagues =
+      await prisma.fantasyLeague.findMany({
+        where: {
+          OR: [
+            {
+              ownerId: req.user.id
+            },
+            {
+              teams: {
+                some: {
+                  userId: req.user.id
+                }
+              }
+            }
+          ]
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
 
-    res.json(
-      teams.map(team => team.league)
-    );
+    res.json(leagues);
   } catch (err) {
+    console.error(
+      'Fetch fantasy leagues error:',
+      err
+    );
+
     res.status(500).json({
       error: 'Failed to fetch leagues'
     });
