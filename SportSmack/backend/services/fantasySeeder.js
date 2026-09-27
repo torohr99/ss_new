@@ -495,6 +495,12 @@ async function seedFantasyPlayers() {
 
     let totalAdded = 0;
 
+	const seenPlayerIds = new Set();
+
+	const syncStartedAt = new Date();
+	
+	let successfulRosterTeams = 0;
+
     /*
      * ---------------------------------------------------------
      * Seed real NFL players.
@@ -614,6 +620,10 @@ async function seedFantasyPlayers() {
           const espnId =
             String(item.id);
 
+		  seenPlayerIds.add(
+		    espnId
+		  );
+
           const projection =
             projectionMap.get(
               espnId
@@ -655,42 +665,49 @@ async function seedFantasyPlayers() {
               },
 
               update: {
-                name:
-                  item.fullName,
-                position,
-                team:
-                  teamAbbrev,
-                jerseyNumber,
-                imageUrl,
-                byeWeek,
-                projectedPoints:
-                  projection,
-                lastYearPoints:
-                  lastYear
-              },
+				  name:
+				    item.fullName,
+				  position,
+				  team:
+				    teamAbbrev,
+				  jerseyNumber,
+				  imageUrl,
+				  byeWeek,
+				  projectedPoints:
+				    projection,
+				  lastYearPoints:
+				    lastYear,
+				  isActive: true,
+				  lastSeenAt:
+				    syncStartedAt
+				},
 
               create: {
-                season:
-                  currentSeason,
-                espnId,
-                name:
-                  item.fullName,
-                position,
-                team:
-                  teamAbbrev,
-                jerseyNumber,
-                imageUrl,
-                byeWeek,
-                projectedPoints:
-                  projection,
-                lastYearPoints:
-                  lastYear
-              }
+				  season:
+				    currentSeason,
+				  espnId,
+				  name:
+				    item.fullName,
+				  position,
+				  team:
+				    teamAbbrev,
+				  jerseyNumber,
+				  imageUrl,
+				  byeWeek,
+				  projectedPoints:
+				    projection,
+				  lastYearPoints:
+				    lastYear,
+				  isActive: true,
+				  lastSeenAt:
+				    syncStartedAt
+				}
             }
           );
 
           totalAdded++;
         }
+	  successfulRosterTeams++;
       } catch (error) {
         console.error(
           `Error loading ${teamAbbrev}:`,
@@ -749,6 +766,9 @@ async function seedFantasyPlayers() {
        */
       const espnId =
         `DST-${team.id}`;
+	  seenPlayerIds.add(
+	    espnId
+	  );
 
       /*
        * Try to locate the team's ESPN fantasy
@@ -842,7 +862,10 @@ async function seedFantasyPlayers() {
             jerseyNumber: null,
             imageUrl,
             projectedPoints,
-            lastYearPoints
+            lastYearPoints,
+			isActive: true,
+		    lastSeenAt:
+		      syncStartedAt
           },
 
           create: {
@@ -857,7 +880,10 @@ async function seedFantasyPlayers() {
             jerseyNumber: null,
             imageUrl,
             projectedPoints,
-            lastYearPoints
+            lastYearPoints,
+			isActive: true,
+		    lastSeenAt:
+		      syncStartedAt
           }
         }
       );
@@ -865,6 +891,51 @@ async function seedFantasyPlayers() {
       totalAdded++;
     }
 
+	/*
+	 * ---------------------------------------------------------
+	 * Deactivate current-season players who were not reported
+	 * by ESPN during a complete roster synchronization.
+	 *
+	 * We only do this when all NFL team roster requests
+	 * succeeded. This prevents an ESPN/API failure from
+	 * incorrectly retiring players.
+	 *
+	 * Historical season records are never modified.
+	 * ---------------------------------------------------------
+	 */
+	if (
+	  successfulRosterTeams ===
+	  teams.length
+	) {
+	  const deactivated =
+	    await prisma.fantasyPlayer.updateMany({
+	      where: {
+	        season: currentSeason,
+	        isActive: true,
+	        espnId: {
+	          notIn:
+	            Array.from(
+	              seenPlayerIds
+	            )
+	        }
+	      },
+	      data: {
+	        isActive: false
+	      }
+	    });
+	
+	  if (
+	    deactivated.count > 0
+	  ) {
+	    console.log(
+	      `Marked ${deactivated.count} current-season fantasy players inactive.`
+	    );
+	  }
+	} else {
+	  console.warn(
+	    `Skipped inactive-player cleanup: only ${successfulRosterTeams}/${teams.length} NFL rosters synchronized successfully.`
+	  );
+	}
     console.log(
       `Successfully seeded/updated ${totalAdded} fantasy players.`
     );
