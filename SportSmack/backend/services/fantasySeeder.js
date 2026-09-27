@@ -30,19 +30,15 @@ async function getFantasyPlayers(season) {
     `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leaguedefaults/3`;
 
   const primaryFilter = {
-    filterActive: {
-      value: true
-    },
-  
-    players: {
-      limit: 3000,
-  
-      sortPercOwned: {
-        sortPriority: 4,
-        sortAsc: false
-      }
-    }
-  };
+	  players: {
+	    limit: 3000,
+	
+	    sortPercOwned: {
+	      sortPriority: 4,
+	      sortAsc: false
+	    }
+	  }
+	};
 
   const requestConfig = {
     params: {
@@ -134,17 +130,14 @@ async function getFantasyPlayers(season) {
       `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/players`;
 
     const fallbackFilter = {
-      filterActive: {
-        value: true
-      },
-      players: {
-        limit: 2000,
-        sortPercOwned: {
-          sortPriority: 4,
-          sortAsc: false
-        }
-      }
-    };
+	  players: {
+	    limit: 2000,
+	    sortPercOwned: {
+	      sortPriority: 4,
+	      sortAsc: false
+	    }
+	  }
+	};
 
     const fallbackResponse =
       await axios.get(
