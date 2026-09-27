@@ -179,7 +179,8 @@ router.get('/players', authenticateToken, async (req, res) => {
     ).trim();
 
     const where = {
-      season
+      season,
+      isActive: true
     };
 
     if (
@@ -257,55 +258,80 @@ router.get('/players', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/players/search', authenticateToken, async (req, res) => {
-  try {
-    const q = String(req.query.q || '').trim();
-    const position = normalizePosition(req.query.position);
-    const team = String(req.query.team || '').trim().toUpperCase();
+router.get(
+  '/players/search',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const season =
+        getCurrentFantasySeason();
 
-    const where = {};
+      const q =
+        String(
+          req.query.q || ''
+        ).trim();
 
-    if (q) {
-      where.name = {
-        contains: q,
-        mode: 'insensitive'
+      const position =
+        normalizePosition(
+          req.query.position
+        );
+
+      const team =
+        String(
+          req.query.team || ''
+        ).trim().toUpperCase();
+
+      const where = {
+        season,
+        isActive: true
       };
-    }
 
-    if (position && VALID_POSITIONS.has(position)) {
-      where.position = position;
-    }
+      if (q) {
+        where.name = {
+          contains: q,
+          mode: 'insensitive'
+        };
+      }
 
-    if (team) {
-      where.team = team;
-    }
+      if (
+        position &&
+        VALID_POSITIONS.has(position)
+      ) {
+        where.position = position;
+      }
 
-    const players =
-      await prisma.fantasyPlayer.findMany({
-        where: {
-          id: {
-            notIn: rosteredIds
-          }
-        },
-        orderBy: [
-          {
-            position: 'asc'
-          },
-          {
-            name: 'asc'
-          }
-        ],
-        take: 200
+      if (team) {
+        where.team = team;
+      }
+
+      const players =
+        await prisma.fantasyPlayer.findMany({
+          where,
+          orderBy: [
+            {
+              position: 'asc'
+            },
+            {
+              name: 'asc'
+            }
+          ],
+          take: 200
+        });
+
+      res.json(players);
+    } catch (err) {
+      console.error(
+        'Player search error:',
+        err
+      );
+
+      res.status(500).json({
+        error:
+          'Failed to search players'
       });
-
-    res.json(players);
-  } catch (err) {
-    console.error('Player search error:', err);
-    res.status(500).json({
-      error: 'Failed to search players'
-    });
+    }
   }
-});
+);
 
 /* =========================================================
    LEAGUES
@@ -1117,8 +1143,25 @@ router.get(
   authenticateToken,
   async (req, res) => {
     try {
-      const leagueId = Number(req.params.id);
-
+      const leagueId =
+        Number(req.params.id);
+      
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: leagueId
+          },
+          select: {
+            season: true
+          }
+        });
+      
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found'
+        });
+      }
+      
       const rostered =
         await prisma.fantasyTeamPlayer.findMany({
           where: {
@@ -1130,13 +1173,17 @@ router.get(
             playerId: true
           }
         });
-
+      
       const rosteredIds =
-        rostered.map(p => p.playerId);
-
+        rostered.map(
+          p => p.playerId
+        );
+      
       const players =
         await prisma.fantasyPlayer.findMany({
           where: {
+            season: league.season,
+            isActive: true,
             id: {
               notIn: rosteredIds
             }
@@ -1393,11 +1440,15 @@ router.post(
         });
       }
 
-      const player = await prisma.fantasyPlayer.findUnique({
-        where: {
-          id: playerId
-        }
-      });
+      const player =
+        await prisma.fantasyPlayer.findFirst({
+          where: {
+            id: playerId,
+            season:
+              team.league.season,
+            isActive: true
+          }
+        });
 
       if (!player) {
         return res.status(404).json({
