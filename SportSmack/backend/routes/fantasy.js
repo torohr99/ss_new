@@ -751,13 +751,17 @@ router.get(
           error: 'League not found'
         });
       }
-            /*
-             * Fetch weekly player scores in one query for the
-             * entire league instead of querying once per player.
-             *
-             * This avoids an N+1 query pattern.
-             */
-            const playerIds = [
+
+      const currentWeek =
+        getCurrentFantasyWeek();
+
+      /*
+       * Fetch weekly player scores in one query for the
+       * entire league instead of querying once per player.
+       *
+       * This avoids an N+1 query pattern.
+       */
+      const playerIds = [
               ...new Set(
                 league.teams.flatMap(team =>
                   team.players.map(
@@ -861,12 +865,13 @@ function getCurrentFantasyWeek() {
 }
 
 async function isLineupLocked(
-  weekNumber
+  weekNumber,
+  season
 ) {
   const lockTime =
     await getFantasyWeekLockTime(
-      league.season,
-      currentWeek
+      season,
+      weekNumber
     );
 
   if (!lockTime) {
@@ -1016,7 +1021,12 @@ router.post(
           }
         });
 
-      if (await isLineupLocked(currentWeek)) {
+      if (
+        await isLineupLocked(
+          currentWeek,
+          team.league.season
+        )
+      ) {
         return res.status(409).json({
           error: `Week ${currentWeek} lineup is locked.`
         });
