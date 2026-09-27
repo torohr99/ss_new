@@ -12,6 +12,10 @@ const {
   syncCurrentFantasySeason
 } = require('./fantasySeasonSync');
 
+const {
+  getCurrentFantasyWeek
+} = require('./fantasySchedule');
+
 let intervalId = null;
 
 async function scoreActiveLeagues() {
@@ -23,30 +27,12 @@ async function scoreActiveLeagues() {
         }
       });
 
-    const now =
-      new Date();
-
     for (const league of leagues) {
-      const seasonStart =
-        new Date(
-          `${league.season}-09-01T00:00:00Z`
-        );
-
       const currentWeek =
-        Math.min(
-          18,
-          Math.max(
-            1,
-            Math.floor(
-              (
-                now -
-                seasonStart
-              ) /
-              (7 * 24 * 60 * 60 * 1000)
-            ) + 1
-          )
+        await getCurrentFantasyWeek(
+          league.season
         );
-
+    
       try {
         /*
          * Process every week through the current week,
