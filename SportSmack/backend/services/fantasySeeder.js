@@ -361,10 +361,11 @@ async function seedFantasyPlayers() {
 
   try {
     /*
-     * ---------------------------------------------------------
-     * Load ESPN fantasy data for 2026 projections.
-     * ---------------------------------------------------------
-     */
+	 * ---------------------------------------------------------
+	 * Load ESPN fantasy data for the current season's
+	 * projections.
+	 * ---------------------------------------------------------
+	 */
 
     let currentFantasyPlayers = [];
 
@@ -375,18 +376,18 @@ async function seedFantasyPlayers() {
         );
 
       console.log(
-        `Loaded ${currentFantasyPlayers.length} 2026 ESPN fantasy players.`
+        `Loaded ${currentFantasyPlayers.length} current-season ESPN fantasy players.`
       );
     } catch (error) {
       console.error(
-        '2026 ESPN fantasy data error:',
+        'Current-season ESPN fantasy data error:',
         error.message
       );
     }
 
     /*
      * ---------------------------------------------------------
-     * Load ESPN fantasy data for 2025 actual results.
+     * Load ESPN fantasy data for the previous season's actual results.
      * ---------------------------------------------------------
      */
 
@@ -399,11 +400,11 @@ async function seedFantasyPlayers() {
         );
 
       console.log(
-        `Loaded ${previousFantasyPlayers.length} 2025 ESPN fantasy players.`
+        `Loaded ${previousFantasyPlayers.length} previous-season ESPN fantasy players.`
       );
     } catch (error) {
       console.error(
-        '2025 ESPN fantasy data error:',
+        'Previous-season ESPN fantasy data error:',
         error.message
       );
     }
