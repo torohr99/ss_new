@@ -751,7 +751,7 @@ router.get(
           error: 'League not found'
         });
       }
-
+            /*
              * Fetch weekly player scores in one query for the
              * entire league instead of querying once per player.
              *
