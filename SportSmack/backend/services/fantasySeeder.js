@@ -496,8 +496,6 @@ async function seedFantasyPlayers() {
 
     let totalAdded = 0;
 
-    const seenPlayerIds = new Set();
-
     const syncStartedAt = new Date();
 	
     let successfulRosterTeams = 0;
@@ -539,30 +537,45 @@ async function seedFantasyPlayers() {
           );
 
         const rawAthletes =
-          rosterRes.data
-            ?.athletes || [];
-
-        const athletes =
-          rawAthletes.flatMap(
-            group => {
-              if (
-                Array.isArray(
-                  group?.items
-                )
-              ) {
-                return group.items;
-              }
-
-              if (
-                group?.id ||
-                group?.fullName
-              ) {
-                return [group];
-              }
-
-              return [];
-            }
-          );
+		  rosterRes.data?.athletes;
+		
+		if (
+		  !Array.isArray(rawAthletes)
+		) {
+		  throw new Error(
+		    `ESPN returned an invalid roster response for ${teamAbbrev}.`
+		  );
+		}
+		
+		const athletes =
+		  rawAthletes.flatMap(
+		    group => {
+		      if (
+		        Array.isArray(
+		          group?.items
+		        )
+		      ) {
+		        return group.items;
+		      }
+		
+		      if (
+		        group?.id ||
+		        group?.fullName
+		      ) {
+		        return [group];
+		      }
+		
+		      return [];
+		    }
+		  );
+		
+		if (
+		  athletes.length === 0
+		) {
+		  throw new Error(
+		    `ESPN returned an empty roster for ${teamAbbrev}.`
+		  );
+		}
 
         for (
           const item of athletes
@@ -620,10 +633,6 @@ async function seedFantasyPlayers() {
 
           const espnId =
             String(item.id);
-
-          seenPlayerIds.add(
-	    espnId
-          );
 
           const projection =
             projectionMap.get(
@@ -767,9 +776,6 @@ async function seedFantasyPlayers() {
        */
       const espnId =
         `DST-${team.id}`;
-      seenPlayerIds.add(
-        espnId
-      );
 
       /*
        * Try to locate the team's ESPN fantasy
@@ -913,12 +919,16 @@ async function seedFantasyPlayers() {
 	      where: {
 	        season: currentSeason,
 	        isActive: true,
-	        espnId: {
-	          notIn:
-	            Array.from(
-	              seenPlayerIds
-	            )
-	        }
+	        OR: [
+	          {
+	            lastSeenAt: null
+	          },
+	          {
+	            lastSeenAt: {
+	              lt: syncStartedAt
+	            }
+	          }
+	        ]
 	      },
 	      data: {
 	        isActive: false
