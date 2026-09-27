@@ -185,6 +185,59 @@ async function getFantasyWeekLockTime(
   );
 }
 
+async function getCurrentFantasyWeek(
+  season = getCurrentNFLSeason()
+) {
+  const normalizedSeason =
+    Number(season);
+
+  if (
+    !Number.isInteger(normalizedSeason) ||
+    normalizedSeason < 2000 ||
+    normalizedSeason > 2100
+  ) {
+    throw new Error(
+      `Invalid NFL season: ${season}`
+    );
+  }
+
+  const now =
+    Date.now();
+
+  /*
+   * NFL regular season weeks are determined from
+   * the actual ESPN schedule rather than a hard-coded
+   * calendar date.
+   *
+   * We find the latest regular-season week whose
+   * first game has already started.
+   *
+   * If no regular-season game has started yet,
+   * return Week 1.
+   */
+  for (
+    let week = 18;
+    week >= 1;
+    week--
+  ) {
+    const lockTime =
+      await getFantasyWeekLockTime(
+        normalizedSeason,
+        week
+      );
+
+    if (
+      lockTime !== null &&
+      now >= lockTime
+    ) {
+      return week;
+    }
+  }
+
+  return 1;
+}
+
 module.exports = {
-  getFantasyWeekLockTime
+  getFantasyWeekLockTime,
+  getCurrentFantasyWeek
 };
