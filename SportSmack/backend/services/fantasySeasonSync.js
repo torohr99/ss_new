@@ -16,7 +16,7 @@ const LOCK_KEY_PREFIX =
   'sportsmack:fantasy:season-sync-lock:';
 
 const SYNC_TTL_SECONDS =
-  24 * 60 * 60;
+  6 * 60 * 60;
 
 const LOCK_TTL_SECONDS =
   15 * 60;
