@@ -28,7 +28,8 @@ const {
 } = require('../services/fantasyProjections');
 
 const {
-  getFantasyWeekLockTime
+  getFantasyWeekLockTime,
+  getCurrentFantasyWeek
 } = require('../services/fantasySchedule');
 
 const {
@@ -753,7 +754,9 @@ router.get(
       }
 
       const currentWeek =
-        getCurrentFantasyWeek();
+        await getCurrentFantasyWeek(
+          league.season
+        );
 
       /*
        * Fetch weekly player scores in one query for the
@@ -847,22 +850,6 @@ router.get(
     }
   }
 );
-
-function getCurrentFantasyWeek() {
-  const seasonStart = new Date('2026-09-09T00:00:00Z');
-  const now = new Date();
-
-  return Math.min(
-    18,
-    Math.max(
-      1,
-      Math.floor(
-        (now - seasonStart) /
-          (7 * 24 * 60 * 60 * 1000)
-      ) + 1
-    )
-  );
-}
 
 async function isLineupLocked(
   weekNumber,
@@ -1173,6 +1160,7 @@ router.get(
       });
     }
   }
+  
 );
 
 /* =========================================================
