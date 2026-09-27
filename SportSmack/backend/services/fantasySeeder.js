@@ -30,15 +30,15 @@ async function getFantasyPlayers(season) {
     `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leaguedefaults/3`;
 
   const primaryFilter = {
-	  players: {
-	    limit: 3000,
+    players: {
+      limit: 3000,
 	
-	    sortPercOwned: {
-	      sortPriority: 4,
-	      sortAsc: false
-	    }
-	  }
-	};
+      sortPercOwned: {
+        sortPriority: 4,
+	sortAsc: false
+      }
+    }
+  };
 
   const requestConfig = {
     params: {
@@ -130,14 +130,14 @@ async function getFantasyPlayers(season) {
       `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/players`;
 
     const fallbackFilter = {
-	  players: {
-	    limit: 2000,
-	    sortPercOwned: {
-	      sortPriority: 4,
-	      sortAsc: false
-	    }
-	  }
-	};
+      players: {
+	limit: 2000,
+	sortPercOwned: {
+	  sortPriority: 4,
+	  sortAsc: false
+	}
+      }
+    };
 
     const fallbackResponse =
       await axios.get(
@@ -361,11 +361,11 @@ async function seedFantasyPlayers() {
 
   try {
     /*
-	 * ---------------------------------------------------------
-	 * Load ESPN fantasy data for the current season's
-	 * projections.
-	 * ---------------------------------------------------------
-	 */
+     * ---------------------------------------------------------
+     * Load ESPN fantasy data for the current season's
+     * projections.
+     * ---------------------------------------------------------
+     */
 
     let currentFantasyPlayers = [];
 
@@ -496,11 +496,11 @@ async function seedFantasyPlayers() {
 
     let totalAdded = 0;
 
-	const seenPlayerIds = new Set();
+    const seenPlayerIds = new Set();
 
-	const syncStartedAt = new Date();
+    const syncStartedAt = new Date();
 	
-	let successfulRosterTeams = 0;
+    let successfulRosterTeams = 0;
 
     /*
      * ---------------------------------------------------------
@@ -621,9 +621,9 @@ async function seedFantasyPlayers() {
           const espnId =
             String(item.id);
 
-		  seenPlayerIds.add(
-		    espnId
-		  );
+          seenPlayerIds.add(
+	    espnId
+          );
 
           const projection =
             projectionMap.get(
@@ -666,49 +666,49 @@ async function seedFantasyPlayers() {
               },
 
               update: {
-				  name:
-				    item.fullName,
-				  position,
-				  team:
-				    teamAbbrev,
-				  jerseyNumber,
-				  imageUrl,
-				  byeWeek,
-				  projectedPoints:
-				    projection,
-				  lastYearPoints:
-				    lastYear,
-				  isActive: true,
-				  lastSeenAt:
-				    syncStartedAt
-				},
+		  name:
+		    item.fullName,
+		  position,
+		  team:
+		    teamAbbrev,
+		  jerseyNumber,
+		  imageUrl,
+		  byeWeek,
+		  projectedPoints:
+		    projection,
+		  lastYearPoints:
+		    lastYear,
+		  isActive: true,
+		  lastSeenAt:
+		    syncStartedAt
+		},
 
               create: {
-				  season:
-				    currentSeason,
-				  espnId,
-				  name:
-				    item.fullName,
-				  position,
-				  team:
-				    teamAbbrev,
-				  jerseyNumber,
-				  imageUrl,
-				  byeWeek,
-				  projectedPoints:
-				    projection,
-				  lastYearPoints:
-				    lastYear,
-				  isActive: true,
-				  lastSeenAt:
-				    syncStartedAt
-				}
+               season:
+		    currentSeason,
+		  espnId,
+		  name:
+		    item.fullName,
+		  position,
+		  team:
+		    teamAbbrev,
+		  jerseyNumber,
+		  imageUrl,
+		  byeWeek,
+		  projectedPoints:
+		    projection,
+		  lastYearPoints:
+		    lastYear,
+		  isActive: true,
+		  lastSeenAt:
+		    syncStartedAt
+		}
             }
           );
 
           totalAdded++;
         }
-	  successfulRosterTeams++;
+      successfulRosterTeams++;
       } catch (error) {
         console.error(
           `Error loading ${teamAbbrev}:`,
@@ -767,9 +767,9 @@ async function seedFantasyPlayers() {
        */
       const espnId =
         `DST-${team.id}`;
-	  seenPlayerIds.add(
-	    espnId
-	  );
+      seenPlayerIds.add(
+        espnId
+      );
 
       /*
        * Try to locate the team's ESPN fantasy
@@ -864,9 +864,9 @@ async function seedFantasyPlayers() {
             imageUrl,
             projectedPoints,
             lastYearPoints,
-			isActive: true,
-		    lastSeenAt:
-		      syncStartedAt
+            isActive: true,
+            lastSeenAt:
+              syncStartedAt
           },
 
           create: {
@@ -882,9 +882,9 @@ async function seedFantasyPlayers() {
             imageUrl,
             projectedPoints,
             lastYearPoints,
-			isActive: true,
-		    lastSeenAt:
-		      syncStartedAt
+            isActive: true,
+            lastSeenAt:
+              syncStartedAt
           }
         }
       );
@@ -892,7 +892,7 @@ async function seedFantasyPlayers() {
       totalAdded++;
     }
 
-	/*
+        /*
 	 * ---------------------------------------------------------
 	 * Deactivate current-season players who were not reported
 	 * by ESPN during a complete roster synchronization.
