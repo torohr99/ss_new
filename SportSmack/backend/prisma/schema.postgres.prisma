@@ -280,17 +280,22 @@ model FantasyTeam {
 }
 
 model FantasyPlayer {
-  id       Int     @id @default(autoincrement())
-  espnId   String
-  season   Int
-  name     String
-  position String
-  team     String
-  jerseyNumber String?
-  imageUrl String?
-  byeWeek        Int?
+  id              Int      @id @default(autoincrement())
+  espnId          String
+  season          Int
+  name            String
+  position        String
+  team            String
+  jerseyNumber    String?
+  imageUrl        String?
+  byeWeek         Int?
   projectedPoints Float?
   lastYearPoints  Float?
+
+  // Current-season lifecycle information.
+  // Historical season records remain unchanged.
+  isActive        Boolean  @default(true)
+  lastSeenAt      DateTime?
 
   draftPicks  FantasyDraftPick[]
   teamRosters FantasyTeamPlayer[]
@@ -299,9 +304,10 @@ model FantasyPlayer {
   weeklyScores FantasyPlayerWeeklyScore[]
   tradeItems FantasyTradeItem[]
 
- @@unique([season, espnId])
- @@index([season, position, name])
- @@index([season, team])
+  @@unique([season, espnId])
+  @@index([season, position, name])
+  @@index([season, team])
+  @@index([season, isActive, position])
 }
 
 model FantasyDraftPick {
