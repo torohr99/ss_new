@@ -1504,6 +1504,7 @@ function FantasyPlayerCard({
           loading="lazy"
         />
       ) : (
+		<>
 	<div
           style={{
             display: 'flex',
@@ -1555,6 +1556,7 @@ function FantasyPlayerCard({
             .slice(0, 2)
             .toUpperCase()}
         </div>
+		</>
       )}
 
       <div className="fantasy-player-info">
