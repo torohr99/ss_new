@@ -829,7 +829,15 @@ export default function GameHubPage({ params }) {
                 </form>
             
                 {memeGenerating && (
-                  // existing loading UI
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '1.5rem',
+                      color: 'var(--text-secondary)'
+                    }}
+                  >
+                    Generating your meme...
+                  </div>
                 )}
             
                 <div style={{ textAlign: 'right' }}>
