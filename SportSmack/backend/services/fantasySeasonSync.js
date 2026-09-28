@@ -31,14 +31,6 @@ async function syncCurrentFantasySeason() {
   const lockKey =
     `${LOCK_KEY_PREFIX}${season}`;
 
-  /*
-   * If this season has already been successfully
-   * synchronized within the last 24 hours,
-   * there is nothing to do.
-   *
-   * This prevents the expensive ESPN seeding
-   * operation from running every 5 minutes.
-   */
   const alreadySynced =
     await redis.get(
       syncedKey
@@ -52,17 +44,6 @@ async function syncCurrentFantasySeason() {
     };
   }
 
-  /*
-   * Only one worker/replica may perform the
-   * synchronization at a time.
-   *
-   * IMPORTANT:
-   * This uses ioredis syntax:
-   * 'NX', 'EX', ttl
-   *
-   * Do NOT use:
-   * { NX: true, EX: ttl }
-   */
   const lock =
     await redis.set(
       lockKey,
@@ -80,13 +61,6 @@ async function syncCurrentFantasySeason() {
     };
   }
 
-  /*
-   * Check the completed-sync key again after
-   * acquiring the lock.
-   *
-   * Another worker may have completed the sync
-   * between our first GET and acquiring the lock.
-   */
   const syncedAfterLock =
     await redis.get(
       syncedKey
@@ -108,13 +82,15 @@ async function syncCurrentFantasySeason() {
     const total =
       await seedFantasyPlayers();
 
-    /*
-     * Mark this season as synchronized for 24 hours.
-     *
-     * The lock itself is intentionally NOT deleted.
-     * Its 15-minute TTL provides automatic recovery
-     * if the worker crashes during synchronization.
-     */
+    if (
+      !Number.isFinite(total) ||
+      total <= 0
+    ) {
+      throw new Error(
+        `Fantasy season ${season} synchronization produced no players.`
+      );
+    }
+
     await redis.set(
       syncedKey,
       String(Date.now()),
@@ -123,8 +99,7 @@ async function syncCurrentFantasySeason() {
     );
 
     console.log(
-      `Fantasy season ${season} synchronization complete. ` +
-      `${total} players synchronized.`
+      `Fantasy season ${season} synchronization completed successfully with ${total} players.`
     );
 
     return {
@@ -134,8 +109,8 @@ async function syncCurrentFantasySeason() {
     };
   } catch (error) {
     console.error(
-      `Fantasy season synchronization failed for ${season}:`,
-      error
+      `Fantasy season ${season} synchronization failed:`,
+      error.message
     );
 
     throw error;
