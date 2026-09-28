@@ -3,14 +3,19 @@ const {
   getOrSetJson
 } = require('./cache');
 
-const CURRENT_SEASON = 2026;
-const CACHE_TTL_SECONDS = 60 * 60;
+const {
+  getCurrentFantasySeason
+} = require('./fantasySeason');
+
+const CACHE_TTL_SECONDS =
+  60 * 60;
 
 async function loadWeeklyProjections(
+  season,
   weekNumber
 ) {
   const url =
-    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${CURRENT_SEASON}` +
+    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}` +
     `/segments/0/leaguedefaults/3`;
 
   const fantasyFilter = {
@@ -156,7 +161,8 @@ async function loadWeeklyProjections(
 }
 
 async function getWeeklyProjectedPoints(
-  weekNumber
+  weekNumber,
+  season = getCurrentFantasySeason()
 ) {
   const week =
     Math.min(
@@ -168,10 +174,11 @@ async function getWeeklyProjectedPoints(
     );
 
   return getOrSetJson(
-    `fantasy:weekly-projections:v2:${CURRENT_SEASON}:${week}`,
+    `fantasy:weekly-projections:v2:${season}:${week}`,
     CACHE_TTL_SECONDS,
     () =>
       loadWeeklyProjections(
+        season,
         week
       ),
     {
