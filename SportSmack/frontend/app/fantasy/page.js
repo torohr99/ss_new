@@ -9,7 +9,11 @@ export default function FantasyDashboard() {
   const [leagues, setLeagues] = useState([]);
   const [playerCount, setPlayerCount] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isOffseason, setIsOffseason] = useState(true); // Default to true since it's May
+  const [isOffseason, setIsOffseason] = useState(() => {
+    const month = new Date().getMonth();
+  
+    return month >= 2 && month <= 7;
+  });
   const [devOverride, setDevOverride] = useState(false);
   
   const [newLeagueName, setNewLeagueName] = useState('');
@@ -18,18 +22,7 @@ export default function FantasyDashboard() {
 
   useEffect(() => {
     fetchLeagues();
-    checkSeasonStatus();
   }, []);
-
-  const checkSeasonStatus = () => {
-    try {
-      const month = new Date().getMonth(); // 0 = Jan, 11 = Dec
-      // NFL offseason is roughly March (2) to August (7)
-      setIsOffseason(month >= 2 && month <= 7);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const fetchLeagues = async () => {
     try {
