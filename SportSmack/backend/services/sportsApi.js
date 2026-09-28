@@ -238,125 +238,425 @@ async function getStandings(leagueKey) {
   }
 }
 
-async function getTeamSchedule(sport, league, espnId) {
-  const cacheKey = `teamSchedule_${sport}_${league}_${espnId}`;
-  const cached = await cache.getJson(cacheKey);
-  if (cached) return cached;
+async function getTeamSchedule(
+  sport,
+  league,
+  espnId
+) {
+  /*
+   * v2 forces a refresh of the schedule logic after
+   * adding explicit postseason support.
+   *
+   * The existing one-hour Redis TTL is retained so
+   * this remains scalable for millions of users.
+   */
+  const cacheKey =
+    `teamSchedule_v2_${sport}_${league}_${espnId}`;
+
+  const cached =
+    await cache.getJson(
+      cacheKey
+    );
+
+  if (cached) {
+    return cached;
+  }
 
   try {
-    const response = await espnClient.get(`https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`);
-    const events = response.data.events || [];
+    const baseUrl =
+      `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${espnId}/schedule`;
+
+    /*
+     * ESPN separates schedules by season type:
+     *
+     * 1 = preseason
+     * 2 = regular season
+     * 3 = postseason
+     *
+     * Fetch all three and merge them.
+     *
+     * This is especially important after a regular
+     * season ends, because the postseason games are
+     * not guaranteed to appear in the regular-season
+     * schedule response.
+     */
+    const seasonTypes = [
+      1,
+      2,
+      3
+    ];
+
+    const scheduleResponses =
+      await Promise.all(
+        seasonTypes.map(
+          async seasonType => {
+            try {
+              const response =
+                await espnClient.get(
+                  `${baseUrl}?limit=1000&seasontype=${seasonType}`
+                );
+
+              return Array.isArray(
+                response.data?.events
+              )
+                ? response.data.events
+                : [];
+            } catch (error) {
+              /*
+               * Some leagues do not have a preseason
+               * or postseason. Do not let one empty
+               * season type break the team's schedule.
+               */
+              console.error(
+                `ESPN schedule error for ${league} team ${espnId}, season type ${seasonType}:`,
+                error.message
+              );
+
+              return [];
+            }
+          }
+        )
+      );
+
+    /*
+     * Merge and de-duplicate by ESPN event ID.
+     *
+     * This protects us if ESPN ever includes an event
+     * in more than one response.
+     */
+    const eventMap =
+      new Map();
+
+    for (
+      const events of
+      scheduleResponses
+    ) {
+      for (
+        const event of
+        events
+      ) {
+        if (!event?.id) {
+          continue;
+        }
+
+        eventMap.set(
+          String(event.id),
+          event
+        );
+      }
+    }
+
+    const sortedEvents =
+      Array.from(
+        eventMap.values()
+      ).sort(
+        (a, b) =>
+          new Date(a.date) -
+          new Date(b.date)
+      );
 
     let lastGame = null;
     let todayGame = null;
     let nextGame = null;
 
-    // We rely on ESPN's internal status types:
-    // 'post' = completed, 'in' = live/today, 'pre' = future
-    const sortedEvents = events.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    // Find last game
-    const completedGames = sortedEvents.filter(e => e.competitions[0].status.type.state === 'post');
-    if (completedGames.length > 0) {
-      lastGame = completedGames[completedGames.length - 1]; // Most recent completed
-    }
-
-    // Find today / live game
-    const liveGames = sortedEvents.filter(e => e.competitions[0].status.type.state === 'in');
-    if (liveGames.length > 0) {
-      todayGame = liveGames[0];
-    } else {
-      // If no live game, check if there's a 'pre' game scheduled for today's date local
-      const todayString = new Date().toDateString();
-      const todayPreGames = sortedEvents.filter(e => 
-        e.competitions[0].status.type.state === 'pre' && 
-        new Date(e.date).toDateString() === todayString
+    /*
+     * ESPN status:
+     *
+     * post = completed
+     * in   = live
+     * pre  = scheduled
+     */
+    const completedGames =
+      sortedEvents.filter(
+        event =>
+          event?.competitions?.[0]
+            ?.status?.type?.state ===
+          'post'
       );
-      if (todayPreGames.length > 0) {
-        todayGame = todayPreGames[0];
+
+    if (
+      completedGames.length > 0
+    ) {
+      lastGame =
+        completedGames[
+          completedGames.length - 1
+        ];
+    }
+
+    /*
+     * A live game takes priority for Today.
+     */
+    const liveGames =
+      sortedEvents.filter(
+        event =>
+          event?.competitions?.[0]
+            ?.status?.type?.state ===
+          'in'
+      );
+
+    if (
+      liveGames.length > 0
+    ) {
+      todayGame =
+        liveGames[0];
+    } else {
+      /*
+       * If no game is live, check for a scheduled
+       * game occurring today.
+       */
+      const todayString =
+        new Date().toDateString();
+
+      const todayPreGames =
+        sortedEvents.filter(
+          event =>
+            event?.competitions?.[0]
+              ?.status?.type?.state ===
+              'pre' &&
+            new Date(
+              event.date
+            ).toDateString() ===
+              todayString
+        );
+
+      if (
+        todayPreGames.length > 0
+      ) {
+        todayGame =
+          todayPreGames[0];
       }
     }
 
-    // Find next game
-    // A future game that is NOT todayGame
-    const futureGames = sortedEvents.filter(e => 
-      e.competitions[0].status.type.state === 'pre' && 
-      (!todayGame || e.id !== todayGame.id)
-    );
-    if (futureGames.length > 0) {
-      nextGame = futureGames[0];
+    /*
+     * The next game is the first future scheduled
+     * game that isn't already represented by todayGame.
+     *
+     * For a playoff team, this now naturally becomes
+     * its next postseason game.
+     *
+     * Once the team is eliminated, ESPN stops providing
+     * future games for that team, so nextGame becomes null.
+     */
+    const futureGames =
+      sortedEvents.filter(
+        event =>
+          event?.competitions?.[0]
+            ?.status?.type?.state ===
+            'pre' &&
+          (
+            !todayGame ||
+            event.id !==
+              todayGame.id
+          )
+      );
+
+    if (
+      futureGames.length > 0
+    ) {
+      nextGame =
+        futureGames[0];
     }
 
-    // Helper to format a game box
-    const formatGame = (game) => {
-      if (!game) return null;
-      const comp = game.competitions[0];
-      const homeTeam = comp.competitors.find(c => c.homeAway === 'home');
-      const awayTeam = comp.competitors.find(c => c.homeAway === 'away');
-      return {
-        id: game.id,
-        name: game.name,
-        shortName: game.shortName,
-        date: game.date,
-        status: comp.status.type.shortDetail,
-        homeTeam: {
-          name: homeTeam.team.displayName,
-          logo: homeTeam.team.logos?.[0]?.href,
-          score: homeTeam.score?.value ?? homeTeam.score, // Use ?? to prevent 0 from falling back to object
-          winner: homeTeam.winner
-        },
-        awayTeam: {
-          name: awayTeam.team.displayName,
-          logo: awayTeam.team.logos?.[0]?.href,
-          score: awayTeam.score?.value ?? awayTeam.score,
-          winner: awayTeam.winner
+    const formatGame =
+      game => {
+        if (!game) {
+          return null;
         }
+
+        const comp =
+          game.competitions?.[0];
+
+        if (!comp) {
+          return null;
+        }
+
+        const homeTeam =
+          comp.competitors?.find(
+            competitor =>
+              competitor.homeAway ===
+              'home'
+          );
+
+        const awayTeam =
+          comp.competitors?.find(
+            competitor =>
+              competitor.homeAway ===
+              'away'
+          );
+
+        if (
+          !homeTeam ||
+          !awayTeam
+        ) {
+          return null;
+        }
+
+        return {
+          id: game.id,
+          name: game.name,
+          shortName:
+            game.shortName,
+          date: game.date,
+          status:
+            comp.status?.type
+              ?.shortDetail ||
+            comp.status?.type
+              ?.description ||
+            '',
+          homeTeam: {
+            name:
+              homeTeam.team
+                ?.displayName ||
+              'Unknown',
+            logo:
+              homeTeam.team
+                ?.logos?.[0]?.href,
+            score:
+              homeTeam.score
+                ?.value ??
+              homeTeam.score,
+            winner:
+              homeTeam.winner
+          },
+          awayTeam: {
+            name:
+              awayTeam.team
+                ?.displayName ||
+              'Unknown',
+            logo:
+              awayTeam.team
+                ?.logos?.[0]?.href,
+            score:
+              awayTeam.score
+                ?.value ??
+              awayTeam.score,
+            winner:
+              awayTeam.winner
+          }
+        };
       };
-    };
 
-    // Format all games for the calendar
-    const allGames = sortedEvents.map(game => {
-      const formatted = formatGame(game);
-      if (!formatted) return null;
-      
-      // Determine if our team (espnId) is home or away
-      const isHome = game.competitions[0].competitors.find(c => c.homeAway === 'home').team.id === espnId;
-      
-      const ourTeam = isHome ? formatted.homeTeam : formatted.awayTeam;
-      const theirTeam = isHome ? formatted.awayTeam : formatted.homeTeam;
+    /*
+     * Format every game for the team calendar.
+     */
+    const allGames =
+      sortedEvents
+        .map(game => {
+          const formatted =
+            formatGame(game);
 
-      // Determine result
-      let result = null;
-      if (game.competitions[0].status.type.state === 'post') {
-        const typeName = game.competitions[0].status.type.name;
-        if (typeName === 'STATUS_POSTPONED') result = 'PPD';
-        else if (typeName === 'STATUS_CANCELED') result = 'CANC';
-        else if (ourTeam.winner) result = 'W';
-        else if (theirTeam.winner) result = 'L';
-        else result = 'T'; // Tie
-      }
+          if (!formatted) {
+            return null;
+          }
 
-      return {
-        ...formatted,
-        isHome,
-        ourScore: ourTeam.score,
-        theirScore: theirTeam.score,
-        opponentName: theirTeam.name,
-        result
-      };
-    }).filter(Boolean);
+          const homeCompetitor =
+            game.competitions?.[0]
+              ?.competitors?.find(
+                competitor =>
+                  competitor.homeAway ===
+                  'home'
+              );
+
+          const isHome =
+            String(
+              homeCompetitor?.team?.id
+            ) ===
+            String(espnId);
+
+          const ourTeam =
+            isHome
+              ? formatted.homeTeam
+              : formatted.awayTeam;
+
+          const theirTeam =
+            isHome
+              ? formatted.awayTeam
+              : formatted.homeTeam;
+
+          let result = null;
+
+          if (
+            game.competitions?.[0]
+              ?.status?.type?.state ===
+            'post'
+          ) {
+            const typeName =
+              game.competitions?.[0]
+                ?.status?.type?.name;
+
+            if (
+              typeName ===
+              'STATUS_POSTPONED'
+            ) {
+              result = 'PPD';
+            } else if (
+              typeName ===
+              'STATUS_CANCELED'
+            ) {
+              result = 'CANC';
+            } else if (
+              ourTeam.winner
+            ) {
+              result = 'W';
+            } else if (
+              theirTeam.winner
+            ) {
+              result = 'L';
+            } else {
+              result = 'T';
+            }
+          }
+
+          return {
+            ...formatted,
+            isHome,
+            ourScore:
+              ourTeam.score,
+            theirScore:
+              theirTeam.score,
+            opponentName:
+              theirTeam.name,
+            result
+          };
+        })
+        .filter(Boolean);
 
     const scheduleData = {
-      lastGame: formatGame(lastGame),
-      todayGame: formatGame(todayGame),
-      nextGame: formatGame(nextGame),
+      lastGame:
+        formatGame(
+          lastGame
+        ),
+      todayGame:
+        formatGame(
+          todayGame
+        ),
+      nextGame:
+        formatGame(
+          nextGame
+        ),
       allGames
     };
-    await cache.setJson(cacheKey, scheduleData, 3600); // cache for 1 hour
-    return scheduleData;
 
+    /*
+     * Keep the existing one-hour shared Redis cache.
+     *
+     * This prevents every page view/user from hitting
+     * ESPN directly and preserves the scalability work
+     * already completed.
+     */
+    await cache.setJson(
+      cacheKey,
+      scheduleData,
+      3600
+    );
+
+    return scheduleData;
   } catch (error) {
-    console.error(`ESPN API Error fetching schedule for team ${espnId}:`, error.message);
+    console.error(
+      `ESPN API Error fetching schedule for team ${espnId}:`,
+      error.message
+    );
+
     return null;
   }
 }
