@@ -803,7 +803,8 @@ router.get(
 
             const weeklyProjections =
               await getWeeklyProjectedPoints(
-                currentWeek
+                currentWeek,
+                league.season
               );
       
             const playerWeeklyScores =
