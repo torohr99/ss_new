@@ -726,7 +726,7 @@ export default function DraftRoom({ params }) {
                               textAlign: 'center'
                             }}
                           >
-                            2025
+                            {league.season - 1}
                           </th>
                           
                           <th
