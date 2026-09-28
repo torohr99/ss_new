@@ -183,7 +183,7 @@ async function getWeeklyStats(
   weekNumber
 ) {
   const url =
-    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=${season}&seasontype=2&week=${weekNumber}`;
+    `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&season=${season}&seasontype=2&week=${weekNumber}`;
 
   const response = await axios.get(url, {
     timeout: 15000
@@ -757,10 +757,17 @@ async function scoreLeagueWeek(
           dstPoints: 0
         };
 
-      const playerPoints =
-        calculatePlayerPoints(
-          playerStats
-        );
+      const isDST =
+        String(
+          rosterPlayer.player.position || ''
+        ).toUpperCase() === 'DST';
+    
+    const playerPoints =
+      isDST
+        ? number(playerStats.dstPoints)
+        : calculatePlayerPoints(
+            playerStats
+          );
 
       /*
        * Store the player's weekly NFL fantasy
