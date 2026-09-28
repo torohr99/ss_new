@@ -46,6 +46,8 @@ export default function DraftRoom({ params }) {
   const [socket, setSocket] = useState(null);
   
   const [league, setLeague] = useState(null);
+  const [currentFantasySeason, setCurrentFantasySeason] =
+    useState(null);
   const [teams, setTeams] = useState([]);
   const [picks, setPicks] = useState([]);
   const [availablePlayers, setAvailablePlayers] = useState([]);
@@ -576,7 +578,7 @@ export default function DraftRoom({ params }) {
                         marginTop: '0.25rem'
                       }}
                     >
-                      Ranked using 65% projected 2026 points + 35% 2025 fantasy points
+                      Ranked using 65% projected {league.season} points + 35% {league.season - 1} fantasy points
                     </div>
                           
                     <div
