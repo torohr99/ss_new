@@ -1019,39 +1019,43 @@ router.post(
   authenticateToken,
   async (req, res) => {
     try {
-      const teamId = Number(req.params.id);
+      const teamId =
+        Number(req.params.id);
+
       const teamPlayerId =
         Number(req.body.teamPlayerId);
+
       const status =
-        String(req.body.status || '').toUpperCase();
+        String(
+          req.body.status || ''
+        ).toUpperCase();
 
-      const league =
-        await prisma.fantasyLeague.findUnique({
-          where: {
-            id: leagueId
-          },
-          select: {
-            season: true
-          }
-        });
-
-      if (
-        await isLineupLocked(
-          currentWeek,
-          team.league.season
-        )
-      ) {
-        return res.status(409).json({
-          error: `Week ${currentWeek} lineup is locked.`
+      if (!Number.isInteger(teamId)) {
+        return res.status(400).json({
+          error: 'Invalid team ID'
         });
       }
 
-      if (!['STARTER', 'BENCH'].includes(status)) {
+      if (!Number.isInteger(teamPlayerId)) {
+        return res.status(400).json({
+          error: 'Invalid roster player ID'
+        });
+      }
+
+      if (
+        !['STARTER', 'BENCH'].includes(
+          status
+        )
+      ) {
         return res.status(400).json({
           error: 'Invalid roster status'
         });
       }
 
+      /*
+       * Load the team before performing any
+       * league/lineup-lock checks.
+       */
       const team =
         await prisma.fantasyTeam.findUnique({
           where: {
@@ -1072,21 +1076,67 @@ router.post(
         });
       }
 
-      if (team.userId !== req.user.id) {
+      /*
+       * Only the owner of the fantasy team
+       * may change its lineup.
+       */
+      if (
+        team.userId !== req.user.id
+      ) {
         return res.status(403).json({
           error: 'Not your team'
+        });
+      }
+
+      /*
+       * Load the league so we can determine
+       * the current fantasy week and lineup
+       * lock time.
+       */
+      const league =
+        await prisma.fantasyLeague.findUnique({
+          where: {
+            id: team.leagueId
+          },
+          select: {
+            season: true
+          }
+        });
+
+      if (!league) {
+        return res.status(404).json({
+          error: 'League not found'
+        });
+      }
+
+      const currentWeek =
+        await getCurrentFantasyWeek(
+          league.season
+        );
+
+      if (
+        await isLineupLocked(
+          currentWeek,
+          league.season
+        )
+      ) {
+        return res.status(409).json({
+          error:
+            `Week ${currentWeek} lineup is locked.`
         });
       }
 
       const target =
         team.players.find(
           player =>
-            player.id === teamPlayerId
+            player.id ===
+            teamPlayerId
         );
 
       if (!target) {
         return res.status(404).json({
-          error: 'Player not found on roster'
+          error:
+            'Player not found on roster'
         });
       }
 
@@ -1125,8 +1175,12 @@ router.post(
         });
 
       res.json(updated);
+
     } catch (err) {
-      console.error('Roster update error:', err);
+      console.error(
+        'Roster update error:',
+        err
+      );
 
       res.status(500).json({
         error: 'Failed to update roster'
