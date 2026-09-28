@@ -235,7 +235,7 @@ model GameChatDiscipline {
 model FantasyLeague {
   id               Int      @id @default(autoincrement())
   name             String
-  season           Int      @default(2026)
+  season           Int
   ownerId          Int
   status           String   @default("PREDRAFT") // PREDRAFT, DRAFTING, SEASON, FINISHED
   currentPickIndex Int      @default(0)
