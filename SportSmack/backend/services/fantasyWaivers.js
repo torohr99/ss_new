@@ -2,7 +2,25 @@ const prisma = require('../lib/prisma');
 
 const MAX_ROSTER_SIZE = 15;
 
-async function processLeagueWaivers(leagueId) {
+async function processLeagueWaivers(
+  leagueId
+) {
+  const league =
+    await prisma.fantasyLeague.findUnique({
+      where: {
+        id: leagueId
+      },
+      select: {
+        season: true
+      }
+    });
+
+  if (!league) {
+    throw new Error(
+      `Fantasy league ${leagueId} not found.`
+    );
+  }
+
   const claims =
     await prisma.fantasyWaiverClaim.findMany({
       where: {
@@ -37,6 +55,34 @@ async function processLeagueWaivers(leagueId) {
     if (processedPlayers.has(claim.playerId)) {
       continue;
     }
+
+        /*
+         * Reject claims for players who are no longer
+         * active or who belong to another fantasy season.
+         */
+        if (
+          !claim.player ||
+          claim.player.season !==
+            league.season ||
+          !claim.player.isActive
+        ) {
+          await prisma.fantasyWaiverClaim.updateMany({
+            where: {
+              leagueId,
+              playerId: claim.playerId,
+              status: 'PENDING'
+            },
+            data: {
+              status: 'REJECTED'
+            }
+          });
+    
+          processedPlayers.add(
+            claim.playerId
+          );
+    
+          continue;
+        }
 
     const stillRostered =
       await prisma.fantasyTeamPlayer.findFirst({
