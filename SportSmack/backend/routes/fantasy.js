@@ -1678,9 +1678,12 @@ router.post(
       }
 
       const player =
-        await prisma.fantasyPlayer.findUnique({
+        await prisma.fantasyPlayer.findFirst({
           where: {
-            id: playerId
+            id: playerId,
+            season:
+              team.league.season,
+            isActive: true
           }
         });
 
