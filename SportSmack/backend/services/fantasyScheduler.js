@@ -114,7 +114,14 @@ function startFantasyScheduler() {
   scoreActiveLeagues();
   processDueWaivers();
   processBotTransactions();
-  syncCurrentFantasySeason();
+  
+  syncCurrentFantasySeason()
+    .catch(error => {
+      console.error(
+        'Initial fantasy season synchronization failed:',
+        error.message
+      );
+    });
 
   // Then every 5 minutes.
   intervalId = setInterval(
