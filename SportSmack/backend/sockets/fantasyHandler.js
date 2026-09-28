@@ -234,14 +234,18 @@ function setupFantasySockets(io) {
 
             const availablePlayers =
               await prisma.fantasyPlayer.findMany({
-                where:
-                  draftedIds.length > 0
+                where: {
+                  season:
+                    currentLeague.season,
+                  isActive: true,
+                  ...(draftedIds.length > 0
                     ? {
                         id: {
                           notIn: draftedIds
                         }
                       }
-                    : {}
+                    : {})
+                }
               });
 
             if (availablePlayers.length === 0) {
@@ -693,6 +697,27 @@ function setupFantasySockets(io) {
             return;
           }
 
+          // Verify player belongs to this league's
+          // fantasy season and is currently active.
+          const draftPlayer =
+            await prisma.fantasyPlayer.findFirst({
+              where: {
+                id: parsedPlayerId,
+                season:
+                  league.season,
+                isActive: true
+              }
+            });
+          
+          if (!draftPlayer) {
+            socket.emit('draft_error', {
+              message:
+                'Player is not available for this draft.'
+            });
+          
+            return;
+          }
+          
           // Verify player is not already drafted.
           const existingPick =
             await prisma.fantasyDraftPick.findFirst({
@@ -701,12 +726,13 @@ function setupFantasySockets(io) {
                 playerId: parsedPlayerId
               }
             });
-
+          
           if (existingPick) {
             socket.emit('draft_error', {
               message:
                 'Player already drafted'
             });
+          
             return;
           }
 
