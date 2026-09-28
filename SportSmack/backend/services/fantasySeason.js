@@ -1,28 +1,41 @@
 const NFL_REGULAR_SEASON_START_MONTH = 8;
 // September = 8 in JavaScript UTC month indexing.
 
-function getCurrentFantasySeason() {
-  const now = new Date();
-  const month = now.getUTCMonth();
+function getFantasySeasonForDate(date) {
+  const value =
+    date instanceof Date
+      ? date
+      : new Date(date);
 
-  /*
-   * NFL seasons are named for the year in which
-   * the regular season begins.
-   *
-   * September through December:
-   *   current calendar year
-   *
-   * January through August:
-   *   previous calendar year
-   */
+  if (
+    Number.isNaN(
+      value.getTime()
+    )
+  ) {
+    throw new Error(
+      `Invalid date: ${date}`
+    );
+  }
+
+  const month =
+    value.getUTCMonth();
+
   if (
     month >=
     NFL_REGULAR_SEASON_START_MONTH
   ) {
-    return now.getUTCFullYear();
+    return value.getUTCFullYear();
   }
 
-  return now.getUTCFullYear() - 1;
+  return (
+    value.getUTCFullYear() - 1
+  );
+}
+
+function getCurrentFantasySeason() {
+  return getFantasySeasonForDate(
+    new Date()
+  );
 }
 
 function getPreviousFantasySeason(
@@ -52,6 +65,7 @@ function validateFantasySeason(
 
 module.exports = {
   getCurrentFantasySeason,
+  getFantasySeasonForDate,
   getPreviousFantasySeason,
   validateFantasySeason
 };
