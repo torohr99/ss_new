@@ -8,30 +8,30 @@ datasource db {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  role          String   @default("USER")
-  username      String   @unique
-  email         String   @unique
-  password_hash String
-  profile_pic   String?
-  isVerified    Boolean  @default(false) // Required for new signups
+  id                Int      @id @default(autoincrement())
+  role              String   @default("USER")
+  username          String   @unique
+  email             String   @unique
+  password_hash     String
+  profile_pic       String?
+  isVerified        Boolean  @default(false) // Required for new signups
   verificationToken String? // Token used to verify the email
-  otpCode       String?
-  created_at    DateTime @default(now())
+  otpCode           String?
+  created_at        DateTime @default(now())
 
-  friends        Friendship[]    @relation("UserFriends")
-  friendOf       Friendship[]    @relation("UserFriendOf")
-  blocksMade     Block[]         @relation("UserBlocks")
-  blockedBy      Block[]         @relation("UserBlockedBy")
-  reportsMade   Report[]        @relation("ReportsMade")
-  reportsResolved Report[]      @relation("ReportsResolved")
-  teams          UserTeam[]
-  posts          Post[]
-  likes          Like[]
-  comments       Comment[]
-  gameMessages   GameMessage[]
-  fantasyLeagues FantasyLeague[] @relation("LeagueOwner")
-  fantasyTeams   FantasyTeam[]
+  friends         Friendship[]         @relation("UserFriends")
+  friendOf        Friendship[]         @relation("UserFriendOf")
+  blocksMade      Block[]              @relation("UserBlocks")
+  blockedBy       Block[]              @relation("UserBlockedBy")
+  reportsMade     Report[]             @relation("ReportsMade")
+  reportsResolved Report[]             @relation("ReportsResolved")
+  teams           UserTeam[]
+  posts           Post[]
+  likes           Like[]
+  comments        Comment[]
+  gameMessages    GameMessage[]
+  fantasyLeagues  FantasyLeague[]      @relation("LeagueOwner")
+  fantasyTeams    FantasyTeam[]
   chatDisciplines GameChatDiscipline[]
 
   // Bracket features
@@ -39,9 +39,9 @@ model User {
   bracketPicks   BracketPick[]   @relation("UserBracketPicks")
 
   // Badges & Notifications
-  badges         UserBadge[]
-  notifications  Notification[]
-  
+  badges        UserBadge[]
+  notifications Notification[]
+
   // Profile enhancements
   predictions_total Int @default(0)
   predictions_won   Int @default(0)
@@ -94,10 +94,10 @@ model Friendship {
 }
 
 model Block {
-  id         Int      @id @default(autoincrement())
-  blockerId  Int
-  blockedId  Int
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  createdAt DateTime @default(now())
 
   blocker User @relation("UserBlocks", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked User @relation("UserBlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
@@ -108,18 +108,18 @@ model Block {
 }
 
 model Report {
-  id          Int      @id @default(autoincrement())
-  reporterId  Int
-  targetType  String
-  targetId    String
-  reason      String
-  details     String?
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
-  resolvedAt  DateTime?
-  resolvedBy  Int?
+  id         Int       @id @default(autoincrement())
+  reporterId Int
+  targetType String
+  targetId   String
+  reason     String
+  details    String?
+  status     String    @default("PENDING")
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  resolvedBy Int?
 
-  reporter User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter User  @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
   resolver User? @relation("ReportsResolved", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
@@ -128,12 +128,12 @@ model Report {
 }
 
 model Team {
-  id       Int    @id @default(autoincrement())
-  city     String
-  name     String
+  id           Int    @id @default(autoincrement())
+  city         String
+  name         String
   abbreviation String
-  logo_url String
-  sport    String
+  logo_url     String
+  sport        String
 
   users UserTeam[]
 
@@ -193,18 +193,18 @@ model Comment {
 }
 
 model GameMessage {
-  id        Int      @id @default(autoincrement())
-  gameId    String
-  league    String
-  content   String
-  type      String   @default("text") // 'text', 'poll', 'meme'
+  id            Int      @id @default(autoincrement())
+  gameId        String
+  league        String
+  content       String
+  type          String   @default("text") // 'text', 'poll', 'meme'
   poll_question String?
   poll_options  String? // JSON string
   poll_results  String? // JSON string
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
-  teamId    Int? // EspnId of the team the user supports, if any
-  createdAt DateTime @default(now())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id])
+  teamId        Int? // EspnId of the team the user supports, if any
+  createdAt     DateTime @default(now())
 
   @@index([gameId, createdAt])
   @@index([league, gameId, createdAt])
@@ -235,17 +235,17 @@ model GameChatDiscipline {
 model FantasyLeague {
   id               Int      @id @default(autoincrement())
   name             String
-  season           Int      @default(2026)
+  season           Int
   ownerId          Int
   status           String   @default("PREDRAFT") // PREDRAFT, DRAFTING, SEASON, FINISHED
   currentPickIndex Int      @default(0)
   createdAt        DateTime @default(now())
 
-  owner      User               @relation("LeagueOwner", fields: [ownerId], references: [id])
-  teams      FantasyTeam[]
-  draftPicks FantasyDraftPick[]
-  matchups      FantasyMatchup[]
-  transactions  FantasyTransaction[]
+  owner        User                 @relation("LeagueOwner", fields: [ownerId], references: [id])
+  teams        FantasyTeam[]
+  draftPicks   FantasyDraftPick[]
+  matchups     FantasyMatchup[]
+  transactions FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
   trades       FantasyTrade[]
 
@@ -260,48 +260,54 @@ model FantasyTeam {
   name       String
   draftOrder Int?
   createdAt  DateTime @default(now())
-  faab       Int @default(100)
+  faab       Int      @default(100)
 
-  league       FantasyLeague        @relation(fields: [leagueId], references: [id])
-  user         User                 @relation(fields: [userId], references: [id])
-  players      FantasyTeamPlayer[]
-  weeklyScores FantasyWeeklyScore[]
-  homeMatchups FantasyMatchup[] @relation("HomeMatchups")
-  awayMatchups FantasyMatchup[] @relation("AwayMatchups")
-  transactions FantasyTransaction[]
-  waiverClaims FantasyWaiverClaim[]
-  tradesProposed FantasyTrade[] @relation("TradeProposer")
-  tradesReceived FantasyTrade[] @relation("TradeRecipient")
-  tradeItemsSent     FantasyTradeItem[] @relation("TradeItemsFromTeam")
-  tradeItemsReceived FantasyTradeItem[] @relation("TradeItemsToTeam")
+  league             FantasyLeague        @relation(fields: [leagueId], references: [id])
+  user               User                 @relation(fields: [userId], references: [id])
+  players            FantasyTeamPlayer[]
+  weeklyScores       FantasyWeeklyScore[]
+  homeMatchups       FantasyMatchup[]     @relation("HomeMatchups")
+  awayMatchups       FantasyMatchup[]     @relation("AwayMatchups")
+  transactions       FantasyTransaction[]
+  waiverClaims       FantasyWaiverClaim[]
+  tradesProposed     FantasyTrade[]       @relation("TradeProposer")
+  tradesReceived     FantasyTrade[]       @relation("TradeRecipient")
+  tradeItemsSent     FantasyTradeItem[]   @relation("TradeItemsFromTeam")
+  tradeItemsReceived FantasyTradeItem[]   @relation("TradeItemsToTeam")
 
   @@index([leagueId])
   @@index([userId])
 }
 
 model FantasyPlayer {
-  id       Int     @id @default(autoincrement())
-  espnId   String  @unique
-  season   Int
-  name     String
-  position String
-  team     String
-  jerseyNumber String?
-  imageUrl String?
-  byeWeek        Int?
+  id              Int     @id @default(autoincrement())
+  espnId          String
+  season          Int
+  name            String
+  position        String
+  team            String
+  jerseyNumber    String?
+  imageUrl        String?
+  byeWeek         Int?
   projectedPoints Float?
   lastYearPoints  Float?
 
-  draftPicks  FantasyDraftPick[]
-  teamRosters FantasyTeamPlayer[]
+  // Current-season lifecycle information.
+  // Historical season records remain unchanged.
+  isActive   Boolean   @default(true)
+  lastSeenAt DateTime?
+
+  draftPicks   FantasyDraftPick[]
+  teamRosters  FantasyTeamPlayer[]
   transactions FantasyTransaction[]
   waiverClaims FantasyWaiverClaim[]
   weeklyScores FantasyPlayerWeeklyScore[]
-  tradeItems FantasyTradeItem[]
+  tradeItems   FantasyTradeItem[]
 
- @@unique([season, espnId])
- @@index([season, position, name])
- @@index([season, team])
+  @@unique([season, espnId])
+  @@index([season, position, name])
+  @@index([season, team])
+  @@index([season, isActive, position])
 }
 
 model FantasyDraftPick {
@@ -314,10 +320,10 @@ model FantasyDraftPick {
   league FantasyLeague @relation(fields: [leagueId], references: [id])
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@index([teamId])
-  @@index([playerId])
   @@unique([leagueId, playerId])
   @@unique([leagueId, pickNumber])
+  @@index([teamId])
+  @@index([playerId])
 }
 
 model FantasyTeamPlayer {
@@ -329,9 +335,9 @@ model FantasyTeamPlayer {
   team   FantasyTeam   @relation(fields: [teamId], references: [id], onDelete: Cascade)
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
+  @@unique([teamId, playerId])
   @@index([teamId, status])
   @@index([playerId])
-  @@unique([teamId, playerId])
 }
 
 model FantasyWeeklyScore {
@@ -348,12 +354,12 @@ model FantasyWeeklyScore {
 }
 
 model FantasyPlayerWeeklyScore {
-  id Int @id @default(autoincrement())
-  playerId Int
+  id         Int     @id @default(autoincrement())
+  playerId   Int
   weekNumber Int
-  points Float @default(0)
-  isLive Boolean @default(true)
-  statsJson String?
+  points     Float   @default(0)
+  isLive     Boolean @default(true)
+  statsJson  String?
 
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
@@ -391,14 +397,14 @@ model BracketPick {
 }
 
 model FantasyMatchup {
-  id              Int      @id @default(autoincrement())
-  leagueId        Int
-  weekNumber      Int
-  homeTeamId      Int
-  awayTeamId      Int
-  homeScore       Float    @default(0)
-  awayScore       Float    @default(0)
-  status          String   @default("UPCOMING")
+  id         Int    @id @default(autoincrement())
+  leagueId   Int
+  weekNumber Int
+  homeTeamId Int
+  awayTeamId Int
+  homeScore  Float  @default(0)
+  awayScore  Float  @default(0)
+  status     String @default("UPCOMING")
 
   league   FantasyLeague @relation(fields: [leagueId], references: [id])
   homeTeam FantasyTeam   @relation("HomeMatchups", fields: [homeTeamId], references: [id])
@@ -408,16 +414,16 @@ model FantasyMatchup {
 }
 
 model FantasyTransaction {
-  id         Int      @id @default(autoincrement())
-  leagueId   Int
-  teamId     Int
-  type       String
-  playerId   Int?
+  id            Int      @id @default(autoincrement())
+  leagueId      Int
+  teamId        Int
+  type          String
+  playerId      Int?
   relatedTeamId Int?
-  createdAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
 
-  league FantasyLeague @relation(fields: [leagueId], references: [id])
-  team   FantasyTeam   @relation(fields: [teamId], references: [id])
+  league FantasyLeague  @relation(fields: [leagueId], references: [id])
+  team   FantasyTeam    @relation(fields: [teamId], references: [id])
   player FantasyPlayer? @relation(fields: [playerId], references: [id])
 
   @@index([leagueId, createdAt])
@@ -426,14 +432,14 @@ model FantasyTransaction {
 }
 
 model FantasyWaiverClaim {
-  id          Int      @id @default(autoincrement())
-  leagueId    Int
-  teamId      Int
-  playerId    Int
-  bidAmount   Int      @default(0)
-  priority    Int?
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  leagueId  Int
+  teamId    Int
+  playerId  Int
+  bidAmount Int      @default(0)
+  priority  Int?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
 
   league FantasyLeague @relation(fields: [leagueId], references: [id])
   team   FantasyTeam   @relation(fields: [teamId], references: [id])
@@ -445,19 +451,19 @@ model FantasyWaiverClaim {
 }
 
 model FantasyTrade {
-  id           Int      @id @default(autoincrement())
-  leagueId     Int
-  proposerTeamId Int
+  id              Int       @id @default(autoincrement())
+  leagueId        Int
+  proposerTeamId  Int
   recipientTeamId Int
-  status       String   @default("PENDING")
-  createdAt    DateTime @default(now())
-  respondedAt  DateTime?
-  expiresAt    DateTime?
+  status          String    @default("PENDING")
+  createdAt       DateTime  @default(now())
+  respondedAt     DateTime?
+  expiresAt       DateTime?
 
-  league         FantasyLeague @relation(fields: [leagueId], references: [id])
-  proposerTeam   FantasyTeam   @relation("TradeProposer", fields: [proposerTeamId], references: [id])
-  recipientTeam  FantasyTeam   @relation("TradeRecipient", fields: [recipientTeamId], references: [id])
-  items          FantasyTradeItem[]
+  league        FantasyLeague      @relation(fields: [leagueId], references: [id])
+  proposerTeam  FantasyTeam        @relation("TradeProposer", fields: [proposerTeamId], references: [id])
+  recipientTeam FantasyTeam        @relation("TradeRecipient", fields: [recipientTeamId], references: [id])
+  items         FantasyTradeItem[]
 
   @@index([leagueId, status])
   @@index([proposerTeamId])
@@ -471,10 +477,10 @@ model FantasyTradeItem {
   fromTeamId Int
   toTeamId   Int
 
-  trade    FantasyTrade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  trade    FantasyTrade  @relation(fields: [tradeId], references: [id], onDelete: Cascade)
   player   FantasyPlayer @relation(fields: [playerId], references: [id])
-  fromTeam FantasyTeam @relation("TradeItemsFromTeam", fields: [fromTeamId], references: [id])
-  toTeam   FantasyTeam @relation("TradeItemsToTeam", fields: [toTeamId], references: [id])
+  fromTeam FantasyTeam   @relation("TradeItemsFromTeam", fields: [fromTeamId], references: [id])
+  toTeam   FantasyTeam   @relation("TradeItemsToTeam", fields: [toTeamId], references: [id])
 
   @@index([tradeId])
   @@index([playerId])
