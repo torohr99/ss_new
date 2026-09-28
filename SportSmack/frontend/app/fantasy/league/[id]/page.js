@@ -243,12 +243,17 @@ export default function LeaguePage({ params }) {
       p => p.status === 'BENCH'
     );
 
-  const totalPoints =
-    myTeam.weeklyScores?.reduce(
-      (sum, score) =>
-        sum + Number(score.points || 0),
-      0
-    ) || 0;
+  const currentWeek =
+    Number(
+      league.currentFantasyWeek
+    );
+
+  const currentWeekPoints =
+    myTeam.weeklyScores?.find(
+      score =>
+        Number(score.weekNumber) ===
+        currentWeek
+    )?.points ?? 0;
 
   const filteredPlayers =
     freeAgents.filter(player => {
@@ -742,7 +747,9 @@ export default function LeaguePage({ params }) {
                     Points
                   </div>
                   <div className="fantasy-stat-value">
-                    {totalPoints.toFixed(1)}
+                    {Number(
+					  currentWeekPoints
+					).toFixed(1)}
                   </div>
                 </div>
       
