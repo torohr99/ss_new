@@ -111,6 +111,9 @@ async function processBotWaiverCycle(
   const candidates =
     await prisma.fantasyPlayer.findMany({
       where: {
+        season:
+          league.season,
+        isActive: true,
         id: {
           notIn: rosteredIds
         }
