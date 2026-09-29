@@ -341,7 +341,7 @@ router.post(
                 'application/json'
             },
       
-            timeout: 120000
+            timeout: 30000
           }
         );
     
