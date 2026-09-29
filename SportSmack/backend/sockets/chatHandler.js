@@ -94,10 +94,6 @@ module.exports = function(io) {
       
       // Fallback: Check explicit token passed in socket.auth
       
-      console.log(
-        'Socket handshake received. Token present:',
-        !!token
-      );
       if (!token) {
         return next(new Error('Authentication error'));
       }
@@ -112,8 +108,13 @@ module.exports = function(io) {
       
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        include: { teams: { include: { team: true } } }
+        where: {
+          id: decoded.id
+        },
+        select: {
+          id: true,
+          username: true
+        }
       });
 
       if (!user) {
@@ -159,7 +160,6 @@ module.exports = function(io) {
     
       return true;
     };
-    console.log(`User connected to chat: ${socket.user.username}`);
 
     socket.on('join_game', async (data, callback) => {
       const league = String(data.league || '').trim();
