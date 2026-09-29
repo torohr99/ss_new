@@ -60,7 +60,13 @@ function setupFantasySockets(io) {
       );
 
       const user = await prisma.user.findUnique({
-        where: { id: decoded.id }
+        where: {
+          id: decoded.id
+        },
+        select: {
+          id: true,
+          username: true
+        }
       });
 
       if (!user) {
@@ -76,9 +82,6 @@ function setupFantasySockets(io) {
   });
 
   io.on('connection', (socket) => {
-    console.log(
-      `User ${socket.user.username} connected to fantasy sockets`
-    );
 
     // ---------------------------------------------------------
     // Helper: Process bot turn
