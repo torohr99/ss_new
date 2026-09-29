@@ -4,6 +4,23 @@ const { spawn } =
 const logger =
   require('./lib/logger');
 
+function envFlag(name, defaultValue = true) {
+  const value = process.env[name];
+
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  return ![
+    'false',
+    '0',
+    'no',
+    'off'
+  ].includes(
+    String(value).toLowerCase()
+  );
+}
+
 function startProcess(name, script) {
   const child = spawn(
     process.execPath,
@@ -23,8 +40,6 @@ function startProcess(name, script) {
       }
     );
 
-    // If either critical process dies, terminate the
-    // container so Railway can restart the service.
     process.exit(
       typeof code === 'number'
         ? code
@@ -46,37 +61,66 @@ function startProcess(name, script) {
   return child;
 }
 
+const startApi =
+  envFlag('START_API', true);
+
+const startWorker =
+  envFlag('START_WORKER', true);
+
+if (!startApi && !startWorker) {
+  throw new Error(
+    'START_API and START_WORKER cannot both be false.'
+  );
+}
+
 logger.info(
-  'Starting SportSmack API server and background worker...'
+  'Starting SportSmack services',
+  {
+    startApi,
+    startWorker
+  }
 );
 
-const server = startProcess(
-  'SportSmack API server',
-  'server.js'
-);
+const server =
+  startApi
+    ? startProcess(
+        'SportSmack API server',
+        'server.js'
+      )
+    : null;
 
-const worker = startProcess(
-  'SportSmack worker',
-  'worker.js'
-);
+const worker =
+  startWorker
+    ? startProcess(
+        'SportSmack worker',
+        'worker.js'
+      )
+    : null;
 
 function shutdown(signal) {
   logger.info(
     `Received ${signal}. Shutting down SportSmack...`
   );
 
-  server.kill('SIGTERM');
-  worker.kill('SIGTERM');
+  if (server) {
+    server.kill('SIGTERM');
+  }
+
+  if (worker) {
+    worker.kill('SIGTERM');
+  }
 
   setTimeout(() => {
     process.exit(0);
   }, 5000);
 }
 
-process.on('SIGTERM', () =>
-  shutdown('SIGTERM')
+process.on(
+  'SIGTERM',
+  () => shutdown('SIGTERM')
 );
 
-process.on('SIGINT', () =>
-  shutdown('SIGINT')
+process.on(
+  'SIGINT',
+  () => shutdown('SIGINT')
 );
