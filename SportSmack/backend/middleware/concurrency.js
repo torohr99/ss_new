@@ -1,67 +1,203 @@
+const redis =
+  require('../lib/redis');
+
+const RELEASE_LOCK_SCRIPT = `
+  if redis.call("get", KEYS[1]) == ARGV[1]
+  then
+    return redis.call("del", KEYS[1])
+  else
+    return 0
+  end
+`;
+
 function createConcurrencyLimiter({
   maxConcurrent = 4,
-  maxQueued = 8
+  maxQueued = 8,
+  keyPrefix = 'global'
 } = {}) {
-  let active = 0;
-  const queue = [];
+  const queueKey =
+    `sportSmack:concurrency:${keyPrefix}:queue`;
 
-  return function concurrencyLimiter(
+  const slotPrefix =
+    `sportSmack:concurrency:${keyPrefix}:slot:`;
+
+  return async function concurrencyLimiter(
     req,
     res,
     next
   ) {
-    if (
-      active >= maxConcurrent &&
-      queue.length >= maxQueued
-    ) {
-      return res.status(429).json({
-        success: false,
-        code: 'SERVER_BUSY',
-        message:
-          'This service is temporarily busy. Please try again shortly.'
-      });
-    }
+    let queued = false;
+    let acquiredSlot = null;
 
-    const run = () => {
-      active += 1;
+    try {
+      const queueCount =
+        await redis.incr(queueKey);
 
-      let finished = false;
+      if (queueCount > maxQueued) {
+        await redis.decr(queueKey);
 
-      const finish = () => {
-        if (finished) {
+        return res.status(429).json({
+          success: false,
+          code: 'SERVER_BUSY',
+          message:
+            'This service is temporarily busy. Please try again shortly.'
+        });
+      }
+
+      queued = true;
+
+      const startedAt =
+        Date.now();
+
+      const maxWaitMs =
+        10000;
+
+      const retryDelayMs =
+        100;
+
+      const slotTtlMs =
+        45000;
+
+      while (
+        Date.now() - startedAt <
+        maxWaitMs
+      ) {
+        for (
+          let slot = 0;
+          slot < maxConcurrent;
+          slot++
+        ) {
+          const slotKey =
+            `${slotPrefix}${slot}`;
+
+          const token =
+            `${process.pid}-${Date.now()}-${Math.random()}`;
+
+          const result =
+            await redis.set(
+              slotKey,
+              token,
+              'PX',
+              slotTtlMs,
+              'NX'
+            );
+
+          if (result === 'OK') {
+            acquiredSlot = {
+              slotKey,
+              token
+            };
+
+            break;
+          }
+        }
+
+        if (acquiredSlot) {
+          break;
+        }
+
+        await new Promise(resolve =>
+          setTimeout(
+            resolve,
+            retryDelayMs
+          )
+        );
+      }
+
+      if (!acquiredSlot) {
+        return res.status(429).json({
+          success: false,
+          code: 'SERVER_BUSY',
+          message:
+            'AI capacity is temporarily full. Please try again shortly.'
+        });
+      }
+
+      await redis.decr(queueKey);
+      queued = false;
+
+      let released = false;
+
+      const release = async () => {
+        if (released) {
           return;
         }
 
-        finished = true;
-        active -= 1;
+        released = true;
 
-        const nextRequest =
-          queue.shift();
+        if (!acquiredSlot) {
+          return;
+        }
 
-        if (nextRequest) {
-          nextRequest();
+        try {
+          await redis.eval(
+            RELEASE_LOCK_SCRIPT,
+            1,
+            acquiredSlot.slotKey,
+            acquiredSlot.token
+          );
+        } catch (error) {
+          console.error(
+            'Distributed concurrency release failed:',
+            error.message
+          );
         }
       };
 
-      res.on('finish', finish);
-      res.on('close', finish);
+      res.on(
+        'finish',
+        release
+      );
 
-      next();
-    };
+      res.on(
+        'close',
+        release
+      );
 
-    if (active < maxConcurrent) {
-      run();
-      return;
+      return next();
+
+    } catch (error) {
+      if (queued) {
+        try {
+          await redis.decr(queueKey);
+        } catch (_) {
+          // Redis failure is already being handled below.
+        }
+      }
+
+      if (acquiredSlot) {
+        try {
+          await redis.eval(
+            RELEASE_LOCK_SCRIPT,
+            1,
+            acquiredSlot.slotKey,
+            acquiredSlot.token
+          );
+        } catch (_) {
+          // Slot TTL provides eventual recovery.
+        }
+      }
+
+      console.error(
+        'Distributed concurrency limiter failed:',
+        error.message
+      );
+
+      return res.status(503).json({
+        success: false,
+        code: 'CONCURRENCY_SERVICE_UNAVAILABLE',
+        message:
+          'This service is temporarily unavailable. Please try again shortly.'
+      });
     }
-
-    queue.push(run);
   };
 }
 
 const aiConcurrencyLimiter =
   createConcurrencyLimiter({
     maxConcurrent: 4,
-    maxQueued: 8
+    maxQueued: 8,
+    keyPrefix: 'ai'
   });
 
 module.exports = {
