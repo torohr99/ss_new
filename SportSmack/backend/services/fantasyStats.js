@@ -1,6 +1,9 @@
 const axios = require('axios');
 const prisma = require('../lib/prisma');
 
+const cache =
+  require('./cache');
+
 const {
   getCurrentFantasySeason
 } = require('./fantasySeason');
@@ -178,7 +181,7 @@ function calculatePlayerPoints(stats) {
   );
 }
 
-async function getWeeklyStats(
+async function getWeeklyStatsUncached(
   season,
   weekNumber
 ) {
@@ -681,6 +684,42 @@ async function getWeeklyStats(
   }
 
   return stats;
+}
+
+async function getWeeklyStats(
+  season,
+  weekNumber
+) {
+  const cacheKey =
+    `fantasy:weekly-stats:${season}:${weekNumber}`;
+
+  const cached =
+    await cache.getOrSetJson(
+      cacheKey,
+      60,
+      async () => {
+        const stats =
+          await getWeeklyStatsUncached(
+            season,
+            weekNumber
+          );
+
+        return Array.from(
+          stats.entries()
+        );
+      },
+      {
+        lockTtlSeconds: 30,
+        waitMs: 250,
+        maxWaitMs: 5000
+      }
+    );
+
+  return new Map(
+    Array.isArray(cached)
+      ? cached
+      : []
+  );
 }
 
 async function scoreLeagueWeek(
