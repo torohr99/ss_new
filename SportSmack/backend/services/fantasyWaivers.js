@@ -231,27 +231,35 @@ async function processLeagueWaivers(
 }
 
 async function processAllDueWaivers() {
-  const leagues =
-    await prisma.fantasyLeague.findMany({
+  const pendingClaims =
+    await prisma.fantasyWaiverClaim.findMany({
       where: {
-        status: 'SEASON'
-      }
+        status: 'PENDING'
+      },
+      select: {
+        leagueId: true
+      },
+      distinct: ['leagueId']
     });
 
   const results = [];
 
-  for (const league of leagues) {
+  for (
+    const { leagueId } of pendingClaims
+  ) {
     try {
       const processed =
-        await processLeagueWaivers(league.id);
+        await processLeagueWaivers(
+          leagueId
+        );
 
       results.push({
-        leagueId: league.id,
+        leagueId,
         processed
       });
     } catch (err) {
       console.error(
-        `Waiver processing failed for league ${league.id}:`,
+        `Waiver processing failed for league ${leagueId}:`,
         err.message
       );
     }
