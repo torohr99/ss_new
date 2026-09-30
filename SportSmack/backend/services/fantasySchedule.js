@@ -6,7 +6,7 @@ const ESPN_NFL_SCOREBOARD_URL =
   'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard';
 
 const CACHE_TTL_SECONDS =
-  24 * 60 * 60;
+  15 * 60;
 
 const LOCK_TTL_SECONDS = 30;
 const WAIT_MS = 100;
@@ -146,6 +146,11 @@ async function getFantasyWeekLockTime(
         );
 
       if (!events.length) {
+        /*
+         * Do not cache an empty schedule as a valid
+         * week-lock result. ESPN schedules can become
+         * available/updated after an earlier request.
+         */
         return null;
       }
 
@@ -205,20 +210,18 @@ async function getCurrentFantasyWeek(
     Date.now();
 
   /*
-   * NFL regular season weeks are determined from
-   * the actual ESPN schedule rather than a hard-coded
-   * calendar date.
+   * Find the most recent NFL regular-season
+   * week whose first game has started.
    *
-   * We find the latest regular-season week whose
-   * first game has already started.
-   *
-   * If no regular-season game has started yet,
-   * return Week 1.
+   * We search from Week 1 upward so that the
+   * result is the latest started week.
    */
+  let latestStartedWeek = null;
+
   for (
-    let week = 18;
-    week >= 1;
-    week--
+    let week = 1;
+    week <= 18;
+    week++
   ) {
     const lockTime =
       await getFantasyWeekLockTime(
@@ -230,11 +233,19 @@ async function getCurrentFantasyWeek(
       lockTime !== null &&
       now >= lockTime
     ) {
-      return week;
+      latestStartedWeek = week;
     }
   }
 
-  return 1;
+  /*
+   * If the season has not started yet,
+   * Week 1 is the current fantasy week.
+   */
+  if (latestStartedWeek === null) {
+    return 1;
+  }
+
+  return latestStartedWeek;
 }
 
 module.exports = {
