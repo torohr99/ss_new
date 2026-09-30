@@ -722,142 +722,256 @@ async function getWeeklyStats(
   );
 }
 
+async function ensureWeeklyPlayerScores(
+  season,
+  weekNumber,
+  isLive = true
+) {
+  const cacheKey =
+    `fantasy:weekly-player-scores:${season}:${weekNumber}:${isLive ? 'live' : 'final'}`;
+
+  await cache.getOrSetJson(
+    cacheKey,
+    isLive ? 60 : 86400,
+    async () => {
+      const stats =
+        await getWeeklyStats(
+          season,
+          weekNumber
+        );
+
+      const players =
+        await prisma.fantasyPlayer.findMany({
+          where: {
+            season
+          },
+          select: {
+            id: true,
+            espnId: true,
+            position: true
+          }
+        });
+
+      const rows = [];
+
+      for (const player of players) {
+        const playerStats =
+          stats.get(
+            String(player.espnId)
+          ) || {
+            passingYards: 0,
+            passingTD: 0,
+            interceptions: 0,
+            rushingYards: 0,
+            rushingTD: 0,
+            receptions: 0,
+            receivingYards: 0,
+            receivingTD: 0,
+            fumbles: 0,
+            twoPointConversions: 0,
+            extraPoints: 0,
+            fieldGoals: 0,
+            sacks: 0,
+            defensiveInterceptions: 0,
+            fumbleRecoveries: 0,
+            defensiveTD: 0,
+            safeties: 0,
+            blockedKicks: 0,
+            specialTeamsTD: 0,
+            dstPoints: 0
+          };
+
+        const isDST =
+          String(
+            player.position || ''
+          ).toUpperCase() === 'DST';
+
+        const points =
+          isDST
+            ? number(
+                playerStats.dstPoints
+              )
+            : calculatePlayerPoints(
+                playerStats
+              );
+
+        rows.push({
+          playerId: player.id,
+          weekNumber,
+          points,
+          isLive,
+          statsJson:
+            JSON.stringify(
+              playerStats
+            )
+        });
+      }
+
+      /*
+       * Only perform the database writes once
+       * for the global season/week dataset.
+       *
+       * The distributed cache lock inside
+       * getOrSetJson() prevents multiple API/
+       * worker replicas from doing this work
+       * simultaneously.
+       */
+      for (const row of rows) {
+        await prisma.fantasyPlayerWeeklyScore.upsert({
+          where: {
+            playerId_weekNumber: {
+              playerId:
+                row.playerId,
+              weekNumber
+            }
+          },
+          update: {
+            points: row.points,
+            isLive: row.isLive,
+            statsJson:
+              row.statsJson
+          },
+          create: row
+        });
+      }
+
+      return {
+        season,
+        weekNumber,
+        playerCount:
+          rows.length
+      };
+    },
+    {
+      lockTtlSeconds: 120,
+      waitMs: 250,
+      maxWaitMs: 10000
+    }
+  );
+}
+
 async function scoreLeagueWeek(
   leagueId,
   weekNumber,
   isLive = true
 ) {
-    const league =
-      await prisma.fantasyLeague.findUnique({
-        where: {
-          id: leagueId
-        },
-        select: {
-          season: true
-        }
-      });
-  
-    if (!league) {
-      throw new Error(
-        `Fantasy league ${leagueId} not found.`
-      );
-    }
+  const league =
+    await prisma.fantasyLeague.findUnique({
+      where: {
+        id: leagueId
+      },
+      select: {
+        season: true
+      }
+    });
+
+  if (!league) {
+    throw new Error(
+      `Fantasy league ${leagueId} not found.`
+    );
+  }
+
+  /*
+   * Ensure the global player/week scores
+   * exist before any league reads them.
+   *
+   * This is shared across all leagues using
+   * the same season/week.
+   */
+  await ensureWeeklyPlayerScores(
+    league.season,
+    weekNumber,
+    isLive
+  );
+
   const teams =
     await prisma.fantasyTeam.findMany({
       where: {
         leagueId
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
         players: {
-          include: {
-            player: true
+          select: {
+            playerId: true,
+            status: true
           }
         }
       }
     });
 
-  const stats =
-    await getWeeklyStats(
-      league.season,
-      weekNumber
+  if (teams.length === 0) {
+    return [];
+  }
+
+  const teamIds =
+    teams.map(team => team.id);
+
+  /*
+   * Read all weekly player scores needed
+   * for this league in one query.
+   */
+  const playerIds = [
+    ...new Set(
+      teams.flatMap(team =>
+        team.players.map(
+          player =>
+            player.playerId
+        )
+      )
+    )
+  ];
+
+  const weeklyScores =
+    playerIds.length > 0
+      ? await prisma.fantasyPlayerWeeklyScore.findMany({
+          where: {
+            weekNumber,
+            playerId: {
+              in: playerIds
+            }
+          },
+          select: {
+            playerId: true,
+            points: true
+          }
+        })
+      : [];
+
+  const pointsByPlayerId =
+    new Map(
+      weeklyScores.map(score => [
+        score.playerId,
+        score.points
+      ])
     );
 
   const results = [];
 
+  /*
+   * Calculate each team's score entirely
+   * from the already-materialized global
+   * player/week scores.
+   */
   for (const team of teams) {
     let total = 0;
 
     for (const rosterPlayer of team.players) {
-      const playerStats =
-        stats.get(
-          String(
-            rosterPlayer.player.espnId
-          )
-        ) || {
-          passingYards: 0,
-          passingTD: 0,
-          interceptions: 0,
-          rushingYards: 0,
-          rushingTD: 0,
-          receptions: 0,
-          receivingYards: 0,
-          receivingTD: 0,
-          fumbles: 0,
-          twoPointConversions: 0,
-          extraPoints: 0,
-          fieldGoals: 0,
-          sacks: 0,
-          defensiveInterceptions: 0,
-          fumbleRecoveries: 0,
-          defensiveTD: 0,
-          safeties: 0,
-          blockedKicks: 0,
-          specialTeamsTD: 0,
-          dstPoints: 0
-        };
-
-      const isDST =
-        String(
-          rosterPlayer.player.position || ''
-        ).toUpperCase() === 'DST';
-    
-    const playerPoints =
-      isDST
-        ? number(playerStats.dstPoints)
-        : calculatePlayerPoints(
-            playerStats
-          );
-
-      /*
-       * Store the player's weekly NFL fantasy
-       * score regardless of whether the player
-       * is currently a starter or bench player.
-       *
-       * FantasyPlayerWeeklyScore is global player/week
-       * data and is therefore reusable across leagues.
-       */
-      await prisma.fantasyPlayerWeeklyScore.upsert({
-        where: {
-          playerId_weekNumber: {
-            playerId:
-              rosterPlayer.playerId,
-            weekNumber
-          }
-        },
-        update: {
-          points: playerPoints,
-          isLive,
-          statsJson:
-            JSON.stringify(playerStats)
-        },
-        create: {
-          playerId:
-            rosterPlayer.playerId,
-          weekNumber,
-          points: playerPoints,
-          isLive,
-          statsJson:
-            JSON.stringify(playerStats)
-        }
-      });
-
-      /*
-       * Only starters contribute to the team's
-       * weekly fantasy score.
-       */
       if (
-        rosterPlayer.status ===
+        rosterPlayer.status !==
         'STARTER'
       ) {
-        total += playerPoints;
+        continue;
       }
+
+      total += number(
+        pointsByPlayerId.get(
+          rosterPlayer.playerId
+        )
+      );
     }
 
-    /*
-     * IMPORTANT:
-     * Save the team's weekly score exactly once,
-     * after every rostered player has been processed.
-     */
     const score =
       await prisma.fantasyWeeklyScore.upsert({
         where: {
@@ -886,10 +1000,6 @@ async function scoreLeagueWeek(
     });
   }
 
-  /*
-   * Once all teams have their weekly scores,
-   * update the corresponding fantasy matchups.
-   */
   await updateMatchups(
     leagueId,
     weekNumber
@@ -1023,6 +1133,7 @@ module.exports = {
   calculateDSTPoints,
   calculatePlayerPoints,
   getWeeklyStats,
+  ensureWeeklyPlayerScores,
   scoreLeagueWeek,
   updateMatchups,
   isWeekComplete
