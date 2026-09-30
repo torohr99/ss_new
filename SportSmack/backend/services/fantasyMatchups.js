@@ -6,8 +6,16 @@ async function generateWeeklyMatchups(
 ) {
   const teams =
     await prisma.fantasyTeam.findMany({
-      where: { leagueId },
-      orderBy: { draftOrder: 'asc' }
+      where: {
+        leagueId
+      },
+      orderBy: {
+        draftOrder: 'asc'
+      },
+      select: {
+        id: true,
+        draftOrder: true
+      }
     });
 
   if (teams.length < 2) {
@@ -16,21 +24,20 @@ async function generateWeeklyMatchups(
     );
   }
 
-  await prisma.fantasyMatchup.deleteMany({
-    where: {
-      leagueId,
-      weekNumber
-    }
-  });
-
   const rotation = [...teams];
 
   // Circle-method rotation.
-  // Keeps one team fixed and rotates the others.
-  const fixed = rotation.shift();
+  const fixed =
+    rotation.shift();
 
-  for (let i = 0; i < weekNumber - 1; i++) {
-    rotation.unshift(rotation.pop());
+  for (
+    let i = 0;
+    i < weekNumber - 1;
+    i++
+  ) {
+    rotation.unshift(
+      rotation.pop()
+    );
   }
 
   const ordered = [
@@ -38,32 +45,56 @@ async function generateWeeklyMatchups(
     ...rotation
   ];
 
-  const matchups = [];
+  const matchupData = [];
 
   for (
     let i = 0;
-    i < Math.floor(ordered.length / 2);
+    i < Math.floor(
+      ordered.length / 2
+    );
     i++
   ) {
-    const home = ordered[i];
-    const away =
-      ordered[ordered.length - 1 - i];
+    const home =
+      ordered[i];
 
-    const matchup =
-      await prisma.fantasyMatchup.create({
-        data: {
+    const away =
+      ordered[
+        ordered.length - 1 - i
+      ];
+
+    matchupData.push({
+      leagueId,
+      weekNumber,
+      homeTeamId: home.id,
+      awayTeamId: away.id,
+      status: 'UPCOMING'
+    });
+  }
+
+  return prisma.$transaction(
+    async tx => {
+      await tx.fantasyMatchup.deleteMany({
+        where: {
           leagueId,
-          weekNumber,
-          homeTeamId: home.id,
-          awayTeamId: away.id,
-          status: 'UPCOMING'
+          weekNumber
         }
       });
 
-    matchups.push(matchup);
-  }
+      await tx.fantasyMatchup.createMany({
+        data: matchupData
+      });
 
-  return matchups;
+      return tx.fantasyMatchup.findMany({
+        where: {
+          leagueId,
+          weekNumber
+        },
+        orderBy: {
+          id: 'asc'
+        }
+      });
+    }
+  );
 }
 
 module.exports = {
