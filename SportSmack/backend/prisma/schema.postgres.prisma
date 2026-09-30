@@ -251,6 +251,7 @@ model FantasyLeague {
 
   @@index([ownerId])
   @@index([status, createdAt])
+  @@index([status, id])
 }
 
 model FantasyTeam {
