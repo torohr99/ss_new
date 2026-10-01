@@ -111,7 +111,7 @@ async function loadWeekSchedule(
  * Return the timestamp of the first NFL game
  * of the specified fantasy week.
  *
- * The result is cached in Redis for 24 hours.
+ * The result is cached in Redis for 15 minutes.
  *
  * This means roster requests do NOT repeatedly
  * hit ESPN, even with many users or multiple
@@ -210,11 +210,18 @@ async function getCurrentFantasyWeek(
     Date.now();
 
   /*
-   * Find the most recent NFL regular-season
-   * week whose first game has started.
+   * Fantasy week semantics:
    *
-   * We search from Week 1 upward so that the
-   * result is the latest started week.
+   * - Before the first game of a week starts,
+   *   that upcoming week is the current fantasy week.
+   *
+   * - Once the first game of a week starts,
+   *   that week remains the current fantasy week.
+   *
+   * This allows managers to set their lineup
+   * throughout the period leading up to kickoff,
+   * while the lineup becomes locked exactly when
+   * that week's first game begins.
    */
   let latestStartedWeek = null;
 
@@ -229,23 +236,40 @@ async function getCurrentFantasyWeek(
         week
       );
 
-    if (
-      lockTime !== null &&
-      now >= lockTime
-    ) {
-      latestStartedWeek = week;
+    if (lockTime === null) {
+      continue;
     }
+
+    /*
+     * This week's first game has not started yet.
+     * Therefore this is the upcoming/current
+     * fantasy week.
+     */
+    if (now < lockTime) {
+      return week;
+    }
+
+    /*
+     * This week's first game has started.
+     * Keep looking so we can find a later week
+     * that may already be underway.
+     */
+    latestStartedWeek = week;
   }
 
   /*
-   * If the season has not started yet,
-   * Week 1 is the current fantasy week.
+   * If the season has already started but all
+   * available weeks have started, use the latest.
    */
-  if (latestStartedWeek === null) {
-    return 1;
+  if (latestStartedWeek !== null) {
+    return latestStartedWeek;
   }
 
-  return latestStartedWeek;
+  /*
+   * If no schedule data is available yet,
+   * default to Week 1.
+   */
+  return 1;
 }
 
 module.exports = {
