@@ -1061,6 +1061,11 @@ async function updateMatchups(
       where: {
         leagueId,
         weekNumber
+      },
+      select: {
+        id: true,
+        homeTeamId: true,
+        awayTeamId: true
       }
     });
 
@@ -1100,6 +1105,8 @@ async function updateMatchups(
       ])
     );
 
+  const updateRows = [];
+
   for (const matchup of matchups) {
     const home =
       scoreByTeamId.get(
@@ -1118,21 +1125,65 @@ async function updateMatchups(
       home?.isLive !== false ||
       away?.isLive !== false;
 
-    await prisma.fantasyMatchup.update({
-      where: {
-        id: matchup.id
-      },
-      data: {
-        homeScore:
-          home?.points || 0,
-        awayScore:
-          away?.points || 0,
-        status:
-          hasBothScores && !isLive
-            ? 'FINAL'
-            : 'LIVE'
-      }
+    updateRows.push({
+      id: matchup.id,
+      homeScore:
+        home?.points || 0,
+      awayScore:
+        away?.points || 0,
+      status:
+        hasBothScores && !isLive
+          ? 'FINAL'
+          : 'LIVE'
     });
+  }
+
+  if (updateRows.length === 0) {
+    return;
+  }
+
+  const BATCH_SIZE = 500;
+
+  for (
+    let start = 0;
+    start < updateRows.length;
+    start += BATCH_SIZE
+  ) {
+    const batch =
+      updateRows.slice(
+        start,
+        start + BATCH_SIZE
+      );
+
+    const values =
+      batch.map(row =>
+        Prisma.sql`(
+          ${row.id},
+          ${row.homeScore},
+          ${row.awayScore},
+          ${row.status}
+        )`
+      );
+
+    await prisma.$executeRaw(
+      Prisma.sql`
+        UPDATE "FantasyMatchup" AS m
+        SET
+          "homeScore" = v."homeScore",
+          "awayScore" = v."awayScore",
+          "status" = v."status"
+        FROM (
+          VALUES
+            ${Prisma.join(values)}
+        ) AS v(
+          "id",
+          "homeScore",
+          "awayScore",
+          "status"
+        )
+        WHERE m."id" = v."id"
+      `
+    );
   }
 }
 
