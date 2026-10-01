@@ -258,5 +258,7 @@ module.exports = {
   getJson,
   setJson,
   deleteKey,
-  getOrSetJson
+  getOrSetJson,
+  acquireLock,
+  releaseLock
 };
