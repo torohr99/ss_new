@@ -1358,70 +1358,163 @@ router.post(
   authenticateToken,
   async (req, res) => {
     try {
-      const teamId = Number(req.params.id);
+      const teamId =
+        Number(req.params.id);
+
       const teamPlayerId =
-        Number(req.body.teamPlayerId);
+        Number(
+          req.body.teamPlayerId
+        );
+
+      if (
+        !Number.isInteger(teamId) ||
+        !Number.isInteger(teamPlayerId)
+      ) {
+        return res.status(400).json({
+          error:
+            'Invalid team or roster player ID'
+        });
+      }
 
       const team =
         await prisma.fantasyTeam.findUnique({
-          where: { id: teamId },
-          include: {
-            league: true
+          where: {
+            id: teamId
+          },
+          select: {
+            id: true,
+            userId: true,
+            leagueId: true,
+            league: {
+              select: {
+                status: true
+              }
+            }
           }
         });
 
       if (!team) {
         return res.status(404).json({
-          error: 'Team not found'
+          error:
+            'Team not found'
         });
       }
 
-      if (team.userId !== req.user.id) {
+      if (
+        team.userId !==
+        req.user.id
+      ) {
         return res.status(403).json({
-          error: 'Not your team'
+          error:
+            'Not your team'
         });
       }
 
-      if (team.league.status !== 'SEASON') {
+      if (
+        team.league.status !==
+        'SEASON'
+      ) {
         return res.status(400).json({
-          error: 'League is not in season'
+          error:
+            'League is not in season'
         });
       }
 
-      const dropped =
-        await prisma.fantasyTeamPlayer.findUnique({
-          where: {
-            id: teamPlayerId
-          }
-        });
+      const {
+        withFantasyRosterLock
+      } =
+        require('../services/fantasyLocks');
 
-      if (!dropped || dropped.teamId !== teamId) {
-        return res.status(404).json({
-          error: 'Player not found on your roster'
-        });
+      try {
+        const result =
+          await withFantasyRosterLock(
+            team.leagueId,
+            async () => {
+              return prisma.$transaction(
+                async tx => {
+                  const dropped =
+                    await tx.fantasyTeamPlayer.findUnique({
+                      where: {
+                        id:
+                          teamPlayerId
+                      },
+                      select: {
+                        id: true,
+                        teamId: true,
+                        playerId: true
+                      }
+                    });
+
+                  if (
+                    !dropped ||
+                    dropped.teamId !==
+                      teamId
+                  ) {
+                    const error =
+                      new Error(
+                        'Player not found on your roster'
+                      );
+
+                    error.code =
+                      'PLAYER_NOT_ON_ROSTER';
+
+                    throw error;
+                  }
+
+                  await tx.fantasyTeamPlayer.delete({
+                    where: {
+                      id:
+                        teamPlayerId
+                    }
+                  });
+
+                  await tx.fantasyTransaction.create({
+                    data: {
+                      leagueId:
+                        team.leagueId,
+                      teamId,
+                      playerId:
+                        dropped.playerId,
+                      type: 'DROP'
+                    }
+                  });
+
+                  return {
+                    success: true,
+                    playerId:
+                      dropped.playerId
+                  };
+                }
+              );
+            }
+          );
+
+        return res.json(
+          result
+        );
+      } catch (err) {
+        if (
+          err?.code ===
+          'FANTASY_ROSTER_LOCKED'
+        ) {
+          return res.status(409).json({
+            error:
+              'Another roster transaction is currently being processed. Please try again.'
+          });
+        }
+
+        if (
+          err?.code ===
+          'PLAYER_NOT_ON_ROSTER'
+        ) {
+          return res.status(404).json({
+            error:
+              err.message
+          });
+        }
+
+        throw err;
       }
-
-      await prisma.$transaction([
-        prisma.fantasyTeamPlayer.delete({
-          where: {
-            id: teamPlayerId
-          }
-        }),
-
-        prisma.fantasyTransaction.create({
-          data: {
-            leagueId: team.leagueId,
-            teamId,
-            playerId: dropped.playerId,
-            type: 'DROP'
-          }
-        })
-      ]);
-
-      res.json({
-        success: true,
-        playerId: dropped.playerId
-      });
     } catch (err) {
       console.error(
         'Fantasy drop error:',
@@ -1429,7 +1522,8 @@ router.post(
       );
 
       res.status(500).json({
-        error: 'Failed to drop player'
+        error:
+          'Failed to drop player'
       });
     }
   }
@@ -1693,18 +1787,38 @@ router.post(
   authenticateToken,
   async (req, res) => {
     try {
-      const teamId = Number(req.params.id);
+      const teamId =
+        Number(req.params.id);
+
       const playerId =
         Number(req.body.playerId);
+
+      if (
+        !Number.isInteger(teamId) ||
+        !Number.isInteger(playerId)
+      ) {
+        return res.status(400).json({
+          error:
+            'Invalid team or player ID'
+        });
+      }
 
       const team =
         await prisma.fantasyTeam.findUnique({
           where: {
             id: teamId
           },
-          include: {
-            league: true,
-            players: true
+          select: {
+            id: true,
+            userId: true,
+            leagueId: true,
+            league: {
+              select: {
+                id: true,
+                season: true,
+                status: true
+              }
+            }
           }
         });
 
@@ -1714,83 +1828,182 @@ router.post(
         });
       }
 
-      if (team.userId !== req.user.id) {
+      if (
+        team.userId !==
+        req.user.id
+      ) {
         return res.status(403).json({
           error: 'Not your team'
         });
       }
 
-      if (team.league.status !== 'SEASON') {
+      if (
+        team.league.status !==
+        'SEASON'
+      ) {
         return res.status(400).json({
-          error: 'League is not in season'
+          error:
+            'League is not in season'
         });
       }
 
-      if (team.players.length >= MAX_ROSTER_SIZE) {
-        return res.status(400).json({
-          error: 'Roster is full'
-        });
-      }
+      const {
+        withFantasyRosterLock
+      } =
+        require('../services/fantasyLocks');
 
-      const player =
-        await prisma.fantasyPlayer.findFirst({
-          where: {
-            id: playerId,
-            season:
-              team.league.season,
-            isActive: true
-          }
-        });
+      try {
+        const rosterPlayer =
+          await withFantasyRosterLock(
+            team.leagueId,
+            async () => {
+              const player =
+                await prisma.fantasyPlayer.findFirst({
+                  where: {
+                    id: playerId,
+                    season:
+                      team.league.season,
+                    isActive: true
+                  },
+                  select: {
+                    id: true
+                  }
+                });
 
-      if (!player) {
-        return res.status(404).json({
-          error: 'Player not found'
-        });
-      }
+              if (!player) {
+                const error =
+                  new Error(
+                    'Player not found'
+                  );
 
-      const alreadyRostered =
-        await prisma.fantasyTeamPlayer.findFirst({
-          where: {
-            team: {
-              leagueId: team.leagueId
-            },
-            playerId
-          }
-        });
+                error.code =
+                  'PLAYER_NOT_FOUND';
 
-      if (alreadyRostered) {
-        return res.status(400).json({
-          error: 'Player is already rostered'
-        });
-      }
+                throw error;
+              }
 
-      const rosterPlayer =
-        await prisma.fantasyTeamPlayer.create({
-          data: {
-            teamId,
-            playerId,
-            status: 'BENCH'
-          },
-          include: {
-            player: true
-          }
-        });
+              return prisma.$transaction(
+                async tx => {
+                  const [
+                    rosterCount,
+                    alreadyRostered
+                  ] = await Promise.all([
+                    tx.fantasyTeamPlayer.count({
+                      where: {
+                        teamId
+                      }
+                    }),
 
-      await prisma.fantasyTransaction.create({
-        data: {
-          leagueId: team.leagueId,
-          teamId,
-          playerId,
-          type: 'ADD'
+                    tx.fantasyTeamPlayer.findFirst({
+                      where: {
+                        playerId,
+                        team: {
+                          leagueId:
+                            team.leagueId
+                        }
+                      },
+                      select: {
+                        id: true
+                      }
+                    })
+                  ]);
+
+                  if (
+                    rosterCount >=
+                    MAX_ROSTER_SIZE
+                  ) {
+                    const error =
+                      new Error(
+                        'Roster is full'
+                      );
+
+                    error.code =
+                      'ROSTER_FULL';
+
+                    throw error;
+                  }
+
+                  if (
+                    alreadyRostered
+                  ) {
+                    const error =
+                      new Error(
+                        'Player is already rostered'
+                      );
+
+                    error.code =
+                      'PLAYER_ALREADY_ROSTERED';
+
+                    throw error;
+                  }
+
+                  const created =
+                    await tx.fantasyTeamPlayer.create({
+                      data: {
+                        teamId,
+                        playerId,
+                        status: 'BENCH'
+                      },
+                      include: {
+                        player: true
+                      }
+                    });
+
+                  await tx.fantasyTransaction.create({
+                    data: {
+                      leagueId:
+                        team.leagueId,
+                      teamId,
+                      playerId,
+                      type: 'ADD'
+                    }
+                  });
+
+                  return created;
+                }
+              );
+            }
+          );
+
+        return res.json(
+          rosterPlayer
+        );
+      } catch (err) {
+        if (
+          err?.code ===
+          'FANTASY_ROSTER_LOCKED'
+        ) {
+          return res.status(409).json({
+            error:
+              'Another roster transaction is currently being processed. Please try again.'
+          });
         }
-      });
 
-      res.json(rosterPlayer);
+        if (
+          err?.code ===
+            'PLAYER_NOT_FOUND' ||
+          err?.code ===
+            'ROSTER_FULL' ||
+          err?.code ===
+            'PLAYER_ALREADY_ROSTERED'
+        ) {
+          return res.status(400).json({
+            error:
+              err.message
+          });
+        }
+
+        throw err;
+      }
     } catch (err) {
-      console.error('Add player error:', err);
+      console.error(
+        'Add player error:',
+        err
+      );
 
       res.status(500).json({
-        error: 'Failed to add player'
+        error:
+          'Failed to add player'
       });
     }
   }
@@ -1805,66 +2018,163 @@ router.post(
   authenticateToken,
   async (req, res) => {
     try {
-      const teamId = Number(req.params.id);
+      const teamId =
+        Number(req.params.id);
+
       const playerId =
         Number(req.body.playerId);
+
+      if (
+        !Number.isInteger(teamId) ||
+        !Number.isInteger(playerId)
+      ) {
+        return res.status(400).json({
+          error:
+            'Invalid team or player ID'
+        });
+      }
 
       const team =
         await prisma.fantasyTeam.findUnique({
           where: {
             id: teamId
+          },
+          select: {
+            id: true,
+            userId: true,
+            leagueId: true,
+            league: {
+              select: {
+                status: true
+              }
+            }
           }
         });
 
       if (!team) {
         return res.status(404).json({
-          error: 'Team not found'
+          error:
+            'Team not found'
         });
       }
 
-      if (team.userId !== req.user.id) {
+      if (
+        team.userId !==
+        req.user.id
+      ) {
         return res.status(403).json({
-          error: 'Not your team'
+          error:
+            'Not your team'
         });
       }
 
-      const rosterPlayer =
-        await prisma.fantasyTeamPlayer.findFirst({
-          where: {
-            teamId,
-            playerId
-          }
-        });
-
-      if (!rosterPlayer) {
-        return res.status(404).json({
-          error: 'Player is not on your roster'
+      if (
+        team.league.status !==
+        'SEASON'
+      ) {
+        return res.status(400).json({
+          error:
+            'League is not in season'
         });
       }
 
-      await prisma.fantasyTeamPlayer.delete({
-        where: {
-          id: rosterPlayer.id
-        }
-      });
+      const {
+        withFantasyRosterLock
+      } =
+        require('../services/fantasyLocks');
 
-      await prisma.fantasyTransaction.create({
-        data: {
-          leagueId: team.leagueId,
-          teamId,
-          playerId,
-          type: 'DROP'
-        }
-      });
+      try {
+        const result =
+          await withFantasyRosterLock(
+            team.leagueId,
+            async () => {
+              return prisma.$transaction(
+                async tx => {
+                  const rosterPlayer =
+                    await tx.fantasyTeamPlayer.findFirst({
+                      where: {
+                        teamId,
+                        playerId
+                      },
+                      select: {
+                        id: true,
+                        playerId: true
+                      }
+                    });
 
-      res.json({
-        success: true
-      });
+                  if (!rosterPlayer) {
+                    const error =
+                      new Error(
+                        'Player is not on your roster'
+                      );
+
+                    error.code =
+                      'PLAYER_NOT_ON_ROSTER';
+
+                    throw error;
+                  }
+
+                  await tx.fantasyTeamPlayer.delete({
+                    where: {
+                      id:
+                        rosterPlayer.id
+                    }
+                  });
+
+                  await tx.fantasyTransaction.create({
+                    data: {
+                      leagueId:
+                        team.leagueId,
+                      teamId,
+                      playerId,
+                      type: 'DROP'
+                    }
+                  });
+
+                  return {
+                    success: true,
+                    playerId
+                  };
+                }
+              );
+            }
+          );
+
+        return res.json(
+          result
+        );
+      } catch (err) {
+        if (
+          err?.code ===
+          'FANTASY_ROSTER_LOCKED'
+        ) {
+          return res.status(409).json({
+            error:
+              'Another roster transaction is currently being processed. Please try again.'
+          });
+        }
+
+        if (
+          err?.code ===
+          'PLAYER_NOT_ON_ROSTER'
+        ) {
+          return res.status(404).json({
+            error:
+              err.message
+          });
+        }
+
+        throw err;
+      }
     } catch (err) {
-      console.error('Drop player error:', err);
+      console.error(
+        'Drop player error:',
+        err
+      );
 
       res.status(500).json({
-        error: 'Failed to drop player'
+        error:
+          'Failed to drop player'
       });
     }
   }
