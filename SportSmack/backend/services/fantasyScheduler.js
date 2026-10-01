@@ -19,7 +19,7 @@ const {
 let intervalId = null;
 
 async function scoreActiveLeagues() {
-  const BATCH_SIZE = 100;
+  const BATCH_SIZE = 250;
 
   try {
     const currentWeekBySeason = new Map();
@@ -54,98 +54,184 @@ async function scoreActiveLeagues() {
         break;
       }
 
+      /*
+       * Group leagues by season so that current-week
+       * and week-completion information is reused.
+       */
+      const leaguesBySeason = new Map();
+
       for (const league of leagues) {
+        if (!leaguesBySeason.has(league.season)) {
+          leaguesBySeason.set(
+            league.season,
+            []
+          );
+        }
+
+        leaguesBySeason
+          .get(league.season)
+          .push(league);
+      }
+
+      /*
+       * Determine which league/week combinations
+       * actually require work.
+       *
+       * The current week is always included.
+       * Older weeks are included only when they
+       * still have non-final matchups.
+       */
+      const workItems = [];
+
+      for (const [
+        season,
+        seasonLeagues
+      ] of leaguesBySeason) {
+        let currentWeek =
+          currentWeekBySeason.get(
+            season
+          );
+
+        if (currentWeek === undefined) {
+          currentWeek =
+            await getCurrentFantasyWeek(
+              season
+            );
+
+          currentWeekBySeason.set(
+            season,
+            currentWeek
+          );
+        }
+
+        const leagueIds =
+          seasonLeagues.map(
+            league => league.id
+          );
+
+        const unfinishedMatchups =
+          await prisma.fantasyMatchup.findMany({
+            where: {
+              leagueId: {
+                in: leagueIds
+              },
+              weekNumber: {
+                lte: currentWeek
+              },
+              status: {
+                not: 'FINAL'
+              }
+            },
+            select: {
+              leagueId: true,
+              weekNumber: true
+            },
+            distinct: [
+              'leagueId',
+              'weekNumber'
+            ]
+          });
+
+        const workKeys = new Set();
+
+        /*
+         * Always process the current week.
+         */
+        for (const league of seasonLeagues) {
+          const key =
+            `${league.id}:${currentWeek}`;
+
+          workKeys.add(key);
+
+          workItems.push({
+            leagueId: league.id,
+            season,
+            weekNumber: currentWeek
+          });
+        }
+
+        /*
+         * Recover any previous weeks that have
+         * unfinished matchups.
+         */
+        for (
+          const matchup
+            of unfinishedMatchups
+        ) {
+          const key =
+            `${matchup.leagueId}:${matchup.weekNumber}`;
+
+          if (workKeys.has(key)) {
+            continue;
+          }
+
+          workKeys.add(key);
+
+          workItems.push({
+            leagueId:
+              matchup.leagueId,
+            season,
+            weekNumber:
+              matchup.weekNumber
+          });
+        }
+      }
+
+      /*
+       * Determine completion once per
+       * season/week, not once per league.
+       */
+      for (const item of workItems) {
         try {
-          let currentWeek =
-            currentWeekBySeason.get(
-              league.season
+          const cacheKey =
+            `${item.season}:${item.weekNumber}`;
+
+          let weekComplete =
+            weekCompleteBySeasonWeek.get(
+              cacheKey
             );
 
-          if (currentWeek === undefined) {
-            currentWeek =
-              await getCurrentFantasyWeek(
-                league.season
-              );
-
-            currentWeekBySeason.set(
-              league.season,
-              currentWeek
-            );
-          }
-
-          for (
-            let week = 1;
-            week <= currentWeek;
-            week++
+          if (
+            weekComplete === undefined
           ) {
-            const existingFinal =
-              await prisma.fantasyMatchup.count({
-                where: {
-                  leagueId: league.id,
-                  weekNumber: week,
-                  status: 'FINAL'
-                }
-              });
-
-            const matchupCount =
-              await prisma.fantasyMatchup.count({
-                where: {
-                  leagueId: league.id,
-                  weekNumber: week
-                }
-              });
-
-            if (
-              matchupCount > 0 &&
-              existingFinal === matchupCount
-            ) {
-              continue;
-            }
-
-            await generateMissingMatchups(
-              league.id,
-              week
-            );
-
-            const cacheKey =
-              `${league.season}:${week}`;
-
-            let weekComplete =
-              weekCompleteBySeasonWeek.get(
-                cacheKey
+            weekComplete =
+              await fantasyStats.isWeekComplete(
+                item.season,
+                item.weekNumber
               );
 
-            if (
-              weekComplete === undefined
-            ) {
-              weekComplete =
-                await fantasyStats.isWeekComplete(
-                  league.season,
-                  week
-                );
-
-              weekCompleteBySeasonWeek.set(
-                cacheKey,
-                weekComplete
-              );
-            }
-
-            await fantasyStats.scoreLeagueWeek(
-              league.id,
-              week,
-              !weekComplete
+            weekCompleteBySeasonWeek.set(
+              cacheKey,
+              weekComplete
             );
           }
+
+          /*
+           * Generate matchups only when the league
+           * does not already have them.
+           */
+          await generateMissingMatchups(
+            item.leagueId,
+            item.weekNumber
+          );
+
+          await fantasyStats.scoreLeagueWeek(
+            item.leagueId,
+            item.weekNumber,
+            !weekComplete
+          );
         } catch (error) {
           console.error(
-            `Fantasy scoring failed for league ${league.id}:`,
+            `Fantasy scoring failed for league ${item.leagueId}, week ${item.weekNumber}:`,
             error.message
           );
         }
       }
 
       lastId =
-        leagues[leagues.length - 1].id;
+        leagues[
+          leagues.length - 1
+        ].id;
 
       if (
         leagues.length <
