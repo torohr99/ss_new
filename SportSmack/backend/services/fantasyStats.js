@@ -1044,12 +1044,22 @@ async function scoreLeagueWeek(
     scoreRows
   );
 
-  await updateMatchups(
-    leagueId,
-    weekNumber
-  );
-
-  return results;
+    await updateMatchups(
+      leagueId,
+      weekNumber
+    );
+  
+    /*
+     * Scores and matchup results are now both
+     * updated. Invalidate the distributed standings
+     * cache so the next standings request rebuilds
+     * the authoritative result.
+     */
+    await invalidateFantasyStandings(
+      leagueId
+    );
+  
+    return results;
 }
 
 async function updateMatchups(
@@ -1187,6 +1197,14 @@ async function updateMatchups(
   }
 }
 
+async function invalidateFantasyStandings(
+  leagueId
+) {
+  await cache.deleteKey(
+    `fantasy:standings:${leagueId}`
+  );
+}
+
 async function isWeekComplete(
   season,
   weekNumber
@@ -1231,5 +1249,6 @@ module.exports = {
   ensureWeeklyPlayerScores,
   scoreLeagueWeek,
   updateMatchups,
+  invalidateFantasyStandings,
   isWeekComplete
 };
