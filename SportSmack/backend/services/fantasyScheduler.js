@@ -295,18 +295,6 @@ async function generateMissingMatchups(
   leagueId,
   weekNumber
 ) {
-  const existing =
-    await prisma.fantasyMatchup.count({
-      where: {
-        leagueId,
-        weekNumber
-      }
-    });
-
-  if (existing > 0) {
-    return;
-  }
-
   await generateWeeklyMatchups(
     leagueId,
     weekNumber
