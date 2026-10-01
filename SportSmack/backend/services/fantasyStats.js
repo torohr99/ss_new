@@ -1,5 +1,10 @@
 const axios = require('axios');
-const prisma = require('../lib/prisma');
+const {
+  Prisma
+} = require('@prisma/client');
+
+const prisma =
+  require('../lib/prisma');
 
 const cache =
   require('./cache');
@@ -850,6 +855,59 @@ async function ensureWeeklyPlayerScores(
   );
 }
 
+async function upsertWeeklyScoresBulk(
+  rows
+) {
+  if (rows.length === 0) {
+    return;
+  }
+
+  const BATCH_SIZE = 500;
+
+  for (
+    let start = 0;
+    start < rows.length;
+    start += BATCH_SIZE
+  ) {
+    const batch =
+      rows.slice(
+        start,
+        start + BATCH_SIZE
+      );
+
+    const values =
+      batch.map(row =>
+        Prisma.sql`(
+          ${row.teamId},
+          ${row.weekNumber},
+          ${row.points},
+          ${row.isLive}
+        )`
+      );
+
+    await prisma.$executeRaw(
+      Prisma.sql`
+        INSERT INTO "FantasyWeeklyScore"
+          (
+            "teamId",
+            "weekNumber",
+            "points",
+            "isLive"
+          )
+        VALUES
+          ${Prisma.join(values)}
+        ON CONFLICT (
+          "teamId",
+          "weekNumber"
+        )
+        DO UPDATE SET
+          "points" = EXCLUDED."points",
+          "isLive" = EXCLUDED."isLive"
+      `
+    );
+  }
+}
+
 async function scoreLeagueWeek(
   leagueId,
   weekNumber,
@@ -947,16 +1005,12 @@ async function scoreLeagueWeek(
       ])
     );
 
+  const scoreRows = [];
   const results = [];
-
-  /*
-   * Calculate each team's score entirely
-   * from the already-materialized global
-   * player/week scores.
-   */
+  
   for (const team of teams) {
     let total = 0;
-
+  
     for (const rosterPlayer of team.players) {
       if (
         rosterPlayer.status !==
@@ -964,41 +1018,31 @@ async function scoreLeagueWeek(
       ) {
         continue;
       }
-
+  
       total += number(
         pointsByPlayerId.get(
           rosterPlayer.playerId
         )
       );
     }
-
-    const score =
-      await prisma.fantasyWeeklyScore.upsert({
-        where: {
-          teamId_weekNumber: {
-            teamId: team.id,
-            weekNumber
-          }
-        },
-        update: {
-          points: total,
-          isLive
-        },
-        create: {
-          teamId: team.id,
-          weekNumber,
-          points: total,
-          isLive
-        }
-      });
-
+  
+    scoreRows.push({
+      teamId: team.id,
+      weekNumber,
+      points: total,
+      isLive
+    });
+  
     results.push({
       teamId: team.id,
       teamName: team.name,
-      points: total,
-      scoreId: score.id
+      points: total
     });
   }
+  
+  await upsertWeeklyScoresBulk(
+    scoreRows
+  );
 
   await updateMatchups(
     leagueId,
