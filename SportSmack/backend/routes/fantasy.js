@@ -1879,83 +1879,230 @@ router.get(
   authenticateToken,
   async (req, res) => {
     try {
-      const teams =
-        await prisma.fantasyTeam.findMany({
+      const leagueId =
+        Number(req.params.id);
+
+      if (!Number.isInteger(leagueId)) {
+        return res.status(400).json({
+          error: 'Invalid league ID'
+        });
+      }
+
+      /*
+       * Verify league membership before touching
+       * the shared standings cache.
+       *
+       * The standings themselves are not user-specific,
+       * but access to a private fantasy league is.
+       */
+      const membership =
+        await prisma.fantasyTeam.findFirst({
           where: {
-            leagueId: Number(req.params.id)
+            leagueId,
+            userId: req.user.id
           },
-          include: {
-            weeklyScores: true,
-            homeMatchups: true,
-            awayMatchups: true
+          select: {
+            id: true
           }
         });
 
-      const standings = teams.map(team => {
-        const matchups = [
-          ...team.homeMatchups,
-          ...team.awayMatchups
-        ];
+      if (!membership) {
+        return res.status(403).json({
+          error: 'You are not a member of this league'
+        });
+      }
 
-        let wins = 0;
-        let losses = 0;
-        let ties = 0;
+      const cacheKey =
+        `fantasy:standings:${leagueId}`;
 
-        for (const matchup of matchups) {
-          if (matchup.status !== 'FINAL') {
-            continue;
+      const standings =
+        await cache.getOrSetJson(
+          cacheKey,
+          30,
+          async () => {
+            /*
+             * Only execute these database reads on a
+             * cache miss. All replicas share the Redis
+             * cache and single-flight lock.
+             */
+            const [
+              teams,
+              matchups,
+              weeklyScores
+            ] = await Promise.all([
+              prisma.fantasyTeam.findMany({
+                where: {
+                  leagueId
+                },
+                select: {
+                  id: true,
+                  name: true
+                },
+                orderBy: {
+                  id: 'asc'
+                }
+              }),
+
+              prisma.fantasyMatchup.findMany({
+                where: {
+                  leagueId
+                },
+                select: {
+                  homeTeamId: true,
+                  awayTeamId: true,
+                  homeScore: true,
+                  awayScore: true,
+                  status: true
+                }
+              }),
+
+              prisma.fantasyWeeklyScore.findMany({
+                where: {
+                  team: {
+                    leagueId
+                  }
+                },
+                select: {
+                  teamId: true,
+                  points: true
+                }
+              })
+            ]);
+
+            const standingsByTeamId =
+              new Map();
+
+            for (const team of teams) {
+              standingsByTeamId.set(
+                team.id,
+                {
+                  teamId: team.id,
+                  teamName: team.name,
+                  wins: 0,
+                  losses: 0,
+                  ties: 0,
+                  totalPoints: 0
+                }
+              );
+            }
+
+            /*
+             * Accumulate total fantasy points.
+             */
+            for (const score of weeklyScores) {
+              const standing =
+                standingsByTeamId.get(
+                  score.teamId
+                );
+
+              if (!standing) {
+                continue;
+              }
+
+              standing.totalPoints +=
+                Number(
+                  score.points || 0
+                );
+            }
+
+            /*
+             * Accumulate completed matchup records.
+             */
+            for (const matchup of matchups) {
+              if (
+                matchup.status !== 'FINAL'
+              ) {
+                continue;
+              }
+
+              const home =
+                standingsByTeamId.get(
+                  matchup.homeTeamId
+                );
+
+              const away =
+                standingsByTeamId.get(
+                  matchup.awayTeamId
+                );
+
+              if (!home || !away) {
+                continue;
+              }
+
+              const homeScore =
+                Number(
+                  matchup.homeScore || 0
+                );
+
+              const awayScore =
+                Number(
+                  matchup.awayScore || 0
+                );
+
+              if (
+                homeScore >
+                awayScore
+              ) {
+                home.wins++;
+                away.losses++;
+              } else if (
+                homeScore <
+                awayScore
+              ) {
+                home.losses++;
+                away.wins++;
+              } else {
+                home.ties++;
+                away.ties++;
+              }
+            }
+
+            const result =
+              Array.from(
+                standingsByTeamId.values()
+              );
+
+            result.sort((a, b) => {
+              if (
+                b.wins !==
+                a.wins
+              ) {
+                return (
+                  b.wins -
+                  a.wins
+                );
+              }
+
+              if (
+                b.ties !==
+                a.ties
+              ) {
+                return (
+                  b.ties -
+                  a.ties
+                );
+              }
+
+              return (
+                b.totalPoints -
+                a.totalPoints
+              );
+            });
+
+            return result;
+          },
+          {
+            lockTtlSeconds: 15,
+            waitMs: 100,
+            maxWaitMs: 3000
           }
+        );
 
-          const isHome =
-            matchup.homeTeamId === team.id;
-
-          const teamScore = isHome
-            ? matchup.homeScore
-            : matchup.awayScore;
-
-          const opponentScore = isHome
-            ? matchup.awayScore
-            : matchup.homeScore;
-
-          if (teamScore > opponentScore) {
-            wins++;
-          } else if (teamScore < opponentScore) {
-            losses++;
-          } else {
-            ties++;
-          }
-        }
-
-        const totalPoints =
-          team.weeklyScores.reduce(
-            (sum, score) =>
-              sum + Number(score.points || 0),
-            0
-          );
-
-        return {
-          teamId: team.id,
-          teamName: team.name,
-          wins,
-          losses,
-          ties,
-          totalPoints
-        };
-      });
-
-      standings.sort((a, b) => {
-        if (b.wins !== a.wins) {
-          return b.wins - a.wins;
-        }
-
-        if (b.ties !== a.ties) {
-          return b.ties - a.ties;
-        }
-
-        return b.totalPoints - a.totalPoints;
-      });
-
-      res.json(standings);
+      res.json(
+        Array.isArray(standings)
+          ? standings
+          : []
+      );
     } catch (err) {
       console.error(
         'Fantasy standings error:',
@@ -1963,7 +2110,8 @@ router.get(
       );
 
       res.status(500).json({
-        error: 'Failed to fetch standings'
+        error:
+          'Failed to fetch standings'
       });
     }
   }
