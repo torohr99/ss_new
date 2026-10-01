@@ -1,267 +1,672 @@
-const prisma = require('../lib/prisma');
+const prisma =
+  require('../lib/prisma');
+
+const {
+  Prisma
+} = require('@prisma/client');
+
+const cache =
+  require('./cache');
 
 const MAX_ROSTER_SIZE = 15;
 
-async function processLeagueWaivers(
-  leagueId
+const WAIVER_LOCK_TTL_SECONDS = 300;
+
+const WAIVER_LEAGUE_BATCH_SIZE = 250;
+
+const WAIVER_TRANSACTION_RETRIES = 3;
+
+function isSerializationConflict(
+  error
 ) {
-  const league =
-    await prisma.fantasyLeague.findUnique({
-      where: {
-        id: leagueId
-      },
-      select: {
-        season: true
-      }
-    });
+  return error?.code === 'P2034';
+}
 
-  if (!league) {
-    throw new Error(
-      `Fantasy league ${leagueId} not found.`
-    );
-  }
+async function processSingleWaiverClaim(
+  leagueId,
+  claim
+) {
+  let attempts = 0;
 
-  const claims =
-    await prisma.fantasyWaiverClaim.findMany({
-      where: {
-        leagueId,
-        status: 'PENDING'
-      },
-      orderBy: [
-        {
-          playerId: 'asc'
-        },
-        {
-          bidAmount: 'desc'
-        },
-        {
-          createdAt: 'asc'
-        }
-      ],
-      include: {
-        player: true,
-        team: {
-          include: {
-            players: true
+  while (
+    attempts < WAIVER_TRANSACTION_RETRIES
+  ) {
+    try {
+      return await prisma.$transaction(
+        async tx => {
+          /*
+           * Re-read the claim inside the transaction.
+           *
+           * This prevents a stale claim snapshot from
+           * being processed after another operation has
+           * already changed its status.
+           */
+          const currentClaim =
+            await tx.fantasyWaiverClaim.findUnique({
+              where: {
+                id: claim.id
+              },
+              select: {
+                id: true,
+                leagueId: true,
+                teamId: true,
+                playerId: true,
+                bidAmount: true,
+                status: true
+              }
+            });
+
+          if (
+            !currentClaim ||
+            currentClaim.status !==
+              'PENDING'
+          ) {
+            return {
+              status: 'SKIPPED'
+            };
           }
-        }
-      }
-    });
 
-  const processedPlayers = new Set();
-  const results = [];
+          /*
+           * Verify that the player is still available
+           * in this league.
+           *
+           * The league-level Redis lock prevents two
+           * waiver processors from competing, while
+           * the Serializable transaction protects this
+           * read/modify/write sequence from concurrent
+           * database changes.
+           */
+          const player =
+            await tx.fantasyPlayer.findUnique({
+              where: {
+                id: currentClaim.playerId
+              },
+              select: {
+                id: true,
+                name: true,
+                season: true,
+                isActive: true
+              }
+            });
 
-  for (const claim of claims) {
-    if (processedPlayers.has(claim.playerId)) {
-      continue;
-    }
+          if (
+            !player ||
+            player.season === undefined
+          ) {
+            await tx.fantasyWaiverClaim.updateMany({
+              where: {
+                leagueId,
+                playerId:
+                  currentClaim.playerId,
+                status: 'PENDING'
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
 
-        /*
-         * Reject claims for players who are no longer
-         * active or who belong to another fantasy season.
-         */
-        if (
-          !claim.player ||
-          claim.player.season !==
-            league.season ||
-          !claim.player.isActive
-        ) {
-          await prisma.fantasyWaiverClaim.updateMany({
+            return {
+              status: 'REJECTED_PLAYER'
+            };
+          }
+
+          const league =
+            await tx.fantasyLeague.findUnique({
+              where: {
+                id: leagueId
+              },
+              select: {
+                season: true
+              }
+            });
+
+          if (
+            !league ||
+            league.season !==
+              player.season ||
+            !player.isActive
+          ) {
+            await tx.fantasyWaiverClaim.updateMany({
+              where: {
+                leagueId,
+                playerId:
+                  currentClaim.playerId,
+                status: 'PENDING'
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
+
+            return {
+              status: 'REJECTED_PLAYER'
+            };
+          }
+
+          /*
+           * Re-check whether the player is already
+           * rostered anywhere in this league.
+           */
+          const existingRosterEntry =
+            await tx.fantasyTeamPlayer.findFirst({
+              where: {
+                playerId:
+                  currentClaim.playerId,
+                team: {
+                  leagueId
+                }
+              },
+              select: {
+                id: true
+              }
+            });
+
+          if (existingRosterEntry) {
+            await tx.fantasyWaiverClaim.updateMany({
+              where: {
+                leagueId,
+                playerId:
+                  currentClaim.playerId,
+                status: 'PENDING'
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
+
+            return {
+              status: 'REJECTED_ROSTERED'
+            };
+          }
+
+          /*
+           * Load only the team fields needed to process
+           * the claim.
+           *
+           * We no longer load every roster player.
+           */
+          const team =
+            await tx.fantasyTeam.findUnique({
+              where: {
+                id: currentClaim.teamId
+              },
+              select: {
+                id: true,
+                name: true,
+                faab: true,
+                _count: {
+                  select: {
+                    players: true
+                  }
+                }
+              }
+            });
+
+          if (!team) {
+            await tx.fantasyWaiverClaim.update({
+              where: {
+                id:
+                  currentClaim.id
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
+
+            return {
+              status: 'REJECTED_TEAM'
+            };
+          }
+
+          /*
+           * IMPORTANT:
+           *
+           * A failed claim because of roster size or
+           * insufficient FAAB does NOT mark the player
+           * as processed.
+           *
+           * A lower valid bid must still be allowed to
+           * win the player.
+           */
+          if (
+            team._count.players >=
+            MAX_ROSTER_SIZE
+          ) {
+            await tx.fantasyWaiverClaim.update({
+              where: {
+                id:
+                  currentClaim.id
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
+
+            return {
+              status: 'REJECTED_ROSTER_FULL'
+            };
+          }
+
+          if (
+            currentClaim.bidAmount >
+            team.faab
+          ) {
+            await tx.fantasyWaiverClaim.update({
+              where: {
+                id:
+                  currentClaim.id
+              },
+              data: {
+                status: 'REJECTED'
+              }
+            });
+
+            return {
+              status: 'REJECTED_FAAB'
+            };
+          }
+
+          /*
+           * Create the roster entry.
+           */
+          await tx.fantasyTeamPlayer.create({
+            data: {
+              teamId:
+                currentClaim.teamId,
+              playerId:
+                currentClaim.playerId,
+              status: 'BENCH'
+            }
+          });
+
+          /*
+           * Deduct the winning bid.
+           */
+          const faabUpdate =
+            await tx.fantasyTeam.updateMany({
+              where: {
+                id:
+                  currentClaim.teamId,
+                faab: {
+                  gte:
+                    currentClaim.bidAmount
+                }
+              },
+              data: {
+                faab: {
+                  decrement:
+                    currentClaim.bidAmount
+                }
+              }
+            });
+
+          /*
+           * Defensive concurrency check.
+           *
+           * If another transaction consumed the
+           * available FAAB before this update, do not
+           * allow the team to go negative.
+           */
+          if (
+            faabUpdate.count !== 1
+          ) {
+            throw new Error(
+              'FAAB changed while processing waiver claim.'
+            );
+          }
+
+          await tx.fantasyTransaction.create({
+            data: {
+              leagueId,
+              teamId:
+                currentClaim.teamId,
+              playerId:
+                currentClaim.playerId,
+              type: 'WAIVER_ADD'
+            }
+          });
+
+          await tx.fantasyWaiverClaim.update({
+            where: {
+              id:
+                currentClaim.id
+            },
+            data: {
+              status: 'APPROVED'
+            }
+          });
+
+          /*
+           * Once the player has been awarded, all
+           * remaining claims for that player lose.
+           */
+          await tx.fantasyWaiverClaim.updateMany({
             where: {
               leagueId,
-              playerId: claim.playerId,
-              status: 'PENDING'
+              playerId:
+                currentClaim.playerId,
+              status: 'PENDING',
+              id: {
+                not:
+                  currentClaim.id
+              }
             },
             data: {
               status: 'REJECTED'
             }
           });
-    
-          processedPlayers.add(
-            claim.playerId
-          );
-    
-          continue;
-        }
 
-    const stillRostered =
-      await prisma.fantasyTeamPlayer.findFirst({
-        where: {
-          playerId: claim.playerId,
-          team: {
-            leagueId
-          }
-        }
-      });
-
-    if (stillRostered) {
-      await prisma.fantasyWaiverClaim.updateMany({
-        where: {
-          leagueId,
-          playerId: claim.playerId,
-          status: 'PENDING'
+          return {
+            status: 'APPROVED',
+            playerId:
+              currentClaim.playerId,
+            playerName:
+              player.name,
+            teamId:
+              currentClaim.teamId,
+            teamName:
+              team.name,
+            bidAmount:
+              currentClaim.bidAmount
+          };
         },
-        data: {
-          status: 'REJECTED'
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 5000,
+          timeout: 10000
         }
-      });
+      );
+    } catch (error) {
+      if (
+        isSerializationConflict(
+          error
+        )
+      ) {
+        attempts++;
 
-      processedPlayers.add(claim.playerId);
-      continue;
+        if (
+          attempts >=
+          WAIVER_TRANSACTION_RETRIES
+        ) {
+          throw error;
+        }
+
+        continue;
+      }
+
+      throw error;
     }
-
-    const currentTeam =
-      await prisma.fantasyTeam.findUnique({
-        where: {
-          id: claim.teamId
-        },
-        include: {
-          players: true
-        }
-      });
-
-    if (!currentTeam) {
-      await prisma.fantasyWaiverClaim.update({
-        where: {
-          id: claim.id
-        },
-        data: {
-          status: 'REJECTED'
-        }
-      });
-
-      processedPlayers.add(claim.playerId);
-      continue;
-    }
-
-    if (currentTeam.players.length >= MAX_ROSTER_SIZE) {
-      await prisma.fantasyWaiverClaim.update({
-        where: {
-          id: claim.id
-        },
-        data: {
-          status: 'REJECTED'
-        }
-      });
-
-      processedPlayers.add(claim.playerId);
-      continue;
-    }
-
-    if (claim.bidAmount > currentTeam.faab) {
-      await prisma.fantasyWaiverClaim.update({
-        where: {
-          id: claim.id
-        },
-        data: {
-          status: 'REJECTED'
-        }
-      });
-
-      processedPlayers.add(claim.playerId);
-      continue;
-    }
-
-    await prisma.$transaction(async tx => {
-      await tx.fantasyTeamPlayer.create({
-        data: {
-          teamId: claim.teamId,
-          playerId: claim.playerId,
-          status: 'BENCH'
-        }
-      });
-
-      await tx.fantasyTeam.update({
-        where: {
-          id: claim.teamId
-        },
-        data: {
-          faab: {
-            decrement: claim.bidAmount
-          }
-        }
-      });
-
-      await tx.fantasyTransaction.create({
-        data: {
-          leagueId,
-          teamId: claim.teamId,
-          playerId: claim.playerId,
-          type: 'WAIVER_ADD'
-        }
-      });
-
-      await tx.fantasyWaiverClaim.update({
-        where: {
-          id: claim.id
-        },
-        data: {
-          status: 'APPROVED'
-        }
-      });
-
-      await tx.fantasyWaiverClaim.updateMany({
-        where: {
-          leagueId,
-          playerId: claim.playerId,
-          status: 'PENDING',
-          id: {
-            not: claim.id
-          }
-        },
-        data: {
-          status: 'REJECTED'
-        }
-      });
-    });
-
-    processedPlayers.add(claim.playerId);
-
-    results.push({
-      playerId: claim.playerId,
-      playerName: claim.player.name,
-      teamId: claim.teamId,
-      teamName: currentTeam.name,
-      bidAmount: claim.bidAmount,
-      status: 'APPROVED'
-    });
   }
 
-  return results;
+  throw new Error(
+    'Waiver transaction retry limit reached.'
+  );
+}
+
+async function processLeagueWaivers(
+  leagueId
+) {
+  const lock =
+    await cache.acquireLock(
+      `fantasy:waivers:${leagueId}`,
+      WAIVER_LOCK_TTL_SECONDS
+    );
+
+  /*
+   * Only one API/worker replica may process
+   * waivers for a league at a time.
+   */
+  if (!lock) {
+    const error =
+      new Error(
+        `Waiver processing already in progress for league ${leagueId}.`
+      );
+
+    error.code =
+      'WAIVER_PROCESSING_IN_PROGRESS';
+
+    throw error;
+  }
+
+  try {
+    const league =
+      await prisma.fantasyLeague.findUnique({
+        where: {
+          id: leagueId
+        },
+        select: {
+          id: true,
+          season: true,
+          status: true
+        }
+      });
+
+    if (!league) {
+      throw new Error(
+        `Fantasy league ${leagueId} not found.`
+      );
+    }
+
+    if (
+      league.status !==
+      'SEASON'
+    ) {
+      return [];
+    }
+
+    /*
+     * Select only fields needed by the waiver
+     * processor.
+     *
+     * We intentionally do NOT include full
+     * FantasyPlayer or FantasyTeam records.
+     */
+    const claims =
+      await prisma.fantasyWaiverClaim.findMany({
+        where: {
+          leagueId,
+          status: 'PENDING'
+        },
+        orderBy: [
+          {
+            playerId: 'asc'
+          },
+          {
+            bidAmount: 'desc'
+          },
+          {
+            createdAt: 'asc'
+          },
+          {
+            id: 'asc'
+          }
+        ],
+        select: {
+          id: true,
+          leagueId: true,
+          teamId: true,
+          playerId: true,
+          bidAmount: true,
+          createdAt: true
+        }
+      });
+
+    if (claims.length === 0) {
+      return [];
+    }
+
+    const processedPlayers =
+      new Set();
+
+    const results = [];
+
+    for (
+      const claim of claims
+    ) {
+      /*
+       * Once a player has been awarded, or has
+       * become unavailable, there is nothing left
+       * to process for that player.
+       */
+      if (
+        processedPlayers.has(
+          claim.playerId
+        )
+      ) {
+        continue;
+      }
+
+      const result =
+        await processSingleWaiverClaim(
+          leagueId,
+          claim
+        );
+
+      if (
+        result.status ===
+        'APPROVED'
+      ) {
+        results.push({
+          playerId:
+            result.playerId,
+          playerName:
+            result.playerName,
+          teamId:
+            result.teamId,
+          teamName:
+            result.teamName,
+          bidAmount:
+            result.bidAmount,
+          status:
+            'APPROVED'
+        });
+
+        processedPlayers.add(
+          claim.playerId
+        );
+
+        continue;
+      }
+
+      /*
+       * These outcomes mean that nobody can
+       * legitimately claim this player anymore.
+       */
+      if (
+        result.status ===
+          'REJECTED_PLAYER' ||
+        result.status ===
+          'REJECTED_ROSTERED'
+      ) {
+        processedPlayers.add(
+          claim.playerId
+        );
+      }
+
+      /*
+       * REJECTED_FAAB and REJECTED_ROSTER_FULL
+       * intentionally do NOT mark the player as
+       * processed. The next lower bid gets a chance.
+       */
+    }
+
+    return results;
+  } finally {
+    await cache.releaseLock(lock);
+  }
 }
 
 async function processAllDueWaivers() {
-  const pendingClaims =
-    await prisma.fantasyWaiverClaim.findMany({
-      where: {
-        status: 'PENDING'
-      },
-      select: {
-        leagueId: true
-      },
-      distinct: ['leagueId']
-    });
+  const BATCH_SIZE =
+    WAIVER_LEAGUE_BATCH_SIZE;
 
   const results = [];
 
-  for (
-    const { leagueId } of pendingClaims
-  ) {
-    try {
-      const processed =
-        await processLeagueWaivers(
-          leagueId
-        );
+  let lastLeagueId = null;
 
-      results.push({
-        leagueId,
-        processed
+  while (true) {
+    const leagues =
+      await prisma.fantasyLeague.findMany({
+        where: {
+          status: 'SEASON',
+          waiverClaims: {
+            some: {
+              status: 'PENDING'
+            }
+          },
+          ...(lastLeagueId !== null
+            ? {
+                id: {
+                  gt:
+                    lastLeagueId
+                }
+              }
+            : {})
+        },
+        orderBy: {
+          id: 'asc'
+        },
+        take: BATCH_SIZE,
+        select: {
+          id: true
+        }
       });
-    } catch (err) {
-      console.error(
-        `Waiver processing failed for league ${leagueId}:`,
-        err.message
-      );
+
+    if (
+      leagues.length === 0
+    ) {
+      break;
+    }
+
+    /*
+     * Process leagues sequentially.
+     *
+     * This deliberately keeps database pressure
+     * predictable. Each league is independently
+     * protected by its Redis lock, so future worker
+     * architecture can safely parallelize this at
+     * the league level.
+     */
+    for (
+      const league of leagues
+    ) {
+      try {
+        const processed =
+          await processLeagueWaivers(
+            league.id
+          );
+
+        results.push({
+          leagueId:
+            league.id,
+          processed
+        });
+      } catch (err) {
+        if (
+          err?.code ===
+          'WAIVER_PROCESSING_IN_PROGRESS'
+        ) {
+          continue;
+        }
+
+        console.error(
+          `Waiver processing failed for league ${league.id}:`,
+          err.message
+        );
+      }
+    }
+
+    lastLeagueId =
+      leagues[
+        leagues.length - 1
+      ].id;
+
+    if (
+      leagues.length <
+      BATCH_SIZE
+    ) {
+      break;
     }
   }
 
