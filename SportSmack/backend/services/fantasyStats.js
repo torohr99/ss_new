@@ -821,23 +821,52 @@ async function ensureWeeklyPlayerScores(
        * worker replicas from doing this work
        * simultaneously.
        */
-      for (const row of rows) {
-        await prisma.fantasyPlayerWeeklyScore.upsert({
-          where: {
-            playerId_weekNumber: {
-              playerId:
-                row.playerId,
-              weekNumber
-            }
-          },
-          update: {
-            points: row.points,
-            isLive: row.isLive,
-            statsJson:
-              row.statsJson
-          },
-          create: row
-        });
+      const BATCH_SIZE = 500;
+
+      for (
+        let start = 0;
+        start < rows.length;
+        start += BATCH_SIZE
+      ) {
+        const batch =
+          rows.slice(
+            start,
+            start + BATCH_SIZE
+          );
+      
+        const values =
+          batch.map(row =>
+            Prisma.sql`(
+              ${row.playerId},
+              ${row.weekNumber},
+              ${row.points},
+              ${row.isLive},
+              ${row.statsJson}
+            )`
+          );
+      
+        await prisma.$executeRaw(
+          Prisma.sql`
+            INSERT INTO "FantasyPlayerWeeklyScore"
+              (
+                "playerId",
+                "weekNumber",
+                "points",
+                "isLive",
+                "statsJson"
+              )
+            VALUES
+              ${Prisma.join(values)}
+            ON CONFLICT (
+              "playerId",
+              "weekNumber"
+            )
+            DO UPDATE SET
+              "points" = EXCLUDED."points",
+              "isLive" = EXCLUDED."isLive",
+              "statsJson" = EXCLUDED."statsJson"
+          `
+        );
       }
 
       return {
