@@ -341,17 +341,19 @@ model FantasyTeamPlayer {
   @@index([playerId])
 }
 
-model FantasyWeeklyScore {
+model FantasyPlayerWeeklyScore {
   id         Int     @id @default(autoincrement())
-  teamId     Int
+  playerId   Int
   weekNumber Int
-  points     Float   @default(0.0)
+  points     Float   @default(0)
   isLive     Boolean @default(true)
+  statsJson  String?
 
-  team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player FantasyPlayer @relation(fields: [playerId], references: [id])
 
-  @@unique([teamId, weekNumber])
+  @@unique([playerId, weekNumber])
   @@index([weekNumber])
+  @@index([weekNumber, playerId])
 }
 
 model FantasyPlayerWeeklyScore {
@@ -366,6 +368,7 @@ model FantasyPlayerWeeklyScore {
 
   @@unique([playerId, weekNumber])
   @@index([weekNumber])
+  @@index([weekNumber, playerId])
 }
 
 model BracketLeague {
@@ -447,6 +450,7 @@ model FantasyWaiverClaim {
   player FantasyPlayer @relation(fields: [playerId], references: [id])
 
   @@index([leagueId, status])
+  @@index([status, leagueId])
   @@index([teamId])
   @@index([playerId])
 }
