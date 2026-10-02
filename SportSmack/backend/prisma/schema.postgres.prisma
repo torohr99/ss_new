@@ -341,6 +341,20 @@ model FantasyTeamPlayer {
   @@index([playerId])
 }
 
+model FantasyWeeklyScore {
+  id         Int     @id @default(autoincrement())
+  teamId     Int
+  weekNumber Int
+  points     Float   @default(0.0)
+  isLive     Boolean @default(true)
+
+  team FantasyTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, weekNumber])
+  @@index([weekNumber])
+  @@index([weekNumber, teamId])
+}
+
 model FantasyPlayerWeeklyScore {
   id         Int     @id @default(autoincrement())
   playerId   Int
