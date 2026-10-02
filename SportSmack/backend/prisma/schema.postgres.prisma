@@ -356,21 +356,6 @@ model FantasyPlayerWeeklyScore {
   @@index([weekNumber, playerId])
 }
 
-model FantasyPlayerWeeklyScore {
-  id         Int     @id @default(autoincrement())
-  playerId   Int
-  weekNumber Int
-  points     Float   @default(0)
-  isLive     Boolean @default(true)
-  statsJson  String?
-
-  player FantasyPlayer @relation(fields: [playerId], references: [id])
-
-  @@unique([playerId, weekNumber])
-  @@index([weekNumber])
-  @@index([weekNumber, playerId])
-}
-
 model BracketLeague {
   id        String   @id @default(uuid())
   name      String
