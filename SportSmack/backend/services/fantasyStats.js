@@ -1073,11 +1073,7 @@ async function scoreLeagueWeek(
     scoreRows
   );
 
-<<<<<<< HEAD
     await updateMatchups(
-=======
-  await updateMatchups(
->>>>>>> d2373b83 (Optimize fantasy scoring queries and indexes)
       leagueId,
       weekNumber
     );
