@@ -57,6 +57,21 @@ const STARTER_LIMITS = {
 const FLEX_LIMIT = 1;
 const MAX_ROSTER_SIZE = 15;
 
+const FANTASY_PLAYER_SELECT = {
+  id: true,
+  espnId: true,
+  name: true,
+  position: true,
+  team: true,
+  jerseyNumber: true,
+  imageUrl: true,
+  byeWeek: true,
+  projectedPoints: true,
+  lastYearPoints: true,
+  season: true,
+  isActive: true
+};
+
 function normalizePosition(position) {
   return String(position || '').toUpperCase();
 }
@@ -202,7 +217,8 @@ router.get('/players', authenticateToken, async (req, res) => {
       orderBy: {
         id: 'asc'
       },
-      take
+      take,
+      select: FANTASY_PLAYER_SELECT
     };
 
     if (
@@ -315,7 +331,8 @@ router.get(
               name: 'asc'
             }
           ],
-          take: 200
+          take: 200,
+          select: FANTASY_PLAYER_SELECT
         });
 
       res.json(players);
@@ -501,6 +518,15 @@ router.get('/leagues', authenticateToken, async (req, res) => {
         },
         orderBy: {
           createdAt: 'desc'
+        },
+        select: {
+          id: true,
+          name: true,
+          ownerId: true,
+          status: true,
+          currentPickIndex: true,
+          createdAt: true,
+          season: true
         }
       });
 
@@ -737,29 +763,91 @@ router.get(
           where: {
             id: leagueId
           },
-          include: {
+          select: {
+            id: true,
+            name: true,
+            ownerId: true,
+            status: true,
+            currentPickIndex: true,
+            createdAt: true,
+            season: true,
+          
             teams: {
-              include: {
+              select: {
+                id: true,
+                leagueId: true,
+                userId: true,
+                name: true,
+                draftOrder: true,
+                faab: true,
+          
                 user: {
                   select: {
                     id: true,
                     username: true
                   }
                 },
+          
                 players: {
-                  include: {
-                    player: true
+                  select: {
+                    id: true,
+                    teamId: true,
+                    playerId: true,
+                    status: true,
+          
+                    player: {
+                      select: FANTASY_PLAYER_SELECT
+                    }
                   }
                 },
+          
                 weeklyScores: {
                   orderBy: {
                     weekNumber: 'asc'
+                  },
+                  select: {
+                    id: true,
+                    teamId: true,
+                    weekNumber: true,
+                    points: true,
+                    isLive: true
                   }
                 },
-                homeMatchups: true,
-                awayMatchups: true
+          
+                homeMatchups: {
+                  orderBy: {
+                    id: 'asc'
+                  },
+                  select: {
+                    id: true,
+                    leagueId: true,
+                    weekNumber: true,
+                    homeTeamId: true,
+                    awayTeamId: true,
+                    homeScore: true,
+                    awayScore: true,
+                    status: true
+                  }
+                },
+          
+                awayMatchups: {
+                  orderBy: {
+                    id: 'asc'
+                  },
+                  select: {
+                    id: true,
+                    leagueId: true,
+                    weekNumber: true,
+                    homeTeamId: true,
+                    awayTeamId: true,
+                    homeScore: true,
+                    awayScore: true,
+                    status: true
+                  }
+                }
               }
             },
+          
             matchups: {
               orderBy: [
                 {
@@ -768,7 +856,17 @@ router.get(
                 {
                   id: 'asc'
                 }
-              ]
+              ],
+              select: {
+                id: true,
+                leagueId: true,
+                weekNumber: true,
+                homeTeamId: true,
+                awayTeamId: true,
+                homeScore: true,
+                awayScore: true,
+                status: true
+              }
             }
           }
         });
@@ -909,21 +1007,45 @@ router.get(
           where: {
             id: Number(req.params.id)
           },
-          include: {
+          select: {
+            id: true,
+            leagueId: true,
+            userId: true,
+            name: true,
+            draftOrder: true,
+            createdAt: true,
+            faab: true,
+      
             user: {
               select: {
                 id: true,
                 username: true
               }
             },
+      
             players: {
-              include: {
-                player: true
+              select: {
+                id: true,
+                teamId: true,
+                playerId: true,
+                status: true,
+      
+                player: {
+                  select: FANTASY_PLAYER_SELECT
+                }
               }
             },
+      
             weeklyScores: {
               orderBy: {
                 weekNumber: 'asc'
+              },
+              select: {
+                id: true,
+                teamId: true,
+                weekNumber: true,
+                points: true,
+                isLive: true
               }
             }
           }
@@ -1250,7 +1372,9 @@ router.get(
             {
               name: 'asc'
             }
-          ]
+          ],
+          take: 2000,
+          select: FANTASY_PLAYER_SELECT
         });
 
       res.json(players);
@@ -1294,33 +1418,47 @@ router.get(
             leagueId,
             weekNumber
           },
-          include: {
+          select: {
+            id: true,
+            leagueId: true,
+            weekNumber: true,
+            homeTeamId: true,
+            awayTeamId: true,
+            homeScore: true,
+            awayScore: true,
+            status: true,
+      
             homeTeam: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true
-                  }
-                },
+              select: {
+                id: true,
+                name: true,
+      
                 weeklyScores: {
                   where: {
                     weekNumber
+                  },
+                  select: {
+                    weekNumber: true,
+                    points: true,
+                    isLive: true
                   }
                 }
               }
             },
+      
             awayTeam: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true
-                  }
-                },
+              select: {
+                id: true,
+                name: true,
+      
                 weeklyScores: {
                   where: {
                     weekNumber
+                  },
+                  select: {
+                    weekNumber: true,
+                    points: true,
+                    isLive: true
                   }
                 }
               }
@@ -1701,8 +1839,21 @@ router.get(
               createdAt: 'asc'
             }
           ],
-          include: {
-            player: true,
+          take: 100,
+          select: {
+            id: true,
+            leagueId: true,
+            teamId: true,
+            playerId: true,
+            bidAmount: true,
+            priority: true,
+            status: true,
+            createdAt: true,
+      
+            player: {
+              select: FANTASY_PLAYER_SELECT
+            },
+      
             team: {
               select: {
                 id: true,
@@ -2487,14 +2638,25 @@ router.get(
           orderBy: {
             createdAt: 'desc'
           },
-          include: {
+          select: {
+            id: true,
+            leagueId: true,
+            teamId: true,
+            type: true,
+            playerId: true,
+            relatedTeamId: true,
+            createdAt: true,
+          
             team: {
               select: {
                 id: true,
                 name: true
               }
             },
-            player: true
+          
+            player: {
+              select: FANTASY_PLAYER_SELECT
+            }
           },
           take: 100
         });
@@ -2787,9 +2949,23 @@ router.get(
           orderBy: {
             createdAt: 'desc'
           },
-          include: {
+          take: 100,
+      
+          select: {
+            id: true,
+            leagueId: true,
+            proposerTeamId: true,
+            recipientTeamId: true,
+            status: true,
+            createdAt: true,
+            respondedAt: true,
+            expiresAt: true,
+      
             proposerTeam: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+      
                 user: {
                   select: {
                     id: true,
@@ -2798,8 +2974,12 @@ router.get(
                 }
               }
             },
+      
             recipientTeam: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+      
                 user: {
                   select: {
                     id: true,
@@ -2808,9 +2988,18 @@ router.get(
                 }
               }
             },
+      
             items: {
-              include: {
-                player: true
+              select: {
+                id: true,
+                tradeId: true,
+                playerId: true,
+                fromTeamId: true,
+                toTeamId: true,
+      
+                player: {
+                  select: FANTASY_PLAYER_SELECT
+                }
               }
             }
           }
