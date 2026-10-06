@@ -716,23 +716,33 @@ router.get('/:id/badges', async (req, res) => {
 // @desc    Get recent notifications and unread count
 router.get('/me/notifications', async (req, res) => {
   try {
-    const [notifications, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where: {
-          user_id: req.user.id
-        },
-        orderBy: {
-          created_at: 'desc'
-        },
-        take: 50
-      }),
-      prisma.notification.count({
-        where: {
-          user_id: req.user.id,
-          read: false
-        }
-      })
-    ]);
+    const [notifications, unreadCount] =
+      await Promise.all([
+        prisma.notification.findMany({
+          where: {
+            user_id: req.user.id
+          },
+          orderBy: {
+            created_at: 'desc'
+          },
+          take: 50,
+          select: {
+            id: true,
+            user_id: true,
+            type: true,
+            message: true,
+            read: true,
+            created_at: true
+          }
+        }),
+    
+        prisma.notification.count({
+          where: {
+            user_id: req.user.id,
+            read: false
+          }
+        })
+      ]);
 
     return res.json({
       notifications,
