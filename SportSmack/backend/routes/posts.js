@@ -315,11 +315,6 @@ router.get('/social', async (req, res) => {
             );
           }
         }
-    
-      if (block.blockedId === req.user.id) {
-        socialUserIds.delete(block.blockerId);
-      }
-    }
 
     const queryParams = {
       where: {
