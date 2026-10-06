@@ -30,38 +30,31 @@ router.get('/', async (req, res) => {
     const take = 15; // smaller chunk size for better performance
     const forum = req.query.forum;
 
-    const blockedUsersStartedAt =
+    const socialGraphStartedAt =
       process.hrtime.bigint();
     
-    const blockedUsers = await prisma.block.findMany({
-      where: {
-        OR: [
-          {
-            blockerId: req.user.id
-          },
-          {
-            blockedId: req.user.id
-          }
-        ]
-      },
-      select: {
-        blockerId: true,
-        blockedId: true
-      }
-    });
+    const [
+      blockedUsers,
+      friendships
+    ] = await Promise.all([
+      prisma.block.findMany({
+        where: {
+          OR: [
+            {
+              blockerId: req.user.id
+            },
+            {
+              blockedId: req.user.id
+            }
+          ]
+        },
+        select: {
+          blockerId: true,
+          blockedId: true
+        }
+      }),
     
-    const blockedUsersDurationMs =
-      Number(
-        process.hrtime.bigint() -
-          blockedUsersStartedAt
-      ) / 1e6;
-    
-    // Find accepted friendships involving the current user.
-    const friendshipsStartedAt =
-      process.hrtime.bigint();
-
-    const friendships =
-      await prisma.friendship.findMany({
+      prisma.friendship.findMany({
         where: {
           status: 'ACCEPTED',
           OR: [
@@ -77,12 +70,13 @@ router.get('/', async (req, res) => {
           user_id: true,
           friend_id: true
         }
-      });
-
-    const friendshipsDurationMs =
+      })
+    ]);
+    
+    const socialGraphDurationMs =
       Number(
         process.hrtime.bigint() -
-          friendshipsStartedAt
+          socialGraphStartedAt
       ) / 1e6;
     
     // All Updates contains the current user
@@ -196,10 +190,8 @@ router.get('/', async (req, res) => {
               userId: req.user.id,
               feedRequestDurationMs:
                 Math.round(feedRequestDurationMs),
-              friendshipsDurationMs:
-                Math.round(friendshipsDurationMs),
-              blockedUsersDurationMs:
-                Math.round(blockedUsersDurationMs),
+              socialGraphDurationMs:
+                Math.round(socialGraphDurationMs),
               postsQueryDurationMs:
                 Math.round(postsQueryDurationMs),
               friendshipCount:
@@ -234,11 +226,14 @@ router.get('/social', async (req, res) => {
 
     // Find all accepted friendships involving the current user.
         // Find all accepted friendships involving the current user.
-        const friendshipsStartedAt =
+        const socialGraphStartedAt =
           process.hrtime.bigint();
-    
-        const friendships =
-          await prisma.friendship.findMany({
+        
+        const [
+          friendships,
+          blockedUsers
+        ] = await Promise.all([
+          prisma.friendship.findMany({
             where: {
               status: 'ACCEPTED',
               OR: [
@@ -254,31 +249,9 @@ router.get('/social', async (req, res) => {
               user_id: true,
               friend_id: true
             }
-          });
-    
-        const friendshipsDurationMs =
-          Number(
-            process.hrtime.bigint() -
-              friendshipsStartedAt
-          ) / 1e6;
-
-    // Build the list of users whose posts belong in the Social feed.
-    const socialUserIds = new Set([req.user.id]);
-
-    for (const friendship of friendships) {
-      if (friendship.user_id === req.user.id) {
-        socialUserIds.add(friendship.friend_id);
-      } else {
-        socialUserIds.add(friendship.user_id);
-      }
-    }
-
-        // Respect the existing two-way block system.
-        const blockedUsersStartedAt =
-          process.hrtime.bigint();
-    
-        const blockedUsers =
-          await prisma.block.findMany({
+          }),
+        
+          prisma.block.findMany({
             where: {
               OR: [
                 {
@@ -293,12 +266,13 @@ router.get('/social', async (req, res) => {
               blockerId: true,
               blockedId: true
             }
-          });
-    
-        const blockedUsersDurationMs =
+          })
+        ]);
+        
+        const socialGraphDurationMs =
           Number(
             process.hrtime.bigint() -
-              blockedUsersStartedAt
+              socialGraphStartedAt
           ) / 1e6;
 
     for (const block of blockedUsers) {
@@ -405,10 +379,8 @@ router.get('/social', async (req, res) => {
               userId: req.user.id,
               feedRequestDurationMs:
                 Math.round(feedRequestDurationMs),
-              friendshipsDurationMs:
-                Math.round(friendshipsDurationMs),
-              blockedUsersDurationMs:
-                Math.round(blockedUsersDurationMs),
+              socialGraphDurationMs:
+                Math.round(socialGraphDurationMs),
               postsQueryDurationMs:
                 Math.round(postsQueryDurationMs),
               friendshipCount:
