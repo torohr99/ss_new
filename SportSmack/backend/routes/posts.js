@@ -274,12 +274,48 @@ router.get('/social', async (req, res) => {
             process.hrtime.bigint() -
               socialGraphStartedAt
           ) / 1e6;
-
-    for (const block of blockedUsers) {
-      if (block.blockerId === req.user.id) {
-        socialUserIds.delete(block.blockedId);
-      }
-
+        
+        // Include the current user plus all
+        // accepted friends.
+        const socialUserIds =
+          new Set([req.user.id]);
+        
+        for (const friendship of friendships) {
+          if (
+            friendship.user_id ===
+            req.user.id
+          ) {
+            socialUserIds.add(
+              friendship.friend_id
+            );
+          } else {
+            socialUserIds.add(
+              friendship.user_id
+            );
+          }
+        }
+        
+        // Remove users involved in a block.
+        for (const block of blockedUsers) {
+          if (
+            block.blockerId ===
+            req.user.id
+          ) {
+            socialUserIds.delete(
+              block.blockedId
+            );
+          }
+        
+          if (
+            block.blockedId ===
+            req.user.id
+          ) {
+            socialUserIds.delete(
+              block.blockerId
+            );
+          }
+        }
+    
       if (block.blockedId === req.user.id) {
         socialUserIds.delete(block.blockerId);
       }
