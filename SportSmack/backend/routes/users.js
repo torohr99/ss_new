@@ -5,6 +5,7 @@ const sportsApi = require('../services/sportsApi');
 const bcrypt = require('bcrypt');
 
 const prisma = require('../lib/prisma');
+const cache = require('../services/cache');
 
 async function mapWithConcurrency(
   items,
@@ -851,91 +852,274 @@ router.put(
 );
 
 // @route   GET /api/users/me/teams/details
-// @desc    Get detailed schedule and stats for all followed teams (for the sidebar)
-router.get('/me/teams/details', authMiddleware, async (req, res) => {
-  try {
-    const userTeams = await prisma.userTeam.findMany({
-      where: { user_id: req.user.id },
-      include: { team: true }
-    });
+// @desc    Get detailed schedule and stats for all followed teams
+router.get(
+  '/me/teams/details',
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const cacheKey =
+        `user_team_details_${req.user.id}`;
 
-    const teamDetailsList = [];
+      const teamDetailsList =
+        await cache.getOrSetJson(
+          cacheKey,
+          30,
+          async () => {
+            const userTeams =
+              await prisma.userTeam.findMany({
+                where: {
+                  user_id: req.user.id
+                },
+                select: {
+                  team: {
+                    select: {
+                      id: true,
+                      name: true,
+                      city: true,
+                      logo_url: true,
+                      sport: true
+                    }
+                  }
+                }
+              });
 
-    for (const ut of userTeams) {
-      let leagueKey = '';
-      let mapping = null;
-      let espnDetails = null;
-
-      let sportKey = ut.team.sport.toLowerCase();
-      
-      // If the team's sport is a direct league key (e.g. 'ncaam', 'ncaaf'), use it directly
-      if (sportsApi.LEAGUE_MAP[sportKey]) {
-        const m = sportsApi.LEAGUE_MAP[sportKey];
-        const details = await sportsApi.getTeamDetails(m.sport, m.league, ut.team.name, ut.team.city);
-        if (details) {
-          espnDetails = details;
-          mapping = m;
-          leagueKey = sportKey;
-        }
-      } else if (sportKey === 'college') {
-        // Just default to fetching Men's Basketball (ncaam) for the sidebar preview
-        const m = sportsApi.LEAGUE_MAP['ncaam'];
-        const details = await sportsApi.getTeamDetails(m.sport, m.league, ut.team.name, ut.team.city);
-        if (details) {
-          espnDetails = details;
-          mapping = m;
-          leagueKey = 'ncaam';
-        }
-      } else {
-        // Fallback for generic or others where sport matches mapping.sport
-        for (const key of Object.keys(sportsApi.LEAGUE_MAP)) {
-          const m = sportsApi.LEAGUE_MAP[key];
-          if (m.sport === sportKey) {
-            const details = await sportsApi.getTeamDetails(m.sport, m.league, ut.team.name, ut.team.city);
-            if (details) {
-              espnDetails = details;
-              mapping = m;
-              leagueKey = key;
-              break;
+            if (!userTeams.length) {
+              return [];
             }
-          }
-        }
-      }
 
-      if (espnDetails && mapping) {
-        const schedule = await sportsApi.getTeamSchedule(mapping.sport, mapping.league, espnDetails.espnId);
-        
-        // Fetch scoreboard to overlay live scores if the game is currently being played
-        const scoreboard = await sportsApi.getScoreboard(leagueKey);
-        if (schedule && schedule.todayGame) {
-          const liveGame = scoreboard.find(g => g.id === schedule.todayGame.id);
-          if (liveGame) {
-            schedule.todayGame.homeTeam.score = liveGame.homeTeam.score;
-            schedule.todayGame.awayTeam.score = liveGame.awayTeam.score;
-            schedule.todayGame.status = liveGame.status;
-          }
-        }
+            /*
+             * Reuse the same scoreboard promise when
+             * multiple followed teams belong to the
+             * same league.
+             */
+            const scoreboardPromises =
+              new Map();
 
-        teamDetailsList.push({
-          id: ut.team.id,
-          name: ut.team.name,
-          city: ut.team.city,
-          logo_url: ut.team.logo_url,
-          color: espnDetails.color,
-          leagueKey: leagueKey,
-          schedule: {
-            todayGame: schedule?.todayGame || null,
-            nextGame: schedule?.nextGame || null
+            const getScoreboard =
+              leagueKey => {
+                if (
+                  !scoreboardPromises.has(
+                    leagueKey
+                  )
+                ) {
+                  scoreboardPromises.set(
+                    leagueKey,
+                    sportsApi.getScoreboard(
+                      leagueKey
+                    )
+                  );
+                }
+
+                return scoreboardPromises.get(
+                  leagueKey
+                );
+              };
+
+            return mapWithConcurrency(
+              userTeams,
+              4,
+              async ({ team }) => {
+                try {
+                  let leagueKey = '';
+                  let mapping = null;
+                  let espnDetails = null;
+
+                  const sportKey =
+                    (
+                      team.sport ||
+                      ''
+                    ).toLowerCase();
+
+                  /*
+                   * Direct league mapping.
+                   */
+                  if (
+                    sportsApi.LEAGUE_MAP[
+                      sportKey
+                    ]
+                  ) {
+                    const m =
+                      sportsApi.LEAGUE_MAP[
+                        sportKey
+                      ];
+
+                    const details =
+                      await sportsApi.getTeamDetails(
+                        m.sport,
+                        m.league,
+                        team.name,
+                        team.city
+                      );
+
+                    if (details) {
+                      espnDetails =
+                        details;
+                      mapping = m;
+                      leagueKey =
+                        sportKey;
+                    }
+                  } else if (
+                    sportKey === 'college'
+                  ) {
+                    /*
+                     * Preserve existing college
+                     * sidebar behavior.
+                     */
+                    const m =
+                      sportsApi.LEAGUE_MAP[
+                        'ncaam'
+                      ];
+
+                    const details =
+                      await sportsApi.getTeamDetails(
+                        m.sport,
+                        m.league,
+                        team.name,
+                        team.city
+                      );
+
+                    if (details) {
+                      espnDetails =
+                        details;
+                      mapping = m;
+                      leagueKey =
+                        'ncaam';
+                    }
+                  } else {
+                    /*
+                     * Fallback for generic sports.
+                     */
+                    for (
+                      const key of Object.keys(
+                        sportsApi.LEAGUE_MAP
+                      )
+                    ) {
+                      const m =
+                        sportsApi.LEAGUE_MAP[
+                          key
+                        ];
+
+                      if (
+                        m.sport !==
+                        sportKey
+                      ) {
+                        continue;
+                      }
+
+                      const details =
+                        await sportsApi.getTeamDetails(
+                          m.sport,
+                          m.league,
+                          team.name,
+                          team.city
+                        );
+
+                      if (details) {
+                        espnDetails =
+                          details;
+                        mapping = m;
+                        leagueKey =
+                          key;
+                        break;
+                      }
+                    }
+                  }
+
+                  if (
+                    !espnDetails ||
+                    !mapping
+                  ) {
+                    return null;
+                  }
+
+                  const schedule =
+                    await sportsApi.getTeamSchedule(
+                      mapping.sport,
+                      mapping.league,
+                      espnDetails.espnId
+                    );
+
+                  /*
+                   * Only request each league's
+                   * scoreboard once per endpoint
+                   * execution.
+                   */
+                  const scoreboard =
+                    await getScoreboard(
+                      leagueKey
+                    );
+
+                  if (
+                    schedule?.todayGame
+                  ) {
+                    const liveGame =
+                      scoreboard.find(
+                        game =>
+                          game.id ===
+                          schedule.todayGame.id
+                      );
+
+                    if (liveGame) {
+                      schedule.todayGame.homeTeam.score =
+                        liveGame.homeTeam.score;
+
+                      schedule.todayGame.awayTeam.score =
+                        liveGame.awayTeam.score;
+
+                      schedule.todayGame.status =
+                        liveGame.status;
+                    }
+                  }
+
+                  return {
+                    id: team.id,
+                    name: team.name,
+                    city: team.city,
+                    logo_url:
+                      team.logo_url,
+                    color:
+                      espnDetails.color,
+                    leagueKey,
+                    schedule: {
+                      todayGame:
+                        schedule?.todayGame ||
+                        null,
+                      nextGame:
+                        schedule?.nextGame ||
+                        null
+                    }
+                  };
+                } catch (error) {
+                  console.error(
+                    `Failed to load team details for ${team.name}:`,
+                    error.message
+                  );
+
+                  return null;
+                }
+              }
+            ).then(results =>
+              results.filter(Boolean)
+            );
           }
-        });
-      }
+        );
+
+      return res.json(
+        teamDetailsList
+      );
+    } catch (error) {
+      console.error(
+        'Error fetching team details:',
+        error
+      );
+
+      return res.status(500).json({
+        message:
+          'Server error fetching team details'
+      });
     }
-
-    res.json(teamDetailsList);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error fetching team details' });
   }
-});
+);
 
 module.exports = router;
