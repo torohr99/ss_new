@@ -5,11 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node start.js",
+    "start:api": "START_API=true START_WORKER=false node start.js",
+    "start:worker": "START_API=false START_WORKER=true node start.js",
     "worker": "node worker.js",
     "test:smoke": "node tests/smoke.js",
     "dev": "npx kill-port 5000 && nodemon server.js",
-    "build": "cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate",
-    "render-build": "npm install && cp prisma/schema.postgres.prisma prisma/schema.prisma && npx prisma generate"
+    "build": "node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma','prisma/schema.prisma')\" && npx prisma generate",
+    "render-build": "npm install && node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma','prisma/schema.prisma')\" && npx prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
