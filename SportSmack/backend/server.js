@@ -188,6 +188,9 @@ app.use(cookieParser());
 app.use('/api', csrfProtection);
 
 app.use((req, res, next) => {
+  const requestMetricsStartedAt =
+    process.hrtime.bigint();
+
   const requestId =
     req.headers['x-request-id'] ||
     `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -211,7 +214,16 @@ app.use((req, res, next) => {
   );
 
   res.on('finish', () => {
-    metrics.recordRequest(res.statusCode);
+    const durationMs =
+      Number(
+        process.hrtime.bigint() -
+          requestMetricsStartedAt
+      ) / 1e6;
+  
+    metrics.recordRequest(
+      res.statusCode,
+      durationMs
+    );
   });
 
   next();
@@ -306,6 +318,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/metrics', (req, res) => {
+  return res.status(200).json(
+    metrics.snapshot()
+  );
+});
+
 app.get('/api/status', async (req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -314,19 +332,28 @@ app.get('/api/status', async (req, res) => {
 
     return res.status(200).json({
       status: 'OK',
+    
       database: 'OK',
+    
       redis: 'OK',
+    
       instance:
         process.env.RAILWAY_REPLICA_ID ||
         process.env.RENDER_INSTANCE_ID ||
         'local',
+    
       region:
         process.env.RAILWAY_REPLICA_REGION ||
         'local',
+    
       timestamp:
         new Date().toISOString(),
+    
       uptime:
-        Math.round(process.uptime())
+        Math.round(process.uptime()),
+    
+      metrics:
+        metrics.snapshot()
     });
   } catch (error) {
     logger.error(
@@ -513,3 +540,43 @@ process.on(
     }, 1000).unref();
   }
 );
+
+const MEMORY_WARNING_INTERVAL_MS =
+  60000;
+
+setInterval(() => {
+  const memory =
+    process.memoryUsage();
+
+  const heapUsedPercent =
+    memory.heapTotal > 0
+      ? memory.heapUsed /
+        memory.heapTotal
+      : 0;
+
+  if (
+    heapUsedPercent >= 0.90
+  ) {
+    logger.warn(
+      {
+        heapUsed:
+          memory.heapUsed,
+
+        heapTotal:
+          memory.heapTotal,
+
+        rss:
+          memory.rss,
+
+        external:
+          memory.external,
+
+        heapUsedPercent:
+          Math.round(
+            heapUsedPercent * 100
+          )
+      },
+      'High Node.js heap usage'
+    );
+  }
+}, MEMORY_WARNING_INTERVAL_MS).unref();
