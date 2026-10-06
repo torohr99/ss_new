@@ -4,9 +4,16 @@ const gameAI = require('../services/gameAI');
 const liveGameEngine = require('../services/liveGameEngine');
 
 const prisma = require('../lib/prisma');
+const cache = require('../services/cache');
 
-async function userFollowsGameTeam(userId, competitors) {
-  if (!Array.isArray(competitors) || competitors.length === 0) {
+async function userFollowsGameTeam(
+  userId,
+  competitors
+) {
+  if (
+    !Array.isArray(competitors) ||
+    competitors.length === 0
+  ) {
     return {
       follows: false,
       teamId: null,
@@ -14,16 +21,35 @@ async function userFollowsGameTeam(userId, competitors) {
     };
   }
 
-  const userTeams = await prisma.userTeam.findMany({
-    where: {
-      user_id: userId
-    },
-    include: {
-      team: true
-    }
-  });
+  const cacheKey =
+    `user_followed_teams_${userId}`;
 
-  for (const competitor of competitors) {
+  const userTeams =
+    await cache.getOrSetJson(
+      cacheKey,
+      30,
+      async () => {
+        return prisma.userTeam.findMany({
+          where: {
+            user_id: userId
+          },
+          select: {
+            team: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                abbreviation: true
+              }
+            }
+          }
+        });
+      }
+    );
+
+  for (
+    const competitor of competitors
+  ) {
     const espnTeamName = (
       competitor.team?.displayName ||
       competitor.team?.name ||
@@ -37,30 +63,64 @@ async function userFollowsGameTeam(userId, competitors) {
       ''
     ).toLowerCase();
 
-    for (const ut of userTeams) {
-      const dbTeamName = (ut.team.name || '').toLowerCase();
-      const dbCityName = (ut.team.city || '').toLowerCase();
-      const dbAbbreviation = (ut.team.abbreviation || '').toLowerCase();
+    for (
+      const ut of userTeams
+    ) {
+      const team =
+        ut.team;
+
+      if (!team) {
+        continue;
+      }
+
+      const dbTeamName =
+        (team.name || '').toLowerCase();
+
+      const dbCityName =
+        (team.city || '').toLowerCase();
+
+      const dbAbbreviation =
+        (team.abbreviation || '').toLowerCase();
 
       const nameMatch =
-        (dbTeamName && espnTeamName.includes(dbTeamName)) ||
-        (dbTeamName && espnShortName.includes(dbTeamName));
+        (
+          dbTeamName &&
+          espnTeamName.includes(
+            dbTeamName
+          )
+        ) ||
+        (
+          dbTeamName &&
+          espnShortName.includes(
+            dbTeamName
+          )
+        );
 
       const cityMatch =
         dbCityName &&
-        espnTeamName.includes(dbCityName);
+        espnTeamName.includes(
+          dbCityName
+        );
 
       const abbreviationMatch =
         dbAbbreviation &&
-        espnShortName.includes(dbAbbreviation);
+        espnShortName.includes(
+          dbAbbreviation
+        );
 
-      if (nameMatch || cityMatch || abbreviationMatch) {
+      if (
+        nameMatch ||
+        cityMatch ||
+        abbreviationMatch
+      ) {
         return {
           follows: true,
-          teamId: ut.team.id,
-          team: ut.team,
+          teamId: team.id,
+          team,
           competitorId: String(
-            competitor.id || competitor.team?.id || ''
+            competitor.id ||
+            competitor.team?.id ||
+            ''
           )
         };
       }
