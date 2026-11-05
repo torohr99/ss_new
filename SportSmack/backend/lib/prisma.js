@@ -28,12 +28,10 @@ if (process.env.NODE_ENV !== 'production') {
 prisma.$on('query', event => {
   const durationMs = Number(event.duration);
 
-  if (durationMs >= 100) {
+  if (durationMs >= 500) {
     console.warn(
       {
-        durationMs,
-        query: event.query,
-        params: event.params
+        durationMs
       },
       'Slow Prisma query'
     );
