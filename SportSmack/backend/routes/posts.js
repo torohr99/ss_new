@@ -216,27 +216,6 @@ router.get('/', async (req, res) => {
           feedRequestStartedAt
       ) / 1e6;
     
-        if (feedRequestDurationMs >= 500) {
-          console.warn(
-            {
-              route: '/api/posts',
-              userId: req.user.id,
-              feedRequestDurationMs:
-                Math.round(feedRequestDurationMs),
-              socialGraphDurationMs:
-                Math.round(socialGraphDurationMs),
-              postsQueryDurationMs:
-                Math.round(postsQueryDurationMs),
-              friendshipCount:
-                friendships.length,
-              allowedUserCount:
-                allowedUserIds.size,
-              postCount:
-                posts.length
-            },
-            'Slow feed request'
-          );
-        }
     
     res.json({
       posts: formattedPosts,
@@ -432,27 +411,6 @@ router.get('/social', async (req, res) => {
           feedRequestStartedAt
       ) / 1e6;
 
-        if (feedRequestDurationMs >= 500) {
-          console.warn(
-            {
-              route: '/api/posts/social',
-              userId: req.user.id,
-              feedRequestDurationMs:
-                Math.round(feedRequestDurationMs),
-              socialGraphDurationMs:
-                Math.round(socialGraphDurationMs),
-              postsQueryDurationMs:
-                Math.round(postsQueryDurationMs),
-              friendshipCount:
-                friendships.length,
-              socialUserCount:
-                socialUserIds.size,
-              postCount:
-                posts.length
-            },
-            'Slow social feed request'
-          );
-        }
 
     return res.json({
       posts: formattedPosts,
