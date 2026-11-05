@@ -21,6 +21,40 @@ const {
 // Protect all post routes
 router.use(authMiddleware);
 
+// Count only the likes and comments belonging to the 15 posts
+// returned for this page. Prisma's relation _count include can
+// aggregate across the entire Like and Comment tables.
+async function getPostCounts(posts) {
+  if (posts.length === 0) return [];
+
+  const postIds = posts.map(post => post.id);
+  const [likeCounts, commentCounts] = await Promise.all([
+    prisma.like.groupBy({
+      by: ['post_id'],
+      where: { post_id: { in: postIds } },
+      _count: { _all: true }
+    }),
+    prisma.comment.groupBy({
+      by: ['post_id'],
+      where: { post_id: { in: postIds } },
+      _count: { _all: true }
+    })
+  ]);
+
+  const likesByPost = new Map(
+    likeCounts.map(row => [row.post_id, row._count._all])
+  );
+  const commentsByPost = new Map(
+    commentCounts.map(row => [row.post_id, row._count._all])
+  );
+
+  return posts.map(post => ({
+    likes: likesByPost.get(post.id) || 0,
+    comments: commentsByPost.get(post.id) || 0
+  }));
+}
+
+
 // @route   GET /api/posts
 // @desc    Get posts (global feed) ordered by newest, with cursor pagination
 router.get('/', async (req, res) => {
@@ -137,9 +171,6 @@ router.get('/', async (req, res) => {
       orderBy: { id: 'desc' }, // sort by id desc is safer for cursor pagination than created_at
       include: {
         user: { select: { id: true, username: true } },
-        _count: {
-          select: { likes: true, comments: true }
-        },
         likes: {
           where: { user_id: req.user.id },
           select: { id: true }
@@ -157,6 +188,7 @@ router.get('/', async (req, res) => {
     
     const posts =
       await prisma.post.findMany(queryParams);
+    const postCounts = await getPostCounts(posts);
     
     const postsQueryDurationMs =
       Number(
@@ -164,8 +196,9 @@ router.get('/', async (req, res) => {
           postsQueryStartedAt
       ) / 1e6;
 
-    const formattedPosts = posts.map(post => ({
+    const formattedPosts = posts.map((post, index) => ({
       ...post,
+      _count: postCounts[index],
       hasLiked: post.likes.length > 0,
       canDelete: post.user_id === req.user.id,
       likes: undefined
@@ -338,12 +371,6 @@ router.get('/social', async (req, res) => {
             username: true
           }
         },
-        _count: {
-          select: {
-            likes: true,
-            comments: true
-          }
-        },
         likes: {
           where: {
             user_id: req.user.id
@@ -378,6 +405,7 @@ router.get('/social', async (req, res) => {
           await prisma.post.findMany(
             queryParams
           );
+        const postCounts = await getPostCounts(posts);
     
         const postsQueryDurationMs =
           Number(
@@ -385,8 +413,9 @@ router.get('/social', async (req, res) => {
               postsQueryStartedAt
           ) / 1e6;
 
-    const formattedPosts = posts.map(post => ({
+    const formattedPosts = posts.map((post, index) => ({
       ...post,
+      _count: postCounts[index],
       hasLiked: post.likes.length > 0,
       canDelete: post.user_id === req.user.id,
       likes: undefined
