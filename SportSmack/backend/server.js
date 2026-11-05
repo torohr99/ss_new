@@ -236,7 +236,7 @@ app.use('/api', (req, res, next) => {
     const durationMs =
       Number(process.hrtime.bigint() - startedAt) / 1e6;
 
-    if (durationMs >= 500) {
+    if (durationMs >= 1500) {
       logger.warn(
         {
           requestId: req.requestId,
