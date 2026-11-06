@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "24.x"
+    "node": ">=22 <25"
   },
   "overrides": {
     "js-yaml": "4.3.2",
@@ -37,11 +37,5 @@
   "devDependencies": {
     "eslint": "^8",
     "eslint-config-next": "15.5.29"
-  },
-  "overrides": {
-    "qs": "6.16.2"
-  },
-  "engines": {
-    "node": ">=22 <25"
   }
 }
