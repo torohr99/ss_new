@@ -48,7 +48,7 @@ console.log(
 let isShuttingDown = false;
 let lockRenewalInterval = null;
 let chatModerationInterval = null;
-let chatModerationInProgress = false;
+let chatModerationPromise = null;
 
 async function startWorker() {
   /*
@@ -126,26 +126,26 @@ async function startWorker() {
     async () => {
       if (
         isShuttingDown ||
-        chatModerationInProgress
+        chatModerationPromise
       ) {
-        return;
+        return chatModerationPromise;
       }
 
-      chatModerationInProgress = true;
+      chatModerationPromise =
+        processPendingChatReports(25)
+          .catch(error => {
+            console.error(
+              'Chat moderation worker error:',
+              error.message
+            );
+          })
+          .finally(() => {
+            chatModerationPromise = null;
+          });
 
-      try {
-        await processPendingChatReports(25);
-      } catch (error) {
-        console.error(
-          'Chat moderation worker error:',
-          error.message
-        );
-      } finally {
-        chatModerationInProgress = false;
-      }
+      return chatModerationPromise;
     };
 
-  runChatModeration();
 
   chatModerationInterval = setInterval(
     runChatModeration,
@@ -164,14 +164,28 @@ async function shutdown(signal) {
 
   isShuttingDown = true;
 
-  if (lockRenewalInterval) {
-    clearInterval(lockRenewalInterval);
-    lockRenewalInterval = null;
-  }
-
   if (chatModerationInterval) {
     clearInterval(chatModerationInterval);
     chatModerationInterval = null;
+  }
+
+  console.log(
+    `Worker ${workerId} received ${signal}.`
+  );
+
+  /*
+   * Stop new work, then allow in-flight jobs to finish while
+   * the distributed lock is still being renewed.
+   */
+  await Promise.all([
+    liveGameEngine.stop(),
+    stopFantasyScheduler(),
+    chatModerationPromise || Promise.resolve()
+  ]);
+
+  if (lockRenewalInterval) {
+    clearInterval(lockRenewalInterval);
+    lockRenewalInterval = null;
   }
 
   console.log(
