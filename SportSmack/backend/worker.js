@@ -146,6 +146,7 @@ async function startWorker() {
       return chatModerationPromise;
     };
 
+  runChatModeration();
 
   chatModerationInterval = setInterval(
     runChatModeration,
