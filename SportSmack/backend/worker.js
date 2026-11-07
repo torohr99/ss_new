@@ -46,6 +46,9 @@ console.log(
 );
 
 let isShuttingDown = false;
+let lockRenewalInterval = null;
+let chatModerationInterval = null;
+let chatModerationInProgress = false;
 
 async function startWorker() {
   /*
@@ -77,18 +80,31 @@ async function startWorker() {
     return;
   }
   
-  setInterval(
+  lockRenewalInterval = setInterval(
     async () => {
-      const renewed =
-        await renewWorkerLock();
-  
-      if (!renewed) {
+      try {
+        const renewed =
+          await renewWorkerLock();
+
+        if (!renewed) {
+          console.error(
+            'Lost background-worker Redis lock.'
+          );
+
+          await shutdown(
+            'WORKER_LOCK_LOST'
+          );
+        }
+      } catch (error) {
         console.error(
-          'Lost background-worker Redis lock.'
+          'Background-worker lock renewal failed:',
+          error.message
         );
-  
+
+        // If lock ownership cannot be verified, stop processing
+        // rather than risk two workers running concurrently.
         await shutdown(
-          'WORKER_LOCK_LOST'
+          'WORKER_LOCK_RENEWAL_FAILED'
         );
       }
     },
@@ -108,6 +124,15 @@ async function startWorker() {
 
   const runChatModeration =
     async () => {
+      if (
+        isShuttingDown ||
+        chatModerationInProgress
+      ) {
+        return;
+      }
+
+      chatModerationInProgress = true;
+
       try {
         await processPendingChatReports(25);
       } catch (error) {
@@ -115,12 +140,14 @@ async function startWorker() {
           'Chat moderation worker error:',
           error.message
         );
+      } finally {
+        chatModerationInProgress = false;
       }
     };
-  
+
   runChatModeration();
-  
-  setInterval(
+
+  chatModerationInterval = setInterval(
     runChatModeration,
     30 * 1000
   );
@@ -136,6 +163,16 @@ async function shutdown(signal) {
   }
 
   isShuttingDown = true;
+
+  if (lockRenewalInterval) {
+    clearInterval(lockRenewalInterval);
+    lockRenewalInterval = null;
+  }
+
+  if (chatModerationInterval) {
+    clearInterval(chatModerationInterval);
+    chatModerationInterval = null;
+  }
 
   console.log(
     `Worker ${workerId} received ${signal}.`
