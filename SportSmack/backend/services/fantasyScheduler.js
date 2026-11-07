@@ -17,7 +17,7 @@ const {
 } = require('./fantasySchedule');
 
 let intervalId = null;
-let cycleInProgress = false;
+let cyclePromise = null;
 
 async function scoreActiveLeagues() {
   const BATCH_SIZE = 250;
@@ -250,27 +250,31 @@ async function scoreActiveLeagues() {
 }
 
 async function runFantasySchedulerCycle() {
-  if (cycleInProgress) {
+  if (cyclePromise) {
     console.log(
       'Skipping fantasy scheduler cycle because the previous cycle is still running.'
     );
-    return;
+    return cyclePromise;
   }
 
-  cycleInProgress = true;
+  cyclePromise = (async () => {
+    try {
+      await scoreActiveLeagues();
+      await processDueWaivers();
+      await processBotTransactions();
+      await syncCurrentFantasySeason();
+    } catch (error) {
+      console.error(
+        'Fantasy scheduler cycle failed:',
+        error.message
+      );
+    }
+  })();
 
   try {
-    await scoreActiveLeagues();
-    await processDueWaivers();
-    await processBotTransactions();
-    await syncCurrentFantasySeason();
-  } catch (error) {
-    console.error(
-      'Fantasy scheduler cycle failed:',
-      error.message
-    );
+    await cyclePromise;
   } finally {
-    cycleInProgress = false;
+    cyclePromise = null;
   }
 }
 
@@ -291,10 +295,15 @@ function startFantasyScheduler() {
   );
 }
 
-function stopFantasyScheduler() {
+async function stopFantasyScheduler() {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
+  }
+
+  // Drain the active cycle before the Worker disconnects Prisma.
+  if (cyclePromise) {
+    await cyclePromise;
   }
 }
 
