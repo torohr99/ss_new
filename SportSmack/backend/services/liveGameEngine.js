@@ -85,45 +85,46 @@ class LiveGameEngine {
 
     this.currentProcessingPromise = (async () => {
       try {
-      const leaguesToCheck = [
-        'mlb',
-        'nba',
-        'nfl',
-        'nhl',
-        'ncaab',
-        'ncaaf'
-      ];
+              const leaguesToCheck = [
+                'mlb',
+                'nba',
+                'nfl',
+                'nhl',
+                'ncaab',
+                'ncaaf'
+              ];
 
-      for (const league of leaguesToCheck) {
-        try {
-          const scoreboard =
-            await sportsApi.getScoreboard(
-              league
-            );
+              for (const league of leaguesToCheck) {
+                try {
+                  const scoreboard =
+                    await sportsApi.getScoreboard(
+                      league
+                    );
 
-          if (!Array.isArray(scoreboard)) {
-            continue;
-          }
+                  if (!Array.isArray(scoreboard)) {
+                    continue;
+                  }
 
-          // sportsApi.getScoreboard() already normalizes
-          // ESPN's authoritative competition status into isLive.
-          const liveGames = scoreboard.filter(
-            game => game?.isLive === true
-          );
+                  // sportsApi.getScoreboard() already normalizes
+                  // ESPN's authoritative competition status into isLive.
+                  const liveGames = scoreboard.filter(
+                    game => game?.isLive === true
+                  );
 
-          for (const game of liveGames) {
-            await this.processGame(
-              league,
-              game.id
-            );
-          }
-        } catch (error) {
-          console.error(
-            `Error processing ${league}:`,
-            error.message
-          );
-        }
-      }
+                  for (const game of liveGames) {
+                    await this.processGame(
+                      league,
+                      game.id
+                    );
+                  }
+                } catch (error) {
+                  console.error(
+                    `Error processing ${league}:`,
+                    error.message
+                  );
+                }
+              }
+              }
       }
     })();
 
