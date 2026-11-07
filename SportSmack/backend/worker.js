@@ -177,26 +177,25 @@ async function shutdown(signal) {
    * Stop new work, then allow in-flight jobs to finish while
    * the distributed lock is still being renewed.
    */
-  await Promise.all([
+  const drainResults = await Promise.allSettled([
     liveGameEngine.stop(),
     stopFantasyScheduler(),
     chatModerationPromise || Promise.resolve()
   ]);
 
+  for (const result of drainResults) {
+    if (result.status === 'rejected') {
+      console.error(
+        'Background job drain failed:',
+        result.reason?.message || result.reason
+      );
+    }
+  }
+
   if (lockRenewalInterval) {
     clearInterval(lockRenewalInterval);
     lockRenewalInterval = null;
   }
-
-  console.log(
-    `Worker ${workerId} received ${signal}.`
-  );
-
-  /*
-   * Stop all background timers first.
-   */
-  liveGameEngine.stop();
-  stopFantasyScheduler();
 
   try {
     await prisma.$disconnect();
@@ -224,7 +223,7 @@ async function shutdown(signal) {
       error.message
     );
   }
-  
+
   try {
     await redis.quit();
   } catch (error) {
