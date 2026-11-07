@@ -42,7 +42,14 @@ class LiveGameEngine {
   start() {
     // Check live games every 30 seconds.
     this.intervalId = setInterval(
-      () => this.processLiveGames(),
+      () => {
+        this.processLiveGames().catch(error => {
+          console.error(
+            'Live-game polling cycle failed:',
+            error.message
+          );
+        });
+      },
       30000
     );
 
@@ -117,8 +124,6 @@ class LiveGameEngine {
           );
         }
       }
-      } finally {
-        // The active promise is cleared by the outer finally below.
       }
     })();
 
