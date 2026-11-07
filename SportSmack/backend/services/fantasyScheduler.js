@@ -17,6 +17,7 @@ const {
 } = require('./fantasySchedule');
 
 let intervalId = null;
+let cycleInProgress = false;
 
 async function scoreActiveLeagues() {
   const BATCH_SIZE = 250;
@@ -248,30 +249,40 @@ async function scoreActiveLeagues() {
   }
 }
 
+async function runFantasySchedulerCycle() {
+  if (cycleInProgress) {
+    console.log(
+      'Skipping fantasy scheduler cycle because the previous cycle is still running.'
+    );
+    return;
+  }
+
+  cycleInProgress = true;
+
+  try {
+    await scoreActiveLeagues();
+    await processDueWaivers();
+    await processBotTransactions();
+    await syncCurrentFantasySeason();
+  } catch (error) {
+    console.error(
+      'Fantasy scheduler cycle failed:',
+      error.message
+    );
+  } finally {
+    cycleInProgress = false;
+  }
+}
+
 function startFantasyScheduler() {
   if (intervalId) return;
 
-  // Run immediately.
-  scoreActiveLeagues();
-  processDueWaivers();
-  processBotTransactions();
-  
-  syncCurrentFantasySeason()
-    .catch(error => {
-      console.error(
-        'Initial fantasy season synchronization failed:',
-        error.message
-      );
-    });
+  // Run immediately, then every five minutes.
+  // The in-flight guard prevents overlapping cycles.
+  runFantasySchedulerCycle();
 
-  // Then every 5 minutes.
   intervalId = setInterval(
-    async () => {
-      await scoreActiveLeagues();
-      await processDueWaivers();
-      await processBotTransactions();
-      await syncCurrentFantasySeason();
-    },
+    runFantasySchedulerCycle,
     5 * 60 * 1000
   );
 
