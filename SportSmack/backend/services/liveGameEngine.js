@@ -8,6 +8,7 @@ class LiveGameEngine {
   constructor() {
     this.io = null;
     this.intervalId = null;
+    this.isProcessing = false;
 
     // Stores the most recent meaningful game state
     // for each live game.
@@ -67,45 +68,56 @@ class LiveGameEngine {
   }
 
   async processLiveGames() {
-    const leaguesToCheck = [
-      'mlb',
-      'nba',
-      'nfl',
-      'nhl',
-      'ncaab',
-      'ncaaf'
-    ];
+    // Prevent a new polling cycle from starting while the previous
+    // cycle is still waiting on sports APIs, AI, or database work.
+    if (this.isProcessing) {
+      return;
+    }
 
-    for (const league of leaguesToCheck) {
-      try {
-        const scoreboard =
-          await sportsApi.getScoreboard(
-            league
+    this.isProcessing = true;
+
+    try {
+      const leaguesToCheck = [
+        'mlb',
+        'nba',
+        'nfl',
+        'nhl',
+        'ncaab',
+        'ncaaf'
+      ];
+
+      for (const league of leaguesToCheck) {
+        try {
+          const scoreboard =
+            await sportsApi.getScoreboard(
+              league
+            );
+
+          if (!Array.isArray(scoreboard)) {
+            continue;
+          }
+
+          // sportsApi.getScoreboard() already normalizes
+          // ESPN's authoritative competition status into isLive.
+          const liveGames = scoreboard.filter(
+            game => game?.isLive === true
           );
 
-        if (!Array.isArray(scoreboard)) {
-          continue;
-        }
-
-        // sportsApi.getScoreboard() already normalizes
-        // ESPN's authoritative competition status into isLive.
-        const liveGames = scoreboard.filter(
-          game => game?.isLive === true
-        );
-
-        for (const game of liveGames) {
-          await this.processGame(
-            league,
-            game.id
+          for (const game of liveGames) {
+            await this.processGame(
+              league,
+              game.id
+            );
+          }
+        } catch (error) {
+          console.error(
+            `Error processing ${league}:`,
+            error.message
           );
         }
-
-      } catch (error) {
-        console.error(
-          `Error processing ${league}:`,
-          error.message
-        );
       }
+    } finally {
+      this.isProcessing = false;
     }
   }
 
