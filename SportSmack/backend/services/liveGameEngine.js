@@ -8,7 +8,7 @@ class LiveGameEngine {
   constructor() {
     this.io = null;
     this.intervalId = null;
-    this.isProcessing = false;
+    this.currentProcessingPromise = null;
 
     // Stores the most recent meaningful game state
     // for each live game.
@@ -65,18 +65,19 @@ class LiveGameEngine {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+
+    // Let the current cycle finish before the Worker disconnects Prisma.
+    return this.currentProcessingPromise || Promise.resolve();
   }
 
   async processLiveGames() {
-    // Prevent a new polling cycle from starting while the previous
-    // cycle is still waiting on sports APIs, AI, or database work.
-    if (this.isProcessing) {
-      return;
+    // Share the active promise with any overlapping timer tick.
+    if (this.currentProcessingPromise) {
+      return this.currentProcessingPromise;
     }
 
-    this.isProcessing = true;
-
-    try {
+    this.currentProcessingPromise = (async () => {
+      try {
       const leaguesToCheck = [
         'mlb',
         'nba',
@@ -116,8 +117,15 @@ class LiveGameEngine {
           );
         }
       }
+      } finally {
+        // The active promise is cleared by the outer finally below.
+      }
+    })();
+
+    try {
+      await this.currentProcessingPromise;
     } finally {
-      this.isProcessing = false;
+      this.currentProcessingPromise = null;
     }
   }
 
