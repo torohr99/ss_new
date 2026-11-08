@@ -46,6 +46,9 @@ console.log(
 );
 
 let isShuttingDown = false;
+let lockRenewalInterval = null;
+let chatModerationInterval = null;
+let chatModerationPromise = null;
 
 async function startWorker() {
   /*
@@ -77,18 +80,41 @@ async function startWorker() {
     return;
   }
   
-  setInterval(
+  lockRenewalInterval = setInterval(
     async () => {
-      const renewed =
-        await renewWorkerLock();
-  
-      if (!renewed) {
+      try {
+        const renewed =
+          await renewWorkerLock();
+
+        if (!renewed) {
+          console.error(
+            'Lost background-worker Redis lock.'
+          );
+
+          await shutdown(
+            'WORKER_LOCK_LOST',
+            {
+              drain: false,
+              releaseLock: false,
+              exitCode: 1
+            }
+          );
+        }
+      } catch (error) {
         console.error(
-          'Lost background-worker Redis lock.'
+          'Background-worker lock renewal failed:',
+          error.message
         );
-  
+
+        // If lock ownership cannot be verified, stop processing
+        // rather than risk two workers running concurrently.
         await shutdown(
-          'WORKER_LOCK_LOST'
+          'WORKER_LOCK_RENEWAL_FAILED',
+          {
+            drain: false,
+            releaseLock: false,
+            exitCode: 1
+          }
         );
       }
     },
@@ -108,19 +134,31 @@ async function startWorker() {
 
   const runChatModeration =
     async () => {
-      try {
-        await processPendingChatReports(25);
-      } catch (error) {
-        console.error(
-          'Chat moderation worker error:',
-          error.message
-        );
+      if (
+        isShuttingDown ||
+        chatModerationPromise
+      ) {
+        return chatModerationPromise;
       }
+
+      chatModerationPromise =
+        processPendingChatReports(25)
+          .catch(error => {
+            console.error(
+              'Chat moderation worker error:',
+              error.message
+            );
+          })
+          .finally(() => {
+            chatModerationPromise = null;
+          });
+
+      return chatModerationPromise;
     };
-  
+
   runChatModeration();
-  
-  setInterval(
+
+  chatModerationInterval = setInterval(
     runChatModeration,
     30 * 1000
   );
@@ -130,22 +168,71 @@ async function startWorker() {
   );
 }
 
-async function shutdown(signal) {
+async function shutdown(signal, options = {}) {
+  const {
+    drain = true,
+    releaseLock = true,
+    exitCode = 0
+  } = options;
+
   if (isShuttingDown) {
     return;
   }
 
   isShuttingDown = true;
 
+  if (chatModerationInterval) {
+    clearInterval(chatModerationInterval);
+    chatModerationInterval = null;
+  }
+
   console.log(
     `Worker ${workerId} received ${signal}.`
   );
 
   /*
-   * Stop all background timers first.
+   * On a normal SIGTERM/SIGINT, stop scheduling new work and
+   * drain active jobs while this Worker still owns the lock.
+   *
+   * If lock ownership is lost, do not wait for active jobs:
+   * another Worker may already be taking ownership. Stop timers
+   * and terminate this process without releasing another owner's lock.
    */
-  liveGameEngine.stop();
-  stopFantasyScheduler();
+  if (drain) {
+    const drainResults = await Promise.allSettled([
+      liveGameEngine.stop(),
+      stopFantasyScheduler(),
+      chatModerationPromise || Promise.resolve()
+    ]);
+
+    for (const result of drainResults) {
+      if (result.status === 'rejected') {
+        console.error(
+          'Background job drain failed:',
+          result.reason?.message || result.reason
+        );
+      }
+    }
+  } else {
+    liveGameEngine.stop().catch(error => {
+      console.error(
+        'Live-game stop error after lock loss:',
+        error.message
+      );
+    });
+
+    stopFantasyScheduler().catch(error => {
+      console.error(
+        'Fantasy scheduler stop error after lock loss:',
+        error.message
+      );
+    });
+  }
+
+  if (lockRenewalInterval) {
+    clearInterval(lockRenewalInterval);
+    lockRenewalInterval = null;
+  }
 
   try {
     await prisma.$disconnect();
@@ -165,15 +252,17 @@ async function shutdown(signal) {
     );
   }
 
-  try {
-    await releaseWorkerLock();
-  } catch (error) {
-    console.error(
-      'Worker lock release error:',
-      error.message
-    );
+  if (releaseLock) {
+    try {
+      await releaseWorkerLock();
+    } catch (error) {
+      console.error(
+        'Worker lock release error:',
+        error.message
+      );
+    }
   }
-  
+
   try {
     await redis.quit();
   } catch (error) {
@@ -187,7 +276,7 @@ async function shutdown(signal) {
     `SportSmack worker ${workerId} shutdown complete.`
   );
 
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 process.on(

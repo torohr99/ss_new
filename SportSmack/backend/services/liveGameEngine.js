@@ -8,6 +8,7 @@ class LiveGameEngine {
   constructor() {
     this.io = null;
     this.intervalId = null;
+    this.currentProcessingPromise = null;
 
     // Stores the most recent meaningful game state
     // for each live game.
@@ -41,7 +42,14 @@ class LiveGameEngine {
   start() {
     // Check live games every 30 seconds.
     this.intervalId = setInterval(
-      () => this.processLiveGames(),
+      () => {
+        this.processLiveGames().catch(error => {
+          console.error(
+            'Live-game polling cycle failed:',
+            error.message
+          );
+        });
+      },
       30000
     );
 
@@ -64,47 +72,69 @@ class LiveGameEngine {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+
+    // Let the current cycle finish before the Worker disconnects Prisma.
+    return this.currentProcessingPromise || Promise.resolve();
   }
 
   async processLiveGames() {
-    const leaguesToCheck = [
-      'mlb',
-      'nba',
-      'nfl',
-      'nhl',
-      'ncaab',
-      'ncaaf'
-    ];
+    // Share the active promise with overlapping timer ticks.
+    if (this.currentProcessingPromise) {
+      return this.currentProcessingPromise;
+    }
 
-    for (const league of leaguesToCheck) {
-      try {
-        const scoreboard =
-          await sportsApi.getScoreboard(
-            league
+    const processingPromise = (async () => {
+      const leaguesToCheck = [
+        'mlb',
+        'nba',
+        'nfl',
+        'nhl',
+        'ncaab',
+        'ncaaf'
+      ];
+
+      for (const league of leaguesToCheck) {
+        try {
+          const scoreboard =
+            await sportsApi.getScoreboard(
+              league
+            );
+
+          if (!Array.isArray(scoreboard)) {
+            continue;
+          }
+
+          // sportsApi.getScoreboard() normalizes ESPN's
+          // authoritative competition status into isLive.
+          const liveGames = scoreboard.filter(
+            game => game?.isLive === true
           );
 
-        if (!Array.isArray(scoreboard)) {
-          continue;
-        }
-
-        // sportsApi.getScoreboard() already normalizes
-        // ESPN's authoritative competition status into isLive.
-        const liveGames = scoreboard.filter(
-          game => game?.isLive === true
-        );
-
-        for (const game of liveGames) {
-          await this.processGame(
-            league,
-            game.id
+          for (const game of liveGames) {
+            await this.processGame(
+              league,
+              game.id
+            );
+          }
+        } catch (error) {
+          console.error(
+            `Error processing ${league}:`,
+            error.message
           );
         }
+      }
+    })();
 
-      } catch (error) {
-        console.error(
-          `Error processing ${league}:`,
-          error.message
-        );
+    this.currentProcessingPromise = processingPromise;
+
+    try {
+      await processingPromise;
+    } finally {
+      if (
+        this.currentProcessingPromise ===
+        processingPromise
+      ) {
+        this.currentProcessingPromise = null;
       }
     }
   }

@@ -17,6 +17,7 @@ const {
 } = require('./fantasySchedule');
 
 let intervalId = null;
+let cyclePromise = null;
 
 async function scoreActiveLeagues() {
   const BATCH_SIZE = 250;
@@ -248,30 +249,44 @@ async function scoreActiveLeagues() {
   }
 }
 
-function startFantasyScheduler() {
-  if (intervalId) return;
+async function runFantasySchedulerCycle() {
+  if (cyclePromise) {
+    console.log(
+      'Skipping fantasy scheduler cycle because the previous cycle is still running.'
+    );
+    return cyclePromise;
+  }
 
-  // Run immediately.
-  scoreActiveLeagues();
-  processDueWaivers();
-  processBotTransactions();
-  
-  syncCurrentFantasySeason()
-    .catch(error => {
-      console.error(
-        'Initial fantasy season synchronization failed:',
-        error.message
-      );
-    });
-
-  // Then every 5 minutes.
-  intervalId = setInterval(
-    async () => {
+  cyclePromise = (async () => {
+    try {
       await scoreActiveLeagues();
       await processDueWaivers();
       await processBotTransactions();
       await syncCurrentFantasySeason();
-    },
+    } catch (error) {
+      console.error(
+        'Fantasy scheduler cycle failed:',
+        error.message
+      );
+    }
+  })();
+
+  try {
+    await cyclePromise;
+  } finally {
+    cyclePromise = null;
+  }
+}
+
+function startFantasyScheduler() {
+  if (intervalId) return;
+
+  // Run immediately, then every five minutes.
+  // The in-flight guard prevents overlapping cycles.
+  runFantasySchedulerCycle();
+
+  intervalId = setInterval(
+    runFantasySchedulerCycle,
     5 * 60 * 1000
   );
 
@@ -280,10 +295,15 @@ function startFantasyScheduler() {
   );
 }
 
-function stopFantasyScheduler() {
+async function stopFantasyScheduler() {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
+  }
+
+  // Drain the active cycle before the Worker disconnects Prisma.
+  if (cyclePromise) {
+    await cyclePromise;
   }
 }
 
