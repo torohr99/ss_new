@@ -1,4 +1,6 @@
 const axios = require('axios');
+const cache = require('./cache');
+const geminiGuard = require('./geminiGuard');
 
 const LIVE_ANALYSIS_CACHE = new Map();
 
