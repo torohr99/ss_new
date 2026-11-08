@@ -92,7 +92,12 @@ async function startWorker() {
           );
 
           await shutdown(
-            'WORKER_LOCK_LOST'
+            'WORKER_LOCK_LOST',
+            {
+              drain: false,
+              releaseLock: false,
+              exitCode: 1
+            }
           );
         }
       } catch (error) {
@@ -104,7 +109,12 @@ async function startWorker() {
         // If lock ownership cannot be verified, stop processing
         // rather than risk two workers running concurrently.
         await shutdown(
-          'WORKER_LOCK_RENEWAL_FAILED'
+          'WORKER_LOCK_RENEWAL_FAILED',
+          {
+            drain: false,
+            releaseLock: false,
+            exitCode: 1
+          }
         );
       }
     },
@@ -158,7 +168,13 @@ async function startWorker() {
   );
 }
 
-async function shutdown(signal) {
+async function shutdown(signal, options = {}) {
+  const {
+    drain = true,
+    releaseLock = true,
+    exitCode = 0
+  } = options;
+
   if (isShuttingDown) {
     return;
   }
@@ -175,22 +191,42 @@ async function shutdown(signal) {
   );
 
   /*
-   * Stop new work, then allow in-flight jobs to finish while
-   * the distributed lock is still being renewed.
+   * On a normal SIGTERM/SIGINT, stop scheduling new work and
+   * drain active jobs while this Worker still owns the lock.
+   *
+   * If lock ownership is lost, do not wait for active jobs:
+   * another Worker may already be taking ownership. Stop timers
+   * and terminate this process without releasing another owner's lock.
    */
-  const drainResults = await Promise.allSettled([
-    liveGameEngine.stop(),
-    stopFantasyScheduler(),
-    chatModerationPromise || Promise.resolve()
-  ]);
+  if (drain) {
+    const drainResults = await Promise.allSettled([
+      liveGameEngine.stop(),
+      stopFantasyScheduler(),
+      chatModerationPromise || Promise.resolve()
+    ]);
 
-  for (const result of drainResults) {
-    if (result.status === 'rejected') {
-      console.error(
-        'Background job drain failed:',
-        result.reason?.message || result.reason
-      );
+    for (const result of drainResults) {
+      if (result.status === 'rejected') {
+        console.error(
+          'Background job drain failed:',
+          result.reason?.message || result.reason
+        );
+      }
     }
+  } else {
+    liveGameEngine.stop().catch(error => {
+      console.error(
+        'Live-game stop error after lock loss:',
+        error.message
+      );
+    });
+
+    stopFantasyScheduler().catch(error => {
+      console.error(
+        'Fantasy scheduler stop error after lock loss:',
+        error.message
+      );
+    });
   }
 
   if (lockRenewalInterval) {
@@ -216,13 +252,15 @@ async function shutdown(signal) {
     );
   }
 
-  try {
-    await releaseWorkerLock();
-  } catch (error) {
-    console.error(
-      'Worker lock release error:',
-      error.message
-    );
+  if (releaseLock) {
+    try {
+      await releaseWorkerLock();
+    } catch (error) {
+      console.error(
+        'Worker lock release error:',
+        error.message
+      );
+    }
   }
 
   try {
@@ -238,7 +276,7 @@ async function shutdown(signal) {
     `SportSmack worker ${workerId} shutdown complete.`
   );
 
-  process.exit(0);
+  process.exit(exitCode);
 }
 
 process.on(
