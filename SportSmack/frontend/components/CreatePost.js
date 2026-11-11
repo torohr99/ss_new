@@ -2,14 +2,52 @@
 
 import { useState } from 'react';
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+async function uploadImage(file, purpose) {
+  const authorization = await fetch(`${API_URL}/api/media/upload-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      purpose,
+      contentType: file.type
+    })
+  });
+
+  const authorizationData = await authorization.json().catch(() => ({}));
+  if (!authorization.ok) {
+    throw new Error(
+      authorizationData.message || 'Unable to authorize image upload.'
+    );
+  }
+
+  const uploaded = await fetch(authorizationData.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${authorizationData.token}`,
+      'Content-Type': file.type
+    },
+    body: file
+  });
+
+  const uploadData = await uploaded.json().catch(() => ({}));
+  if (!uploaded.ok) {
+    throw new Error(uploadData.message || 'Image upload failed.');
+  }
+
+  return uploadData.imageUrl;
+}
+
 export default function CreatePost({ onPostCreated, forumTag = null }) {
   const [content, setContent] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if (!content.trim() || submitting) return;
+    if ((!content.trim() && !imageFile) || submitting) return;
 
     setSubmitting(true);
     setError('');
@@ -19,26 +57,24 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
       : content.trim();
 
     try {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      let imageUrl = null;
 
-      const res = await fetch(`${apiUrl}/api/posts`, {
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile, 'post');
+      }
+
+      const res = await fetch(`${API_URL}/api/posts`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           content: finalContent,
-          image_url: imageUrl.trim() || null
+          image_url: imageUrl
         })
       });
 
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
-        console.error('Create post failed:', res.status, data);
-
         throw new Error(
           data.message ||
           data.error ||
@@ -47,17 +83,42 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
       }
 
       setContent('');
-      setImageUrl('');
+      setImageFile(null);
+      const fileInput = document.getElementById('create-post-image');
+      if (fileInput) fileInput.value = '';
 
-      if (onPostCreated) {
-        onPostCreated(data);
-      }
+      if (onPostCreated) onPostCreated(data);
     } catch (err) {
       console.error('Error creating post:', err);
       setError(err.message || 'Failed to create post.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleFileChange = event => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setImageFile(null);
+      return;
+    }
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Choose a JPEG, PNG, or WebP image.');
+      event.target.value = '';
+      setImageFile(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Images must be 5 MB or smaller.');
+      event.target.value = '';
+      setImageFile(null);
+      return;
+    }
+
+    setError('');
+    setImageFile(file);
   };
 
   return (
@@ -67,25 +128,44 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
         placeholder="What's on your mind? (Use keyboard emojis 😊)"
         rows="3"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={event => setContent(event.target.value)}
         disabled={submitting}
       />
 
       <div className="create-post-actions">
-        <input
-          type="text"
-          className="image-url-input"
-          placeholder="Optional: Paste an image URL here..."
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          disabled={submitting}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1 }}>
+          <label htmlFor="create-post-image">Attach image (JPEG, PNG, or WebP; max 5 MB)</label>
+          <input
+            id="create-post-image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            disabled={submitting}
+          />
+          {imageFile && (
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+              Selected: {imageFile.name}
+              <button
+                type="button"
+                onClick={() => {
+                  setImageFile(null);
+                  const input = document.getElementById('create-post-image');
+                  if (input) input.value = '';
+                }}
+                disabled={submitting}
+                style={{ marginLeft: '0.5rem' }}
+              >
+                Remove
+              </button>
+            </span>
+          )}
+        </div>
 
         <button
           type="button"
           className="btn btn-primary"
           onClick={handleSubmit}
-          disabled={submitting || !content.trim()}
+          disabled={submitting || (!content.trim() && !imageFile)}
         >
           {submitting ? 'Posting...' : 'Post'}
         </button>
