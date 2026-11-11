@@ -47,7 +47,7 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
-    if ((!content.trim() && !imageFile) || submitting) return;
+    if (!content.trim() || submitting) return;
 
     setSubmitting(true);
     setError('');
@@ -165,7 +165,7 @@ export default function CreatePost({ onPostCreated, forumTag = null }) {
           type="button"
           className="btn btn-primary"
           onClick={handleSubmit}
-          disabled={submitting || (!content.trim() && !imageFile)}
+          disabled={submitting || !content.trim()}
         >
           {submitting ? 'Posting...' : 'Post'}
         </button>
