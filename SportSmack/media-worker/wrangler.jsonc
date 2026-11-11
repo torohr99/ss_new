@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sportsmack-media",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-11",
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "sportsmack-media"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://ss-new-backendfromr.vercel.app,http://localhost:3000"
+  }
+}
