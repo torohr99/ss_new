@@ -20,7 +20,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY backup.sh /app/backup.sh
+COPY SportSmack/database-backup/backup.sh /app/backup.sh
 RUN chmod 0755 /app/backup.sh
 
 CMD ["/bin/bash", "/app/backup.sh"]
