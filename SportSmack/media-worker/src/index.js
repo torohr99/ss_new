@@ -241,6 +241,16 @@ async function handleDelete(request, env, url) {
     return json({ message: 'Invalid delete authorization.' }, 401, cors);
   }
 
+  const cache = caches.default;
+  await Promise.all(
+    Object.keys(VARIANTS).map(variant =>
+      cache.delete(new Request(
+        url.origin + '/' + key + '?variant=' + variant,
+        { method: 'GET' }
+      ))
+    )
+  );
+
   await env.MEDIA_BUCKET.delete(key);
   return json({ success: true }, 200, cors);
 }
@@ -252,9 +262,6 @@ async function handleImage(request, env, url, ctx) {
     return new Response('Not found', { status: 404 });
   }
 
-  const object = await env.MEDIA_BUCKET.get(key);
-  if (!object) return new Response('Not found', { status: 404 });
-
   const variant = url.searchParams.get('variant') || 'post';
   const maxDimension = VARIANTS[variant];
 
@@ -262,12 +269,6 @@ async function handleImage(request, env, url, ctx) {
     return new Response('Unsupported image variant', { status: 400 });
   }
 
-  const ownerId = key.split('/')[0];
-  if (!object.customMetadata || object.customMetadata.ownerId !== ownerId) {
-    return new Response('Not found', { status: 404 });
-  }
-
-  const etag = object.httpEtag || object.etag || key;
   const cacheKey = new Request(
     url.origin + '/' + key + '?variant=' + variant,
     { method: 'GET' }
@@ -277,6 +278,15 @@ async function handleImage(request, env, url, ctx) {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
+  const object = await env.MEDIA_BUCKET.get(key);
+  if (!object) return new Response('Not found', { status: 404 });
+
+  const ownerId = key.split('/')[0];
+  if (!object.customMetadata || object.customMetadata.ownerId !== ownerId) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const etag = object.httpEtag || object.etag || key;
   const inputBytes = new Uint8Array(await object.arrayBuffer());
   if (!inputBytes.length || inputBytes.length > MAX_UPLOAD_BYTES) {
     return new Response('Invalid stored image', { status: 415 });
