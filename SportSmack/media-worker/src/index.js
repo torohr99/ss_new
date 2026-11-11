@@ -26,7 +26,7 @@ function corsHeaders(request, env) {
 
   const headers = {
     'Vary': 'Origin',
-    'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400'
   };
@@ -89,8 +89,11 @@ async function verifyUploadToken(token, secret) {
       !Number.isInteger(payload.userId) ||
       !Number.isFinite(payload.expiresAt) ||
       payload.expiresAt < Date.now() ||
-      !['profile', 'post'].includes(payload.purpose) ||
-      !ALLOWED_TYPES.has(payload.contentType)
+      !(
+        (['profile', 'post'].includes(payload.purpose) &&
+          ALLOWED_TYPES.has(payload.contentType)) ||
+        payload.action === 'delete'
+      )
     ) {
       return null;
     }
@@ -222,6 +225,26 @@ async function handleUpload(request, env, url) {
   }, 201, cors);
 }
 
+async function handleDelete(request, env, url) {
+  const cors = corsHeaders(request, env);
+  const key = decodeURIComponent(url.pathname.slice('/delete/'.length));
+  const token = (request.headers.get('Authorization') || '')
+    .replace(/^Bearer\\s+/i, '');
+  const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
+
+  if (
+    !payload ||
+    payload.action !== 'delete' ||
+    !validObjectKey(key, payload.userId) ||
+    payload.key !== key
+  ) {
+    return json({ message: 'Invalid delete authorization.' }, 401, cors);
+  }
+
+  await env.MEDIA_BUCKET.delete(key);
+  return json({ success: true }, 200, cors);
+}
+
 async function handleImage(request, env, url, ctx) {
   const key = decodeURIComponent(url.pathname.slice(1));
 
@@ -327,13 +350,17 @@ export default {
       return handleUpload(request, env, url);
     }
 
+    if (url.pathname.startsWith('/delete/') && request.method === 'DELETE') {
+      return handleDelete(request, env, url);
+    }
+
     if (request.method === 'GET') {
       return handleImage(request, env, url, ctx);
     }
 
     return new Response('Method not allowed', {
       status: 405,
-      headers: { Allow: 'GET, PUT, OPTIONS', ...cors }
+      headers: { Allow: 'GET, PUT, DELETE, OPTIONS', ...cors }
     });
   }
 };
