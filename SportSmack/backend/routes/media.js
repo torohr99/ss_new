@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { writeLimiter } = require('../middleware/rateLimits');
+const prisma = require('../lib/prisma');
 
 router.use(authMiddleware);
 
@@ -100,6 +101,25 @@ router.delete('/image', writeLimiter, async (req, res) => {
     const match = /^\/([1-9][0-9]*)\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/.exec(parsed.pathname);
     if (!match || Number(match[1]) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'You cannot delete another user’s image.' });
+    }
+
+    const [postReference, profileReference] = await Promise.all([
+      prisma.post.findFirst({
+        where: { image_url: imageUrl },
+        select: { id: true }
+      }),
+      prisma.user.findFirst({
+        where: { profile_pic: imageUrl },
+        select: { id: true }
+      })
+    ]);
+
+    if (postReference || profileReference) {
+      return res.json({
+        success: true,
+        skipped: true,
+        message: 'Image is still referenced and was retained.'
+      });
     }
 
     const key = match[1] + '/' + match[2];
