@@ -229,7 +229,7 @@ async function handleDelete(request, env, url) {
   const cors = corsHeaders(request, env);
   const key = decodeURIComponent(url.pathname.slice('/delete/'.length));
   const token = (request.headers.get('Authorization') || '')
-    .replace(/^Bearer\\s+/i, '');
+    .replace(/^Bearer\s+/i, '');
   const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
 
   if (
