@@ -137,8 +137,20 @@ export default function SettingsPage() {
         throw new Error(data.message || 'Failed to update profile.');
       }
 
-      setProfilePic(data.profile_pic || profilePic);
+      const previousProfilePic = user.profile_pic || '';
+      const nextProfilePic = data.profile_pic || profilePic;
+
+      setProfilePic(nextProfilePic);
       setProfileFile(null);
+
+      if (previousProfilePic && previousProfilePic !== nextProfilePic) {
+        fetch(API_URL + '/api/media/image', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ imageUrl: previousProfilePic })
+        }).catch(() => {});
+      }
       setPassword('');
       setConfirmPassword('');
       setSuccess('Profile updated successfully. Refresh the page to see the new picture throughout SportSmack.');
@@ -172,7 +184,7 @@ export default function SettingsPage() {
               <div style={{ width: '60px', height: '60px', borderRadius: '50%', backgroundColor: 'var(--border-color)', overflow: 'hidden', flexShrink: 0 }}>
                 {(previewUrl || profilePic) ? (
                   <img
-                    src={previewUrl || profilePic}
+                    src={(previewUrl || profilePic) ? ((previewUrl || profilePic).includes('?') ? (previewUrl || profilePic) + '&variant=avatar' : (previewUrl || profilePic) + '?variant=avatar') : ''}
                     alt="Profile preview"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
