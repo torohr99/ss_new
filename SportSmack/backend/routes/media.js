@@ -74,4 +74,59 @@ router.post('/upload-token', writeLimiter, async (req, res) => {
   }
 });
 
+// @route DELETE /api/media/image
+// Deletes only an image owned by the authenticated user.
+router.delete('/image', writeLimiter, async (req, res) => {
+  try {
+    const { imageUrl } = req.body || {};
+    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/\\/+$/, '');
+    const secret = process.env.MEDIA_UPLOAD_SECRET;
+
+    if (!workerUrl || !secret || secret.length < 32) {
+      return res.status(503).json({ message: 'Media deletion is not configured.' });
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(imageUrl);
+    } catch {
+      return res.status(400).json({ message: 'Invalid image URL.' });
+    }
+
+    if (parsed.origin !== new URL(workerUrl).origin) {
+      return res.status(400).json({ message: 'Image is not stored in SportSmack media.' });
+    }
+
+    const match = /^\\/([1-9][0-9]*)\\/([0-9a-f-]{36}\\.(?:jpg|png|webp))$/.exec(parsed.pathname);
+    if (!match || Number(match[1]) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'You cannot delete another user’s image.' });
+    }
+
+    const key = match[1] + '/' + match[2];
+    const token = signPayload({
+      userId: Number(req.user.id),
+      key,
+      action: 'delete',
+      expiresAt: Date.now() + 60 * 1000
+    }, secret);
+
+    const response = await fetch(workerUrl + '/delete/' + key, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + token }
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      return res.status(response.status).json({
+        message: body.message || 'Unable to delete image.'
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Media deletion failed:', error);
+    return res.status(500).json({ message: 'Unable to delete image.' });
+  }
+});
+
 module.exports = router;
