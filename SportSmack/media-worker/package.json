@@ -1,0 +1,17 @@
+{
+  "name": "sportsmack-media-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@cf-wasm/photon": "0.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.45.0"
+  }
+}

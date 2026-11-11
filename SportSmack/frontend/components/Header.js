@@ -27,7 +27,7 @@ export default function Header() {
           <>
             <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', color: 'var(--text-primary)' }}>
               {user.profile_pic ? (
-                <img src={user.profile_pic} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                <img src={user.profile_pic.includes('?') ? `${user.profile_pic}&variant=avatar` : `${user.profile_pic}?variant=avatar`} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontWeight: '500' }}>Settings</span>
               )}

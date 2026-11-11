@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 
 const prisma = require('../lib/prisma');
 const cache = require('../services/cache');
+const { validateMediaUrlForUser } = require('../services/mediaUrls');
 
 async function mapWithConcurrency(
   items,
@@ -611,7 +612,18 @@ router.put('/me', async (req, res) => {
     let updateData = {};
 
     if (profile_pic !== undefined) {
-      updateData.profile_pic = profile_pic;
+      const validation = validateMediaUrlForUser(
+        profile_pic,
+        req.user.id
+      );
+
+      if (!validation.valid) {
+        return res.status(400).json({
+          message: 'Invalid profile image URL or image does not belong to this account.'
+        });
+      }
+
+      updateData.profile_pic = validation.value;
     }
 
     if (password) {

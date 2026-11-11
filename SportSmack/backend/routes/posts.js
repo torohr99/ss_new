@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const logger = require('../lib/logger');
+const { validateMediaUrlForUser } = require('../services/mediaUrls');
 
 const prisma = require('../lib/prisma');
 const {
@@ -457,6 +458,17 @@ router.post(
     
     const normalizedContent =
       validation.content;
+
+    const imageValidation = validateMediaUrlForUser(
+      image_url,
+      req.user.id
+    );
+
+    if (!imageValidation.valid) {
+      return res.status(400).json({
+        message: 'Invalid post image URL or image does not belong to this account.'
+      });
+    }
     
     if (
       await hasRecentDuplicatePost(
@@ -473,7 +485,7 @@ router.post(
     const newPost = await prisma.post.create({
       data: {
         content: normalizedContent,
-        image_url: image_url || null,
+        image_url: imageValidation.value,
         user_id: req.user.id
       },
       include: {

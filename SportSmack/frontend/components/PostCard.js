@@ -189,6 +189,20 @@ export default function PostCard({ post }) {
         );
       }
   
+      if (post.image_url) {
+        fetch(
+          API_URL + '/api/media/image',
+          {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              imageUrl: post.image_url
+            })
+          }
+        ).catch(() => {});
+      }
+
       window.location.reload();
     } catch (error) {
       console.error(

@@ -280,6 +280,7 @@ const adminMetricsRoute =
   require('./routes/adminMetrics');
 const teamsRoute = require('./routes/teams');
 const postsRoute = require('./routes/posts');
+const mediaRoute = require('./routes/media');
 const searchRoutes = require('./routes/search');
 const sportsRoute = require('./routes/sports');
 const fantasyRoute = require('./routes/fantasy');
@@ -301,6 +302,7 @@ app.use(
   adminMetricsRoute
 );
 app.use('/api/teams', teamsRoute);
+app.use('/api/media', mediaRoute);
 app.use('/api/posts', postsRoute);
 app.use('/api/search', searchRoutes);
 app.use('/api/sports', sportsRoute);
