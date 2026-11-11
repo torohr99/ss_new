@@ -79,7 +79,7 @@ router.post('/upload-token', writeLimiter, async (req, res) => {
 router.delete('/image', writeLimiter, async (req, res) => {
   try {
     const { imageUrl } = req.body || {};
-    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/\\/+$/, '');
+    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/\/+$/, '');
     const secret = process.env.MEDIA_UPLOAD_SECRET;
 
     if (!workerUrl || !secret || secret.length < 32) {
@@ -97,7 +97,7 @@ router.delete('/image', writeLimiter, async (req, res) => {
       return res.status(400).json({ message: 'Image is not stored in SportSmack media.' });
     }
 
-    const match = /^\\/([1-9][0-9]*)\\/([0-9a-f-]{36}\\.(?:jpg|png|webp))$/.exec(parsed.pathname);
+    const match = /^\/([1-9][0-9]*)\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/.exec(parsed.pathname);
     if (!match || Number(match[1]) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'You cannot delete another user’s image.' });
     }
