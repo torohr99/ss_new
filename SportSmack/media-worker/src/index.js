@@ -143,7 +143,11 @@ async function handleUpload(request, env, url) {
 
   const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
 
-  if (!payload || !validObjectKey(key, payload.userId)) {
+  if (
+    !payload ||
+    payload.key !== key ||
+    !validObjectKey(key, payload.userId)
+  ) {
     return json({ message: 'Invalid or expired upload authorization.' }, 401, cors);
   }
 
@@ -160,10 +164,40 @@ async function handleUpload(request, env, url) {
     return json({ message: 'This upload authorization has already been used.' }, 409, cors);
   }
 
-  const bytes = new Uint8Array(await request.arrayBuffer());
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return json({ message: 'Image upload body is missing.' }, 400, cors);
+  }
 
-  if (!bytes.length || bytes.length > MAX_UPLOAD_BYTES) {
-    return json({ message: 'Images must be between 1 byte and 5 MB.' }, 413, cors);
+  const chunks = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_UPLOAD_BYTES) {
+        await reader.cancel();
+        return json({ message: 'Images must be 5 MB or smaller.' }, 413, cors);
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (!totalBytes) {
+    return json({ message: 'Image upload body is empty.' }, 400, cors);
+  }
+
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
   }
 
   if (!matchesImageSignature(bytes, payload.contentType)) {
@@ -203,6 +237,11 @@ async function handleImage(request, env, url, ctx) {
 
   if (!maxDimension) {
     return new Response('Unsupported image variant', { status: 400 });
+  }
+
+  const ownerId = key.split('/')[0];
+  if (!object.customMetadata || object.customMetadata.ownerId !== ownerId) {
+    return new Response('Not found', { status: 404 });
   }
 
   const etag = object.httpEtag || object.etag || key;
