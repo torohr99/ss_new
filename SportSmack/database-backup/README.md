@@ -20,9 +20,9 @@ Create a new service in the existing SportSmack Railway project:
 - Name: `database-backup`
 - Source repository: `torohr99/ss_new`
 - Branch: `main` after this pull request has been reviewed and merged
-- Root directory: `/SportSmack/database-backup`
+- Root directory: `/`
 - Builder: Dockerfile
-- Dockerfile path: `/Dockerfile` relative to the root directory
+- Dockerfile path: `/SportSmack/database-backup/Dockerfile`
 - No public domain or networking is needed
 - Restart policy: `Never`
 - Cron schedule: `0 6 * * *` (06:00 UTC daily)
