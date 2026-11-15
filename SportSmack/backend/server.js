@@ -5,6 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
+const redisOptions = require('./lib/redisOptions');
 
 const helmet = require('helmet');
 const {
@@ -42,10 +43,7 @@ if (!redisUrl) {
   throw new Error('REDIS_URL environment variable is required.');
 }
 
-const pubClient = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
-  family: 0
-});
+const pubClient = new Redis(redisUrl, redisOptions());
 
 const subClient = pubClient.duplicate();
 
@@ -327,55 +325,39 @@ app.get('/api/metrics', (req, res) => {
 });
 
 app.get('/api/status', async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
+  const checks = await Promise.allSettled([
+    prisma.$queryRaw`SELECT 1`,
+    redis.ping()
+  ]);
 
-    await redis.ping();
+  const databaseOk = checks[0].status === 'fulfilled';
+  const redisOk = checks[1].status === 'fulfilled';
+  const healthy = databaseOk && redisOk;
 
-    return res.status(200).json({
-      status: 'OK',
-    
-      database: 'OK',
-    
-      redis: 'OK',
-    
-      instance:
-        process.env.RAILWAY_REPLICA_ID ||
-        process.env.RENDER_INSTANCE_ID ||
-        'local',
-    
-      region:
-        process.env.RAILWAY_REPLICA_REGION ||
-        'local',
-    
-      timestamp:
-        new Date().toISOString(),
-    
-      uptime:
-        Math.round(process.uptime()),
-    
-      metrics:
-        metrics.snapshot()
-    });
-  } catch (error) {
-    logger.error(
-      'Health check failed',
-      {
-        error
-      }
-    );
-
-    return res.status(503).json({
-      status: 'ERROR',
-      database: 'ERROR',
-      redis: 'ERROR',
-      instance:
-        process.env.RENDER_INSTANCE_ID ||
-        'local',
-      timestamp:
-        new Date().toISOString()
+  if (!healthy) {
+    logger.error('Dependency health check failed', {
+      database: databaseOk ? 'OK' : 'ERROR',
+      redis: redisOk ? 'OK' : 'ERROR',
+      databaseError: databaseOk ? undefined : checks[0].reason,
+      redisError: redisOk ? undefined : checks[1].reason
     });
   }
+
+  return res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'OK' : 'ERROR',
+    database: databaseOk ? 'OK' : 'ERROR',
+    redis: redisOk ? 'OK' : 'ERROR',
+    instance:
+      process.env.RAILWAY_REPLICA_ID ||
+      process.env.RENDER_INSTANCE_ID ||
+      'local',
+    region:
+      process.env.RAILWAY_REPLICA_REGION ||
+      'local',
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime()),
+    metrics: metrics.snapshot()
+  });
 });
 
 // 404 handler — MUST come after all routes
@@ -469,6 +451,11 @@ async function gracefulShutdown(signal) {
         }
       );
     }
+
+    // Socket.IO's Redis adapter owns these dedicated clients.
+    // Disconnect them explicitly during process shutdown.
+    pubClient.disconnect();
+    subClient.disconnect();
 
     try {
       await redis.quit();
