@@ -324,10 +324,27 @@ app.get('/api/metrics', (req, res) => {
   );
 });
 
+const DEPENDENCY_HEALTH_TIMEOUT_MS = 5000;
+
+function withHealthTimeout(promise, dependency) {
+  let timeout;
+
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(
+        `${dependency} health check timed out after ${DEPENDENCY_HEALTH_TIMEOUT_MS}ms`
+      ));
+    }, DEPENDENCY_HEALTH_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeoutPromise])
+    .finally(() => clearTimeout(timeout));
+}
+
 app.get('/api/status', async (req, res) => {
   const checks = await Promise.allSettled([
-    prisma.$queryRaw`SELECT 1`,
-    redis.ping()
+    withHealthTimeout(prisma.$queryRaw`SELECT 1`, 'PostgreSQL'),
+    withHealthTimeout(redis.ping(), 'Redis')
   ]);
 
   const databaseOk = checks[0].status === 'fulfilled';
