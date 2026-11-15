@@ -6,6 +6,9 @@ const { Emitter } =
 const Redis =
   require('ioredis');
 
+const redisOptions =
+  require('./lib/redisOptions');
+
 const {
   acquireWorkerLock,
   renewWorkerLock,
@@ -31,7 +34,7 @@ const redis =
   require('./lib/redis');
 
 const emitterRedis =
-  new Redis(process.env.REDIS_URL);
+  new Redis(process.env.REDIS_URL, redisOptions());
 
 const io =
   new Emitter(emitterRedis);
