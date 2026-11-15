@@ -34,6 +34,12 @@ jobs:
       - name: Check server syntax
         run: node --check server.js
 
+      - name: Check process supervisor syntax and lifecycle tests
+        run: |
+          node --check start.js
+          node --check lib/processSupervisor.js
+          npm run test:supervisor
+
       - name: Check authentication middleware
         run: node --check middleware/auth.js
 
