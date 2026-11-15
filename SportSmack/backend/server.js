@@ -451,54 +451,65 @@ async function gracefulShutdown(signal) {
     }
   );
 
-  io.close(() => {
-    logger.info(
-      'Socket.IO connections closed.'
-    );
-  });
-
-  server.close(async () => {
-    try {
-      await prisma.$disconnect();
-    } catch (error) {
-      logger.error(
-        'Prisma shutdown error',
-        {
-          error
-        }
-      );
-    }
-
-    // Socket.IO's Redis adapter owns these dedicated clients.
-    // Disconnect them explicitly during process shutdown.
-    pubClient.disconnect();
-    subClient.disconnect();
-
-    try {
-      await redis.quit();
-    } catch (error) {
-      logger.error(
-        'Redis shutdown error',
-        {
-          error
-        }
-      );
-    }
-
-    logger.info(
-      'SportSmack backend shutdown complete.'
-    );
-
-    process.exit(0);
-  });
-
-  setTimeout(() => {
+  // io.close() also closes the underlying HTTP server. Calling
+  // server.close() separately creates a competing close operation.
+  const shutdownTimeout = setTimeout(() => {
     logger.error(
       'Graceful shutdown timed out.'
     );
 
     process.exit(1);
-  }, 25000).unref();
+  }, 25000);
+
+  try {
+    await new Promise(resolve => {
+      io.close(() => {
+        logger.info(
+          'Socket.IO connections and HTTP server closed.'
+        );
+
+        resolve();
+      });
+    });
+
+    const cleanupResults = await Promise.allSettled([
+      prisma.$disconnect(),
+      redis.quit()
+    ]);
+
+    for (const result of cleanupResults) {
+      if (result.status === 'rejected') {
+        logger.error(
+          'Backend dependency shutdown error',
+          {
+            error: result.reason
+          }
+        );
+      }
+    }
+
+    // Socket.IO's Redis adapter owns these dedicated clients.
+    // Disconnect explicitly after Socket.IO has closed.
+    pubClient.disconnect();
+    subClient.disconnect();
+
+    logger.info(
+      'SportSmack backend shutdown complete.'
+    );
+
+    clearTimeout(shutdownTimeout);
+    process.exit(0);
+  } catch (error) {
+    logger.error(
+      'SportSmack backend graceful shutdown failed.',
+      {
+        error
+      }
+    );
+
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
 }
 
 process.on(
