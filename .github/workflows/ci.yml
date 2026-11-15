@@ -46,6 +46,14 @@ jobs:
       - name: Check rate-limit middleware
         run: node --check middleware/rateLimits.js
 
+      - name: Check Redis client and retry policy
+        run: |
+          node --check lib/redis.js
+          node --check lib/redisOptions.js
+
+      - name: Check background worker
+        run: node --check worker.js
+
       - name: Check CSRF middleware
         run: node --check middleware/csrf.js
 
