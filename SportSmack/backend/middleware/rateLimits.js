@@ -30,10 +30,15 @@ const standardLimiter = rateLimit({
   // so the test measures API capacity rather than
   // the normal per-IP production rate limit.
   skip: req => {
+    // Dependency status must remain observable during Redis outages.
+    if (req.path === '/status') {
+      return true;
+    }
+
     const loadTestSecret =
       process.env.LOAD_TEST_SECRET;
 
-    return (
+    return Boolean(
       loadTestSecret &&
       req.headers['x-load-test-secret'] ===
         loadTestSecret
