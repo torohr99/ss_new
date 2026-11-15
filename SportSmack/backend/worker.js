@@ -292,11 +292,20 @@ process.on(
   () => shutdown('SIGINT')
 );
 
-startWorker().catch(error => {
+startWorker().catch(async error => {
   console.error(
     'SportSmack worker failed to start:',
     error
   );
 
-  process.exit(1);
+  // Reuse the normal cleanup path so a startup failure cannot
+  // leave Redis/Prisma connections or an acquired worker lock behind.
+  await shutdown(
+    'STARTUP_FAILURE',
+    {
+      drain: false,
+      releaseLock: true,
+      exitCode: 1
+    }
+  );
 });
