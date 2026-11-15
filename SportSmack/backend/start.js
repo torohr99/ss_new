@@ -73,6 +73,8 @@ if (children.length > 0) {
   superviseChildren({
     children,
     logger,
-    gracePeriodMs: Number(process.env.SUPERVISOR_SHUTDOWN_GRACE_MS) || 20000
+    // The API has a 25-second internal shutdown deadline; keep the parent
+    // alive slightly longer before escalating children to SIGKILL.
+    gracePeriodMs: Number(process.env.SUPERVISOR_SHUTDOWN_GRACE_MS) || 30000
   });
 }
