@@ -382,7 +382,11 @@ test('image delivery rejects empty or oversized stored objects', async () => {
     });
 
     const response = await worker.fetch(
-      new Request('https://media.test/' + KEY),
+      new Request('https://media.test/' + KEY, {
+        headers: {
+          Authorization: 'Bearer ' + signedToken({ action: 'read' })
+        }
+      }),
       makeEnv(bucket),
       {}
     );
