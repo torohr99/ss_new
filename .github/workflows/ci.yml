@@ -6,6 +6,7 @@ on:
       - main
       - phase-21-10-3-api-worker-deployment-recovery
       - phase-21-10-4-production-security-audit
+      - phase-21-10-5-monitoring-alerting-runbooks
   pull_request:
     branches:
       - main
