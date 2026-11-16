@@ -3,6 +3,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const logger = require('../lib/logger');
 const { validateMediaUrlForUser } = require('../services/mediaUrls');
+const { canViewPost } = require('../services/postPrivacy');
 
 const prisma = require('../lib/prisma');
 const {
@@ -153,10 +154,24 @@ router.get('/', async (req, res) => {
       }
     }
     
+    const excludedUserIds = Array.from(new Set(
+      blockedUsers.map(block =>
+        block.blockerId === req.user.id
+          ? block.blockedId
+          : block.blockerId
+      )
+    ));
+
     let whereClause = {
-      user_id: {
-        in: Array.from(allowedUserIds)
-      }
+      AND: [
+        { user_id: { notIn: excludedUserIds } },
+        {
+          OR: [
+            { user_id: { in: Array.from(allowedUserIds) } },
+            { user: { is: { postPrivacy: 'PUBLIC' } } }
+          ]
+        }
+      ]
     };
     if (forum) {
       // Fetch posts specific to this forum category
@@ -589,12 +604,7 @@ router.post(
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    if (
-      await isBlocked(
-        req.user.id,
-        post.user_id
-      )
-    ) {
+    if (!(await canViewPost(req.user.id, post))) {
       return res.status(403).json({
         message:
           'You cannot interact with this post.'
@@ -643,6 +653,19 @@ router.get('/:id/comments', async (req, res) => {
       return res.status(400).json({
         message: 'Invalid ID'
       });
+    }
+
+    const parentPost = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, user_id: true }
+    });
+
+    if (!parentPost) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    if (!(await canViewPost(req.user.id, parentPost))) {
+      return res.status(403).json({ message: 'You cannot view comments on this post.' });
     }
 
     const cursor = req.query.cursor
@@ -768,6 +791,17 @@ router.delete(
         });
       }
 
+      const parentPost = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { id: true, user_id: true }
+      });
+
+      if (!parentPost || !(await canViewPost(req.user.id, parentPost))) {
+        return res.status(403).json({
+          message: 'You cannot access comments on this post.'
+        });
+      }
+
       await prisma.comment.delete({
         where: {
           id: commentId
@@ -832,12 +866,7 @@ router.post(
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    if (
-      await isBlocked(
-        req.user.id,
-        post.user_id
-      )
-    ) {
+    if (!(await canViewPost(req.user.id, post))) {
       return res.status(403).json({
         message:
           'You cannot comment on this post.'
