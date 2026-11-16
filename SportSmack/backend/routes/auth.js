@@ -661,7 +661,8 @@ router.post('/login', async (req, res) => {
     return res.json({
       id: user.id,
       username: user.username,
-      email: user.email
+      email: user.email,
+      postPrivacy: user.postPrivacy || 'FRIENDS_ONLY'
     });
 
   } catch (error) {
