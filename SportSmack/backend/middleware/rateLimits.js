@@ -1,4 +1,5 @@
 const rateLimit = require('express-rate-limit');
+const { emailActionRateLimitKey } = require('../lib/emailActionRateLimit');
 const { ipKeyGenerator } =
   require('express-rate-limit');
 const { RedisStore } =
@@ -119,6 +120,19 @@ const reportLimiter = rateLimit({
   }
 });
 
+
+const emailActionLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: emailActionRateLimitKey,
+  store: redisStore('rl:email-action:'),
+  message: {
+    error: 'Too many email requests. Please try again later.'
+  }
+});
+
 module.exports = {
   standardLimiter,
   authLimiter,
@@ -126,5 +140,6 @@ module.exports = {
   aiLimiter,
   socialLimiter,
   postCreationLimiter,
-  reportLimiter
+  reportLimiter,
+  emailActionLimiter
 };
