@@ -7,6 +7,7 @@ on:
       - phase-21-10-3-api-worker-deployment-recovery
       - phase-21-10-4-production-security-audit
       - phase-21-10-5-monitoring-alerting-runbooks
+      - phase-21-11-2-token-hardening
   pull_request:
     branches:
       - main
@@ -86,6 +87,35 @@ jobs:
 
       - name: Generate Prisma client
         run: npx prisma generate --schema prisma/schema.postgres.prisma
+
+
+  media-worker:
+    name: Cloudflare media Worker tests and bundle check
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: SportSmack/media-worker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: SportSmack/media-worker/package-lock.json
+
+      - name: Install Worker dependencies
+        run: npm ci
+
+      - name: Run adversarial Worker tests
+        run: npm test
+
+      - name: Validate Worker production bundle
+        run: npm run check
 
   frontend:
     name: Frontend checks
