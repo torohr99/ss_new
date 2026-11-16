@@ -9,6 +9,7 @@ process.env.FRONTEND_URL = 'https://frontend.example.test';
 
 const users = [];
 let nextId = 1;
+let sendMailError = null;
 
 function matchesWhere(user, where) {
   for (const [key, expected] of Object.entries(where || {})) {
@@ -89,6 +90,7 @@ require.cache[mailerPath] = {
   loaded: true,
   exports: {
     async sendMail() {
+      if (sendMailError) throw sendMailError;
       return { messageId: 'test-message-id' };
     }
   }
@@ -123,6 +125,7 @@ test.after(async () => {
 test.beforeEach(() => {
   users.length = 0;
   nextId = 1;
+  sendMailError = null;
 });
 
 function addUser(overrides = {}) {
@@ -251,6 +254,40 @@ test('verification token is single-use under concurrent requests', async () => {
     responses.map(response => response.status).sort(),
     [200, 400]
   );
+});
+
+test('password reset request stores a hash and a one-hour expiry while emailing the raw token', async () => {
+  const user = addUser({
+    email: 'forgot@example.com'
+  });
+
+  const response = await post('/api/auth/forgot-password', {
+    email: ' FORGOT@example.com '
+  });
+
+  assert.equal(response.status, 200);
+  assert.match((await response.json()).message, /If an account exists/);
+  assert.equal(user.resetPasswordToken.length, 64);
+  assert.match(user.resetPasswordTokenHash, /^[a-f0-9]{64}$/);
+  assert.notEqual(user.resetPasswordTokenHash, user.resetPasswordToken);
+  assert.ok(user.resetPasswordExpires instanceof Date);
+  assert.ok(user.resetPasswordExpires > new Date());
+});
+
+test('password reset email failure invalidates both token representations', async () => {
+  const user = addUser({
+    email: 'mail-failure@example.com'
+  });
+  sendMailError = new Error('test mail transport failure');
+
+  const response = await post('/api/auth/forgot-password', {
+    email: user.email
+  });
+
+  assert.equal(response.status, 500);
+  assert.equal(user.resetPasswordToken, null);
+  assert.equal(user.resetPasswordTokenHash, null);
+  assert.equal(user.resetPasswordExpires, null);
 });
 
 test('password reset accepts a valid hash-only token and clears token fields', async () => {
