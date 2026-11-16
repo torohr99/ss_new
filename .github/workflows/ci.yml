@@ -12,6 +12,7 @@ on:
       - phase-21-10-4-production-security-audit
       - phase-21-10-5-monitoring-alerting-runbooks
       - phase-21-11-2-token-hardening
+      - phase-21-11-3-post-privacy-media-auth
   pull_request:
     branches:
       - main
@@ -103,6 +104,9 @@ jobs:
 
       - name: Test auth token security helpers
         run: npm run test:auth-token
+
+      - name: Test post privacy authorization
+        run: npm run test:post-privacy
 
       - name: Check gamecast routes
         run: node --check routes/gamecast.js
