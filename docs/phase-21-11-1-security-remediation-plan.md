@@ -160,3 +160,17 @@ Phase 21.11.1 does not:
 - Certify the application for millions of users or high concurrency.
 
 All implementation changes should be made on the Phase 21.11 branch, reviewed through a pull request, and validated in non-production environments first.
+
+
+## 8. Production migration workflow safeguard (Phase 21.11.2)
+
+The existing `.github/workflows/prisma-migrate.yml` originally ran automatically whenever migration files were pushed to `main`. That behavior could apply a production database migration as a side effect of merging a pull request, without a separate migration approval.
+
+On the Phase 21.11.2 branch, the workflow has been changed to:
+
+- Run only through an explicit `workflow_dispatch`.
+- Require a deliberate `yes` selection for the production-migration confirmation input; the default is `no`.
+- Serialize production migration runs so two migration jobs cannot overlap.
+- Use read-only repository permissions.
+
+This workflow change does not run a migration, connect to the production database, or alter production data. It removes automatic migration execution on merge. A manually dispatched production migration remains a separate action and must not be run without explicit approval and prior non-production validation.
