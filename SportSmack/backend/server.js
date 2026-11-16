@@ -304,12 +304,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/metrics', (req, res) => {
-  return res.status(200).json(
-    metrics.snapshot()
-  );
-});
-
 const DEPENDENCY_HEALTH_TIMEOUT_MS = 5000;
 
 function withHealthTimeout(promise, dependency) {
@@ -350,16 +344,8 @@ app.get('/api/status', async (req, res) => {
     status: healthy ? 'OK' : 'ERROR',
     database: databaseOk ? 'OK' : 'ERROR',
     redis: redisOk ? 'OK' : 'ERROR',
-    instance:
-      process.env.RAILWAY_REPLICA_ID ||
-      process.env.RENDER_INSTANCE_ID ||
-      'local',
-    region:
-      process.env.RAILWAY_REPLICA_REGION ||
-      'local',
     timestamp: new Date().toISOString(),
-    uptime: Math.round(process.uptime()),
-    metrics: metrics.snapshot()
+    uptime: Math.round(process.uptime())
   });
 });
 
