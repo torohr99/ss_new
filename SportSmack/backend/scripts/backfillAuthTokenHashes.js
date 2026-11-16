@@ -9,7 +9,7 @@ const {
 
 const BATCH_SIZE = 100;
 
-async function backfillAuthTokenHashes() {
+async function backfillAuthTokenHashes(client = prisma) {
   let lastId = 0;
   const counts = {
     scanned: 0,
@@ -21,7 +21,7 @@ async function backfillAuthTokenHashes() {
   };
 
   while (true) {
-    const users = await prisma.user.findMany({
+    const users = await client.user.findMany({
       where: {
         id: { gt: lastId },
         OR: [
@@ -91,7 +91,7 @@ async function backfillAuthTokenHashes() {
         continue;
       }
 
-      const result = await prisma.user.updateMany({
+      const result = await client.user.updateMany({
         where,
         data
       });
@@ -111,16 +111,23 @@ async function backfillAuthTokenHashes() {
     }
   }
 
-  console.log('Auth token hash backfill summary:', counts);
-  console.log('Legacy plaintext token columns were not cleared by this script.');
-  console.log('Run again after the application rollout to catch concurrent legacy writes.');
+  return counts;
 }
 
-backfillAuthTokenHashes()
-  .catch(error => {
-    console.error('Auth token hash backfill failed:', error.message);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  backfillAuthTokenHashes()
+    .then(counts => {
+      console.log('Auth token hash backfill summary:', counts);
+      console.log('Legacy plaintext token columns were not cleared by this script.');
+      console.log('Run again after the application rollout to catch concurrent legacy writes.');
+    })
+    .catch(error => {
+      console.error('Auth token hash backfill failed:', error.message);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
+
+module.exports = { backfillAuthTokenHashes };
