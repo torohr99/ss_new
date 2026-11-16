@@ -284,9 +284,6 @@ async function handleDelete(request, env, url) {
 }
 
 async function handleImage(request, env, url, ctx) {
-  const { PhotonImage, SamplingFilter, resize } =
-    await import('@cf-wasm/photon/workerd');
-
   const key = decodePathKey(url.pathname, 1);
 
   if (!key || !/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
@@ -327,6 +324,9 @@ async function handleImage(request, env, url, ctx) {
   let outputImage;
 
   try {
+    const { PhotonImage, SamplingFilter, resize } =
+      await import('@cf-wasm/photon/workerd');
+
     inputImage = PhotonImage.new_from_byteslice(inputBytes);
 
     const originalWidth = inputImage.get_width();
