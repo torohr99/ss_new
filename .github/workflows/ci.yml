@@ -76,6 +76,11 @@ jobs:
       - name: Check posts routes
         run: node --check routes/posts.js
 
+      - name: Check privacy and media routes
+        run: |
+          node --check services/postPrivacy.js
+          node --check routes/media.js
+
       - name: Check rate-limit middleware
         run: node --check middleware/rateLimits.js
 
