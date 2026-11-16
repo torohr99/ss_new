@@ -98,7 +98,7 @@ router.get('/post/:postId', async (req, res) => {
       return res.status(404).json({ message: 'Image not found.' });
     }
 
-    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/\\/+$/, '');
+    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/[/]+$/, '');
     const secret = process.env.MEDIA_UPLOAD_SECRET;
     if (!workerUrl || !secret || secret.length < 32) {
       return res.status(503).json({ message: 'Media delivery is not configured.' });
@@ -115,7 +115,7 @@ router.get('/post/:postId', async (req, res) => {
       return res.status(404).json({ message: 'Image not found.' });
     }
 
-    const match = /^\\/([1-9][0-9]*)\\/([0-9a-f-]{36}\\.(?:jpg|png|webp))$/.exec(storedUrl.pathname);
+    const match = /^[/]([1-9][0-9]*)[/]([0-9a-f-]{36}[.](?:jpg|png|webp))$/.exec(storedUrl.pathname);
     if (!match || Number(match[1]) !== Number(post.user_id)) {
       return res.status(404).json({ message: 'Image not found.' });
     }
