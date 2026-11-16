@@ -174,3 +174,12 @@ On the Phase 21.11.2 branch, the workflow has been changed to:
 - Use read-only repository permissions.
 
 This workflow change does not run a migration, connect to the production database, or alter production data. It removes automatic migration execution on merge. A manually dispatched production migration remains a separate action and must not be run without explicit approval and prior non-production validation.
+
+
+## 9. Phase 21.11.2 implementation progress
+
+The feature branch now contains the additive token-hash schema/migration, shared token utility, transitional auth-route changes, a legacy-token backfill utility, a resend-verification endpoint/UI, and helper/route regression tests. The implementation details and staged rollout are recorded in `docs/phase-21-11-2-auth-token-hardening-implementation.md`.
+
+The transitional application intentionally dual-writes raw tokens and hashes so older API replicas can continue to verify tokens during the first deployment. Therefore, plaintext token removal is **not complete**. A second rollout must stop plaintext writes, followed by an approved cleanup of remaining raw values and a later migration that removes the legacy columns.
+
+The migration workflow is now manual-only and requires an explicit confirmation input. No migration or production backfill has been run. Phase 21.11.2 remains open until CI, disposable-PostgreSQL migration/backfill tests, and rollout review pass.
