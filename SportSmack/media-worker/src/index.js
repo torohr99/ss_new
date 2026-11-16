@@ -1,9 +1,3 @@
-import {
-  PhotonImage,
-  SamplingFilter,
-  resize
-} from '@cf-wasm/photon/workerd';
-
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   'image/jpeg',
@@ -290,6 +284,9 @@ async function handleDelete(request, env, url) {
 }
 
 async function handleImage(request, env, url, ctx) {
+  const { PhotonImage, SamplingFilter, resize } =
+    await import('@cf-wasm/photon/workerd');
+
   const key = decodePathKey(url.pathname, 1);
 
   if (!key || !/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
