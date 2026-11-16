@@ -21,6 +21,24 @@ jobs:
     name: Backend checks
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: postgresql://sportsmack:sportsmack-ci-password@localhost:5432/sportsmack_ci?schema=public
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sportsmack
+          POSTGRES_PASSWORD: sportsmack-ci-password
+          POSTGRES_DB: sportsmack_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sportsmack -d sportsmack_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     defaults:
       run:
         working-directory: SportSmack/backend
@@ -92,8 +110,14 @@ jobs:
       - name: Check chat socket handler
         run: node --check sockets/chatHandler.js
 
+      - name: Apply all migrations to disposable PostgreSQL
+        run: npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+
       - name: Generate Prisma client
         run: npx prisma generate --schema prisma/schema.postgres.prisma
+
+      - name: Test auth token backfill against PostgreSQL
+        run: npm run test:auth-token-db
 
 
   media-worker:
