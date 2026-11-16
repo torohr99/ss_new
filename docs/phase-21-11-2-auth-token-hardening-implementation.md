@@ -12,6 +12,10 @@ The PostgreSQL Prisma schema and the secondary Prisma schema now include:
 
 A forward-only migration adds these three nullable columns and unique indexes. Existing plaintext columns are intentionally retained. The migration does not update or delete user data and does not change current application behavior until the new code is deployed.
 
+
+
+The migration directory is named `zzzz_20261116170000_add_auth_token_hash_fields` so it sorts after the repository's existing non-timestamped `optimize_fantasy_scheduler_queries` migration. This avoids inserting a new pending migration lexically before a migration that is already applied in production.
+
 ## 2. Token utility and behavior
 
 `backend/lib/authTokenSecurity.js` centralizes:
