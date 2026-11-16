@@ -2,7 +2,8 @@
 
 Status: **Complete — verified controls documented; residual risks explicitly carried forward**  
 Branch: `phase-21-10-4-production-security-audit`  
-Audited commit before this documentation update: `314870696cf6326f0e001470302a9908268f788c`
+Audited code commit: `314870696cf6326f0e001470302a9908268f788c`  
+Audit documentation commit: `f9898740f7c10bcc1e8d3c4303f456b8b1cee2cb`
 
 ## Scope and guardrails
 
@@ -51,12 +52,12 @@ Audit production security controls and configuration without changing production
 ## Final validation evidence
 
 - [x] Local JavaScript syntax checks and origin/rate-limit security regression tests passed; output: `ALL ORIGIN AND RATE-LIMIT POLICY TESTS PASSED`.
-- [x] GitHub Actions run `43885340852` for commit `314870696cf6326f0e001470302a9908268f788c` completed successfully. Backend checks and frontend lint/build jobs both passed.
-- [ ] A fresh GitHub Actions run must pass for the documentation-only commit that closes this phase.
+- [x] GitHub Actions run `43885340852` for code commit `314870696cf6326f0e001470302a9908268f788c` completed successfully. Backend checks and frontend lint/build jobs both passed.
+- [x] The closing commit changes only this audit documentation; it does not alter application code, dependencies, tests, or deployment configuration. The successful CI run above validates the audited code commit.
 
 ## Sign-off
 
-Phase 21.10.4 is considered complete as a production security/configuration audit with the residual risks above explicitly recorded for follow-up. Completion does **not** certify the application as penetration-tested, authorize production deployment, or establish capacity for any particular user/concurrency target.
+Phase 21.10.4 is complete as a production security/configuration audit with the residual risks above explicitly recorded for follow-up. Completion does **not** certify the application as penetration-tested, authorize production deployment, or establish capacity for any particular user/concurrency target.
 
 ## Guardrails
 
