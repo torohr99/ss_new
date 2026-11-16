@@ -46,8 +46,10 @@ No R2 access key, secret access key, Cloudflare account ID, or hosted Images del
 - Upload authorization is issued by the authenticated backend for a single object key and expires after five minutes.
 - The Worker accepts JPEG, PNG, and WebP only, verifies file signatures, and caps uploads at 5 MiB.
 - Objects are stored under `<userId>/<uuid>.<extension>`.
-- Public delivery supports `?variant=avatar` (256px maximum), `?variant=thumbnail` (640px maximum), and `?variant=post` (1200px maximum).
-- Transformed output is WebP and cached with immutable cache headers.
+- Profile images (`purpose=profile`) remain directly viewable through the Worker and are cached for up to 24 hours.
+- Post images (`purpose=post`) are not publicly readable. The browser requests `/api/media/post/:postId`; the authenticated API checks the current post-privacy and block rules, then proxies the image from the Worker using a 30-second HMAC-signed read authorization.
+- The Worker validates the signed action, purpose, owner ID, exact object key, and expiry before serving a post image. Post-image responses use `private, no-store` and are not put in the shared Cache API.
+- Supported transforms are `?variant=avatar` (256px maximum), `?variant=thumbnail` (640px maximum), and `?variant=post` (1200px maximum). Transformed output is WebP.
 - Delete authorizations are signed by the backend and only permit deletion of the authenticated user's own image. The API retains images still referenced by a post or profile.
 - The bucket is not made publicly accessible; all reads pass through this Worker.
 
