@@ -1,6 +1,6 @@
 # Phase 21.11.2 — Authentication Token Hardening Implementation
 
-**Status:** Implementation added to the feature branch; automated CI and disposable-PostgreSQL validation pending. Production migration, deployment, backfill, and merge have not been run or approved.
+**Status:** Implementation and CI validation complete on the feature branch. Production migration, deployment, backfill, and merge have not been run or approved.
 
 ## 1. Additive database change
 
@@ -85,7 +85,7 @@ The current branch implements steps 1, 3, and the backfill utility. It does not 
 - Resend-verification tests for fresh token generation and non-enumerating responses.
 - Backend CI runs the auth-token test suite.
 
-The tests still need to execute successfully in GitHub Actions. The route tests use a test double; they do not replace disposable-PostgreSQL migration/backfill validation.
+CI run 43962159413 completed successfully: backend syntax/security tests, the full migration history on disposable PostgreSQL, Prisma Client generation, PostgreSQL backfill integration, Worker adversarial tests, Wrangler bundle validation, frontend lint, and frontend build all passed. The route tests use an in-memory Prisma test double; the separate backfill integration test exercises PostgreSQL.
 
 ## 7. Explicit exclusions
 
