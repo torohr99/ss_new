@@ -9,6 +9,13 @@ const {
 } = require('../lib/mailer');
 const prisma = require('../lib/prisma');
 const authMiddleware = require('../middleware/auth');
+const {
+  generateAuthToken,
+  isValidAuthToken,
+  hashAuthToken,
+  getVerificationTokenExpiry,
+  getResetTokenExpiry
+} = require('../lib/authTokenSecurity');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -301,17 +308,22 @@ router.post('/register', async (req, res) => {
       await bcrypt.hash(password, salt);
 
     // Generate a cryptographically secure token.
-    const verificationToken =
-      crypto.randomBytes(32).toString('hex');
+    const verificationToken = generateAuthToken();
+    const verificationTokenHash = hashAuthToken(verificationToken);
+    const verificationTokenExpires = getVerificationTokenExpiry();
 
-    // Create account as UNVERIFIED.
+    // Keep the legacy raw field during the rolling-deployment compatibility
+    // window. The hash is the preferred lookup; plaintext is removed only
+    // after every old application replica has been replaced.
     const user = await prisma.user.create({
       data: {
         username,
         email,
         password_hash,
         isVerified: false,
-        verificationToken
+        verificationToken,
+        verificationTokenHash,
+        verificationTokenExpires
       }
     });
 
@@ -386,59 +398,88 @@ router.post('/verify/:token', async (req, res) => {
   try {
     const { token } = req.params;
 
-    if (!token || token.length !== 64) {
+    if (!isValidAuthToken(token)) {
       return res.status(400).json({
-        message:
-          'Invalid verification link.'
+        message: 'Invalid or expired verification link.'
       });
     }
 
+    const tokenHash = hashAuthToken(token);
+    const now = new Date();
+
     const user = await prisma.user.findFirst({
       where: {
-        verificationToken: token
+        OR: [
+          {
+            verificationTokenHash: tokenHash,
+            verificationTokenExpires: { gt: now }
+          },
+          {
+            verificationToken: token,
+            OR: [
+              { verificationTokenExpires: { gt: now } },
+              { verificationTokenExpires: null }
+            ]
+          }
+        ]
       }
     });
 
     if (!user) {
       return res.status(400).json({
-        message:
-          'This verification link is invalid or has already been used.'
+        message: 'This verification link is invalid, expired, or has already been used.'
       });
     }
 
     if (user.isVerified) {
       return res.json({
         success: true,
-        message:
-          'Your email is already verified.'
+        message: 'Your email is already verified.'
       });
     }
 
-    await prisma.user.update({
+    // Conditional update makes token consumption single-use under concurrency.
+    const consumed = await prisma.user.updateMany({
       where: {
-        id: user.id
+        id: user.id,
+        isVerified: false,
+        OR: [
+          {
+            verificationTokenHash: tokenHash,
+            verificationTokenExpires: { gt: now }
+          },
+          {
+            verificationToken: token,
+            OR: [
+              { verificationTokenExpires: { gt: now } },
+              { verificationTokenExpires: null }
+            ]
+          }
+        ]
       },
       data: {
         isVerified: true,
-        verificationToken: null
+        verificationToken: null,
+        verificationTokenHash: null,
+        verificationTokenExpires: null
       }
     });
 
+    if (consumed.count !== 1) {
+      return res.status(400).json({
+        message: 'This verification link is invalid, expired, or has already been used.'
+      });
+    }
+
     return res.json({
       success: true,
-      message:
-        'Your email has been verified successfully. You may now log in.'
+      message: 'Your email has been verified successfully. You may now log in.'
     });
-
   } catch (error) {
-    console.error(
-      'Email verification error:',
-      error
-    );
+    logger.error({ error }, 'Email verification error');
 
     return res.status(500).json({
-      message:
-        'Server error during email verification.'
+      message: 'Server error during email verification.'
     });
   }
 });
@@ -610,28 +651,18 @@ router.post(
         );
       }
 
-      const resetToken =
-        crypto
-          .randomBytes(32)
-          .toString('hex');
-
-      const resetExpires =
-        new Date(
-          Date.now() +
-            60 * 60 * 1000
-        );
+      const resetToken = generateAuthToken();
+      const resetTokenHash = hashAuthToken(resetToken);
+      const resetExpires = getResetTokenExpiry();
 
       await prisma.user.update({
         where: {
           id: user.id
         },
-
         data: {
-          resetPasswordToken:
-            resetToken,
-
-          resetPasswordExpires:
-            resetExpires
+          resetPasswordToken: resetToken,
+          resetPasswordTokenHash: resetTokenHash,
+          resetPasswordExpires: resetExpires
         }
       });
 
@@ -656,11 +687,9 @@ router.post(
           },
 
           data: {
-            resetPasswordToken:
-              null,
-
-            resetPasswordExpires:
-              null
+            resetPasswordToken: null,
+            resetPasswordTokenHash: null,
+            resetPasswordExpires: null
           }
         });
 
@@ -708,78 +737,74 @@ router.post(
           ? req.body.password
           : '';
 
-      if (!token || !password) {
+      if (!isValidAuthToken(token) || !password) {
         return res.status(400).json({
-          message:
-            'Reset token and new password are required.'
+          message: 'A valid reset token and new password are required.'
         });
       }
 
       if (password.length < 8 || password.length > 128) {
         return res.status(400).json({
-          message:
-            'Password must be between 8 and 128 characters long.'
+          message: 'Password must be between 8 and 128 characters long.'
         });
       }
 
-      const user =
-        await prisma.user.findFirst({
-          where: {
-            resetPasswordToken: token,
-            resetPasswordExpires: {
-              gt: new Date()
-            }
-          }
-        });
+      const tokenHash = hashAuthToken(token);
+      const now = new Date();
 
-      if (!user) {
-        return res.status(400).json({
-          message:
-            'This password reset link is invalid or has expired.'
-        });
-      }
-
-      const salt =
-        await bcrypt.genSalt(10);
-
-      const passwordHash =
-        await bcrypt.hash(
-          password,
-          salt
-        );
-
-      await prisma.user.update({
+      const user = await prisma.user.findFirst({
         where: {
-          id: user.id
-        },
-
-        data: {
-          password_hash:
-            passwordHash,
-
-          resetPasswordToken:
-            null,
-
-          resetPasswordExpires:
-            null
+          resetPasswordExpires: { gt: now },
+          OR: [
+            { resetPasswordTokenHash: tokenHash },
+            { resetPasswordToken: token }
+          ]
         }
       });
 
-      return res.json({
-        success: true,
-        message:
-          'Your password has been reset successfully.'
+      if (!user) {
+        return res.status(400).json({
+          message: 'This password reset link is invalid or has expired.'
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+
+      // Consume the token and change the password in one conditional write.
+      // Concurrent reset requests can therefore succeed only once.
+      const consumed = await prisma.user.updateMany({
+        where: {
+          id: user.id,
+          resetPasswordExpires: { gt: now },
+          OR: [
+            { resetPasswordTokenHash: tokenHash },
+            { resetPasswordToken: token }
+          ]
+        },
+        data: {
+          password_hash: passwordHash,
+          resetPasswordToken: null,
+          resetPasswordTokenHash: null,
+          resetPasswordExpires: null
+        }
       });
 
+      if (consumed.count !== 1) {
+        return res.status(400).json({
+          message: 'This password reset link is invalid or has expired.'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Your password has been reset successfully.'
+      });
     } catch (error) {
-      console.error(
-        'Reset password error:',
-        error
-      );
+      logger.error({ error }, 'Reset password error');
 
       return res.status(500).json({
-        message:
-          'Unable to reset password.'
+        message: 'Unable to reset password.'
       });
     }
   }
