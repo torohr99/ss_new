@@ -1,6 +1,6 @@
 # Phase 21.11.3 — Cloudflare Media Worker Adversarial Review
 
-**Status:** Source review and initial negative-test implementation complete; automated execution and deployed-Worker verification pending.
+**Status:** Source review, negative-test implementation, CI execution, and Wrangler bundle check complete. Real R2 and deployed-Worker verification remain pending.
 
 ## Scope
 
@@ -90,14 +90,15 @@ Before changing cache behavior, choose and test one of:
 
 Do not claim immediate global deletion with the current local Cache API invalidation.
 
-### C. Remaining negative tests
+### C. Remaining negative tests and runtime verification
 
-Before marking 21.11.3 complete, extend or execute tests for:
-- Delete: missing/invalid/expired token, wrong action, mismatched key, cross-user key, successful delete, and cache invalidation.
-- Image delivery: malformed path, invalid variant, missing object, mismatched ownership metadata, corrupt/oversized stored image, and successful resize.
+The Node test suite now covers delete authorization (missing token, wrong action, expiry, cross-user key), successful deletion, malformed image paths, unsupported variants, missing objects, ownership-metadata mismatch, and invalid stored image bytes. These tests and the Wrangler production-bundle dry run passed in CI run 43962159413.
+
+Still required before marking 21.11.3 complete:
 - Real R2 conditional writes under concurrent requests.
 - Cross-data-center deletion/cache behavior.
 - Worker behavior when the R2 binding or signing secret is unavailable.
+- Successful resize against a real Cloudflare Workers runtime with the Photon WASM module.
 
 ## Completion criteria
 
