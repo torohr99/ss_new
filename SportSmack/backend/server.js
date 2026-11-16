@@ -55,7 +55,8 @@ subClient.on('error', (error) => {
   console.error('Socket.IO Redis subscriber error:', error.message);
 });
 
-// FIX 1: Tell Express to trust Render's proxy headers so express-rate-limit stops crashing
+// Trust one hosting proxy hop. Confirm this value against the active
+// ingress topology before changing it (see the Phase 21.10.4 audit).
 app.set('trust proxy', 1);
 
 // Parse request bodies with strict production limits.
