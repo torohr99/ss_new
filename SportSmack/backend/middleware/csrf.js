@@ -1,42 +1,4 @@
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  process.env.FRONTEND_URL
-]
-  .filter(Boolean)
-  .map(origin =>
-    origin.trim().replace(/\/+$/, '')
-  );
-
-function isAllowedOrigin(origin) {
-  if (!origin) {
-    return false;
-  }
-
-  const normalizedOrigin =
-    origin
-      .trim()
-      .replace(/\/+$/, '');
-
-  if (
-    allowedOrigins.includes(
-      normalizedOrigin
-    )
-  ) {
-    return true;
-  }
-
-  if (
-    process.env.NODE_ENV !== 'production' &&
-    /^https:\/\/ss-new-backendfromr(?:-[a-z0-9]+)*-sport-smack\.vercel\.app$/i.test(
-      normalizedOrigin
-    )
-  ) {
-    return true;
-  }
-
-  return false;
-}
+const { isAllowedOrigin } = require('../lib/originPolicy');
 
 function csrfProtection(
   req,
