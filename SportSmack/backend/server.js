@@ -68,28 +68,16 @@ app.use(express.urlencoded({
 const isProduction =
   process.env.NODE_ENV === 'production';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || '')
-  .trim()
-  .replace(/\/+$/, '');
-
-const ALLOWED_ORIGINS = new Set(
-  [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    FRONTEND_URL
-  ].filter(Boolean)
-);
+const { isAllowedOrigin } = require('./lib/originPolicy');
 
 const verifyOrigin = (origin, callback) => {
+  // Requests without an Origin header are not browser CORS requests.
+  // State-changing API requests are independently protected by CSRF middleware.
   if (!origin) {
     return callback(null, true);
   }
 
-  const normalizedOrigin = origin
-    .trim()
-    .replace(/\/+$/, '');
-
-  if (ALLOWED_ORIGINS.has(normalizedOrigin)) {
+  if (isAllowedOrigin(origin)) {
     return callback(null, true);
   }
 
