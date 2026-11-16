@@ -47,6 +47,23 @@ function createBucket() {
     },
     async head(key) {
       return objects.has(key) ? { key } : null;
+    },
+    async delete(key) {
+      objects.delete(key);
+    },
+    async get(key) {
+      const stored = objects.get(key);
+      if (!stored) return null;
+      return {
+        customMetadata: stored.options.customMetadata,
+        httpEtag: 'test-etag',
+        async arrayBuffer() {
+          return stored.bytes.buffer.slice(
+            stored.bytes.byteOffset,
+            stored.bytes.byteOffset + stored.bytes.byteLength
+          );
+        }
+      };
     }
   };
 }
@@ -57,6 +74,27 @@ function makeEnv(bucket = createBucket()) {
     ALLOWED_ORIGINS: ORIGIN,
     MEDIA_BUCKET: bucket
   };
+}
+
+async function withCacheMock(callback) {
+  const original = globalThis.caches;
+  globalThis.caches = {
+    default: {
+      async match() { return null; },
+      async put() { return true; },
+      async delete() { return true; }
+    }
+  };
+
+  try {
+    return await callback();
+  } finally {
+    if (original === undefined) {
+      delete globalThis.caches;
+    } else {
+      globalThis.caches = original;
+    }
+  }
 }
 
 function uploadRequest({
@@ -215,6 +253,141 @@ test('concurrent replays cannot overwrite the same object when R2 enforces the c
 
   assert.deepEqual(statuses, [201, 409]);
   assert.equal(bucket.objects.size, 1);
+});
+
+test('delete rejects missing, malformed, or non-delete authorization', async () => {
+  const noToken = await worker.fetch(
+    new Request('https://media.test/delete/' + KEY, { method: 'DELETE' }),
+    makeEnv(),
+    {}
+  );
+  assert.equal(noToken.status, 401);
+
+  const uploadToken = signedToken();
+  const wrongAction = await worker.fetch(
+    new Request('https://media.test/delete/' + KEY, {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer ' + uploadToken }
+    }),
+    makeEnv(),
+    {}
+  );
+  assert.equal(wrongAction.status, 401);
+});
+
+test('delete rejects expired and cross-user authorizations', async () => {
+  const expired = await worker.fetch(
+    new Request('https://media.test/delete/' + KEY, {
+      method: 'DELETE',
+      headers: {
+        Authorization: 'Bearer ' + signedToken({
+          action: 'delete',
+          expiresAt: Date.now() - 1
+        })
+      }
+    }),
+    makeEnv(),
+    {}
+  );
+  assert.equal(expired.status, 401);
+
+  const otherUserKey = '43/123e4567-e89b-12d3-a456-426614174000.png';
+  const crossUser = await worker.fetch(
+    new Request('https://media.test/delete/' + otherUserKey, {
+      method: 'DELETE',
+      headers: {
+        Authorization: 'Bearer ' + signedToken({
+          action: 'delete',
+          userId: 42,
+          key: otherUserKey
+        })
+      }
+    }),
+    makeEnv(),
+    {}
+  );
+  assert.equal(crossUser.status, 401);
+});
+
+test('delete removes the R2 object and invalidates every configured variant', async () => {
+  await withCacheMock(async () => {
+    const bucket = createBucket();
+    bucket.objects.set(KEY, {
+      bytes: PNG_SIGNATURE,
+      options: { customMetadata: { ownerId: '42', purpose: 'post' } }
+    });
+
+    const response = await worker.fetch(
+      new Request('https://media.test/delete/' + KEY, {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer ' + signedToken({ action: 'delete' })
+        }
+      }),
+      makeEnv(bucket),
+      {}
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { success: true });
+    assert.equal(bucket.objects.has(KEY), false);
+  });
+});
+
+test('image delivery rejects malformed keys and unsupported variants', async () => {
+  const malformed = await worker.fetch(
+    new Request('https://media.test/%E0%A4%A'),
+    makeEnv(),
+    {}
+  );
+  assert.equal(malformed.status, 404);
+
+  const unsupported = await worker.fetch(
+    new Request('https://media.test/' + KEY + '?variant=unknown'),
+    makeEnv(),
+    {}
+  );
+  assert.equal(unsupported.status, 400);
+});
+
+test('image delivery returns not found for absent objects and mismatched ownership metadata', async () => {
+  await withCacheMock(async () => {
+    const missing = await worker.fetch(
+      new Request('https://media.test/' + KEY),
+      makeEnv(),
+      {}
+    );
+    assert.equal(missing.status, 404);
+
+    const bucket = createBucket();
+    bucket.objects.set(KEY, {
+      bytes: PNG_SIGNATURE,
+      options: { customMetadata: { ownerId: '43', purpose: 'post' } }
+    });
+    const wrongOwner = await worker.fetch(
+      new Request('https://media.test/' + KEY),
+      makeEnv(bucket),
+      {}
+    );
+    assert.equal(wrongOwner.status, 404);
+  });
+});
+
+test('image delivery rejects empty or oversized stored objects', async () => {
+  await withCacheMock(async () => {
+    const bucket = createBucket();
+    bucket.objects.set(KEY, {
+      bytes: new Uint8Array(0),
+      options: { customMetadata: { ownerId: '42', purpose: 'post' } }
+    });
+
+    const response = await worker.fetch(
+      new Request('https://media.test/' + KEY),
+      makeEnv(bucket),
+      {}
+    );
+    assert.equal(response.status, 415);
+  });
 });
 
 test('CORS reflects only an explicitly configured origin', async () => {
