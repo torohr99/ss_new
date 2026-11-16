@@ -183,3 +183,17 @@ The feature branch now contains the additive token-hash schema/migration, shared
 The transitional application intentionally dual-writes raw tokens and hashes so older API replicas can continue to verify tokens during the first deployment. Therefore, plaintext token removal is **not complete**. A second rollout must stop plaintext writes, followed by an approved cleanup of remaining raw values and a later migration that removes the legacy columns.
 
 The migration workflow is now manual-only and requires an explicit confirmation input. No migration or production backfill has been run. Phase 21.11.2 remains open until CI, disposable-PostgreSQL migration/backfill tests, and rollout review pass.
+
+
+## 10. Phase 21.11 progress snapshot (2026-11-16)
+
+- **21.11.1 — Security inventory and remediation plan:** complete and merged.
+- **21.11.2 — Auth token hashing and expiry:** feature-branch implementation and CI validation complete. Production rollout remains pending explicit approval; plaintext compatibility fields remain intentionally present.
+- **21.11.3 — Media Worker adversarial review:** source changes, negative tests, and CI bundle validation complete. Real R2 concurrency, deployed Worker image transformation, public-read design confirmation, and global cache-deletion behavior remain open.
+- **21.11.4 — Environment/credential consumer audit:** repository consumer mapping documented. Platform variable-name inventories and confirmation of external consumers remain open; no variables were removed.
+- **21.11.5 — Logging/proxy/Vercel review:** source review documented. Railway ingress path confirmation and Vercel variable-name/scope confirmation remain open; no production configuration changed.
+- **21.11.6 — Regression suite and final closeout:** pending the remaining environment/runtime evidence and final PR review.
+
+CI run 43962159413 passed on commit 859fcfb50fb15a64377bbf182ea07dcb04f959e4, including the complete backend migration history on a disposable PostgreSQL 17 service, the token backfill integration test, backend security tests, Worker adversarial tests, Wrangler bundle check, and frontend lint/build.
+
+No production migration, token backfill, deployment, merge, environment-variable change, or credential rotation was performed.
