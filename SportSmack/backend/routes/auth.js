@@ -389,6 +389,77 @@ router.post('/register', async (req, res) => {
 });
 
 // ------------------------------------------------------------
+// RESEND EMAIL VERIFICATION
+// ------------------------------------------------------------
+
+router.post('/resend-verification', async (req, res) => {
+  try {
+    const email =
+      typeof req.body.email === 'string'
+        ? req.body.email.trim().toLowerCase()
+        : '';
+
+    const genericResponse = {
+      success: true,
+      message: 'If an unverified account exists for that email, a verification link has been sent.'
+    };
+
+    if (!email || email.length > 254) {
+      return res.json(genericResponse);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user || user.isVerified) {
+      return res.json(genericResponse);
+    }
+
+    const verificationToken = generateAuthToken();
+    const verificationTokenHash = hashAuthToken(verificationToken);
+    const verificationTokenExpires = getVerificationTokenExpiry();
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationToken,
+        verificationTokenHash,
+        verificationTokenExpires
+      }
+    });
+
+    try {
+      await sendVerificationEmail(user.email, verificationToken);
+    } catch (emailError) {
+      await prisma.user.updateMany({
+        where: {
+          id: user.id,
+          verificationTokenHash
+        },
+        data: {
+          verificationToken: null,
+          verificationTokenHash: null,
+          verificationTokenExpires: null
+        }
+      });
+
+      logger.error({ error: emailError }, 'Resend verification email failed');
+      // Keep the public response identical to avoid account enumeration.
+    }
+
+    return res.json(genericResponse);
+  } catch (error) {
+    logger.error({ error }, 'Resend verification request failed');
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to process the verification request.'
+    });
+  }
+});
+
+// ------------------------------------------------------------
 // VERIFY EMAIL
 // ------------------------------------------------------------
 
