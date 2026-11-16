@@ -400,3 +400,71 @@ test('CORS reflects only an explicitly configured origin', async () => {
   );
   assert.equal(denied.headers.get('Access-Control-Allow-Origin'), null);
 });
+
+
+test('post image objects reject direct unauthenticated delivery', async () => {
+  const bucket = createBucket();
+  bucket.objects.set(KEY, {
+    bytes: PNG_SIGNATURE,
+    options: { customMetadata: { ownerId: '42', purpose: 'post' } }
+  });
+
+  const response = await worker.fetch(
+    new Request('https://media.test/' + KEY + '?variant=post'),
+    makeEnv(bucket),
+    {}
+  );
+
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+});
+
+test('post image read authorization must match action, purpose, owner, and exact object key', async () => {
+  const bucket = createBucket();
+  bucket.objects.set(KEY, {
+    bytes: PNG_SIGNATURE,
+    options: { customMetadata: { ownerId: '42', purpose: 'post' } }
+  });
+
+  const wrongPurpose = await worker.fetch(
+    new Request('https://media.test/' + KEY, {
+      headers: {
+        Authorization: 'Bearer ' + signedToken({
+          action: 'read',
+          purpose: 'profile'
+        })
+      }
+    }),
+    makeEnv(bucket),
+    {}
+  );
+  assert.equal(wrongPurpose.status, 401);
+
+  const wrongKey = await worker.fetch(
+    new Request('https://media.test/' + KEY, {
+      headers: {
+        Authorization: 'Bearer ' + signedToken({
+          action: 'read',
+          key: '42/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.png'
+        })
+      }
+    }),
+    makeEnv(bucket),
+    {}
+  );
+  assert.equal(wrongKey.status, 401);
+
+  const expired = await worker.fetch(
+    new Request('https://media.test/' + KEY, {
+      headers: {
+        Authorization: 'Bearer ' + signedToken({
+          action: 'read',
+          expiresAt: Date.now() - 1
+        })
+      }
+    }),
+    makeEnv(bucket),
+    {}
+  );
+  assert.equal(expired.status, 401);
+});
