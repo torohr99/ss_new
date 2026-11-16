@@ -15,12 +15,15 @@ model User {
   profile_pic          String?
   isVerified           Boolean              @default(false)
   verificationToken    String?
+  verificationTokenHash String? @unique
+  verificationTokenExpires DateTime?
   otpCode              String?
   created_at           DateTime             @default(now())
   predictions_total    Int                  @default(0)
   predictions_won      Int                  @default(0)
   resetPasswordExpires DateTime?
   resetPasswordToken   String?
+  resetPasswordTokenHash String? @unique
   role                 String               @default("USER")
   blockedBy            Block[]              @relation("UserBlockedBy")
   blocksMade           Block[]              @relation("UserBlocks")
