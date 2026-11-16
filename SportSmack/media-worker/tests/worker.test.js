@@ -403,6 +403,7 @@ test('CORS reflects only an explicitly configured origin', async () => {
 
 
 test('post image objects reject direct unauthenticated delivery', async () => {
+  await withCacheMock(async () => {
   const bucket = createBucket();
   bucket.objects.set(KEY, {
     bytes: PNG_SIGNATURE,
@@ -417,9 +418,11 @@ test('post image objects reject direct unauthenticated delivery', async () => {
 
   assert.equal(response.status, 401);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  });
 });
 
 test('post image read authorization must match action, purpose, owner, and exact object key', async () => {
+  await withCacheMock(async () => {
   const bucket = createBucket();
   bucket.objects.set(KEY, {
     bytes: PNG_SIGNATURE,
@@ -467,4 +470,5 @@ test('post image read authorization must match action, purpose, owner, and exact
     {}
   );
   assert.equal(expired.status, 401);
+  });
 });
