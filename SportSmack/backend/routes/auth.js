@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const logger = require('../lib/logger');
 const {
   sendMail
 } = require('../lib/mailer');
@@ -714,10 +715,10 @@ router.post(
         });
       }
 
-      if (password.length < 8) {
+      if (password.length < 8 || password.length > 128) {
         return res.status(400).json({
           message:
-            'Password must be at least 8 characters long.'
+            'Password must be between 8 and 128 characters long.'
         });
       }
 
