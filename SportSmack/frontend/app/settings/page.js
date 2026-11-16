@@ -43,7 +43,7 @@ async function uploadProfileImage(file) {
 }
 
 export default function SettingsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, updateUser } = useAuth();
   const router = useRouter();
 
   const [profilePic, setProfilePic] = useState('');
@@ -144,6 +144,11 @@ export default function SettingsPage() {
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update profile.');
       }
+
+      updateUser({
+        postPrivacy: data.postPrivacy || postPrivacy,
+        profile_pic: data.profile_pic || user.profile_pic
+      });
 
       const previousProfilePic = user.profile_pic || '';
       const nextProfilePic = data.profile_pic || profilePic;
