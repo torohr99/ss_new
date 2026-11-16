@@ -17,8 +17,7 @@ const {
   MAX_COMMENT_LENGTH,
   validateContent,
   hasRecentDuplicatePost,
-  hasRecentDuplicateComment,
-  isBlocked
+  hasRecentDuplicateComment
 } = require('../middleware/moderation');
 // Protect all post routes
 router.use(authMiddleware);
