@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - phase-21-10-3-api-worker-deployment-recovery
+      - phase-21-10-4-production-security-audit
   pull_request:
     branches:
       - main
@@ -61,8 +62,11 @@ jobs:
       - name: Check background worker
         run: node --check worker.js
 
-      - name: Check CSRF middleware
-        run: node --check middleware/csrf.js
+      - name: Check CSRF and origin policy
+        run: |
+          node --check middleware/csrf.js
+          node --check lib/originPolicy.js
+          npm run test:security
 
       - name: Check concurrency middleware
         run: node --check middleware/concurrency.js
