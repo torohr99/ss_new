@@ -163,10 +163,6 @@ async function handleUpload(request, env, url) {
     return json({ message: 'Images must be 5 MB or smaller.' }, 413, cors);
   }
 
-  if (await env.MEDIA_BUCKET.head(key)) {
-    return json({ message: 'This upload authorization has already been used.' }, 409, cors);
-  }
-
   const reader = request.body?.getReader();
   if (!reader) {
     return json({ message: 'Image upload body is missing.' }, 400, cors);
@@ -207,7 +203,12 @@ async function handleUpload(request, env, url) {
     return json({ message: 'The uploaded file does not match an allowed image format.' }, 415, cors);
   }
 
-  await env.MEDIA_BUCKET.put(key, bytes, {
+  // R2 evaluates this condition atomically with the write. A separate
+  // head() check would allow two concurrent replays to overwrite the object.
+  const storedObject = await env.MEDIA_BUCKET.put(key, bytes, {
+    onlyIf: {
+      etagDoesNotMatch: '*'
+    },
     httpMetadata: {
       contentType: payload.contentType,
       cacheControl: 'public, max-age=31536000, immutable'
@@ -217,6 +218,10 @@ async function handleUpload(request, env, url) {
       purpose: payload.purpose
     }
   });
+
+  if (!storedObject) {
+    return json({ message: 'This upload authorization has already been used.' }, 409, cors);
+  }
 
   return json({
     success: true,
