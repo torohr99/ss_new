@@ -16,10 +16,86 @@ export default function VerifyPage() {
   const [status, setStatus] =
     useState('checking');
 
+  const [email, setEmail] = useState('');
+  const [resendMessage, setResendMessage] = useState('');
+  const [resending, setResending] = useState(false);
+
   const searchParams =
     useSearchParams();
 
   const router = useRouter();
+
+  const resendVerification = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setResendMessage('Enter the email address used to create your account.');
+      return;
+    }
+
+    setResending(true);
+    setResendMessage('');
+
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:5000';
+
+      const res = await axios.post(
+        `${baseUrl}/api/auth/resend-verification`,
+        { email: normalizedEmail }
+      );
+
+      setResendMessage(
+        res.data.message ||
+        'If an unverified account exists for that email, a verification link has been sent.'
+      );
+    } catch {
+      setResendMessage('Unable to process the request right now. Please try again later.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const resendVerificationForm = (
+    <div style={{ marginTop: '1.5rem' }}>
+      <input
+        type="email"
+        value={email}
+        onChange={event => setEmail(event.target.value)}
+        placeholder="Email address"
+        autoComplete="email"
+        aria-label="Email address for verification"
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '0.75rem',
+          borderRadius: '8px',
+          border: '1px solid var(--glass-border)',
+          marginBottom: '0.75rem'
+        }}
+      />
+      <button
+        type="button"
+        onClick={resendVerification}
+        disabled={resending}
+        style={{
+          padding: '0.75rem 1.25rem',
+          borderRadius: '8px',
+          border: 'none',
+          cursor: resending ? 'wait' : 'pointer',
+          opacity: resending ? 0.7 : 1
+        }}
+      >
+        {resending ? 'Sending...' : 'Resend verification email'}
+      </button>
+      {resendMessage && (
+        <p role="status" style={{ fontSize: '0.9rem', lineHeight: 1.5, marginTop: '0.75rem', opacity: 0.85 }}>
+          {resendMessage}
+        </p>
+      )}
+    </div>
+  );
 
   useEffect(() => {
     const token =
@@ -155,6 +231,8 @@ export default function VerifyPage() {
             Don&apos;t see it? Check your spam
             or junk folder.
           </p>
+
+          {resendVerificationForm}
 
           <button
             onClick={() =>
@@ -343,6 +421,8 @@ export default function VerifyPage() {
         >
           {status}
         </p>
+
+        {resendVerificationForm}
 
         <button
           onClick={() =>
