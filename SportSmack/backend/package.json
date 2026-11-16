@@ -16,7 +16,8 @@
     "render-build": "npm install && node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma','prisma/schema.prisma')\" && npx prisma generate",
     "test:auth-token": "node --test tests/authTokenSecurity.js tests/authTokenRoutes.js tests/emailActionRateLimit.js",
     "tokens:backfill": "node scripts/backfillAuthTokenHashes.js",
-    "test:auth-token-db": "node --test tests/authTokenBackfill.integration.js"
+    "test:auth-token-db": "node --test tests/authTokenBackfill.integration.js",
+    "test:post-privacy": "node --test tests/postPrivacy.js"
   },
   "engines": {
     "node": ">=22 <25"
