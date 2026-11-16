@@ -121,11 +121,13 @@ test('upload rejects a token bound to a different object key', async () => {
   assert.equal(response.status, 401);
 });
 
-test('upload rejects a token whose object key belongs to another user', async () => {
+test('upload rejects an object key outside the signed user namespace', async () => {
+  const otherUserKey = '43/123e4567-e89b-12d3-a456-426614174000.png';
   const response = await upload({
+    key: otherUserKey,
     token: signedToken({
-      userId: 43,
-      key: '43/123e4567-e89b-12d3-a456-426614174000.png'
+      userId: 42,
+      key: otherUserKey
     })
   });
   assert.equal(response.status, 401);
