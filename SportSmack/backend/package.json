@@ -14,7 +14,7 @@
     "dev": "npx kill-port 5000 && nodemon server.js",
     "build": "node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma','prisma/schema.prisma')\" && npx prisma generate",
     "render-build": "npm install && node -e \"require('fs').copyFileSync('prisma/schema.postgres.prisma','prisma/schema.prisma')\" && npx prisma generate",
-    "test:auth-token": "node tests/authTokenSecurity.js",
+    "test:auth-token": "node --test tests/authTokenSecurity.js tests/authTokenRoutes.js",
     "tokens:backfill": "node scripts/backfillAuthTokenHashes.js"
   },
   "engines": {
