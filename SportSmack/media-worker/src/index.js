@@ -292,7 +292,7 @@ async function handleDelete(request, env, url) {
 async function handleImage(request, env, url, ctx) {
   const key = decodePathKey(url.pathname, 1);
 
-  if (!key || !/^([1-9][0-9]*)\\/[0-9a-f-]{36}\\.(jpg|png|webp)$/.test(key)) {
+  if (!key || !/^([1-9][0-9]*)[/][0-9a-f-]{36}[.](jpg|png|webp)$/.test(key)) {
     return new Response('Not found', { status: 404 });
   }
 
@@ -314,7 +314,7 @@ async function handleImage(request, env, url, ctx) {
   const purpose = metadata.purpose;
   if (purpose === 'post') {
     const token = (request.headers.get('Authorization') || '')
-      .replace(/^Bearer\\s+/i, '');
+      .replace(/^Bearer[ ]+/i, '');
     const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
 
     if (
