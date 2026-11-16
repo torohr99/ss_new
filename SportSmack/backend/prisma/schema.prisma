@@ -14,6 +14,7 @@ model User {
   email             String   @unique
   password_hash     String
   profile_pic       String?
+  postPrivacy       String   @default("FRIENDS_ONLY")
   isVerified        Boolean  @default(false) // Required for new signups
   verificationToken String? // Token used to verify the email
   verificationTokenHash String? @unique
