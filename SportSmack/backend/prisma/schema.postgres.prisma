@@ -13,6 +13,7 @@ model User {
   email                String               @unique
   password_hash        String
   profile_pic          String?
+  postPrivacy          String   @default("FRIENDS_ONLY")
   isVerified           Boolean              @default(false)
   verificationToken    String?
   verificationTokenHash String? @unique
