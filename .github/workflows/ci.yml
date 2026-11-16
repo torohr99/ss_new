@@ -79,6 +79,9 @@ jobs:
       - name: Check authentication routes
         run: node --check routes/auth.js
 
+      - name: Test auth token security helpers
+        run: npm run test:auth-token
+
       - name: Check gamecast routes
         run: node --check routes/gamecast.js
 
