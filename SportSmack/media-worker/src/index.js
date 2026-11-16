@@ -57,10 +57,22 @@ function decodeBase64Url(value) {
 }
 
 async function verifyUploadToken(token, secret) {
-  if (!token || !secret) return null;
+  if (
+    typeof token !== 'string' ||
+    token.length > 4096 ||
+    !secret
+  ) {
+    return null;
+  }
 
   const parts = token.split('.');
-  if (parts.length !== 2) return null;
+  if (
+    parts.length !== 2 ||
+    !parts[0] ||
+    !parts[1]
+  ) {
+    return null;
+  }
 
   try {
     const key = await crypto.subtle.importKey(
@@ -86,9 +98,10 @@ async function verifyUploadToken(token, secret) {
 
     if (
       !payload ||
-      !Number.isInteger(payload.userId) ||
-      !Number.isFinite(payload.expiresAt) ||
-      payload.expiresAt < Date.now() ||
+      !Number.isSafeInteger(payload.userId) ||
+      payload.userId < 1 ||
+      !Number.isSafeInteger(payload.expiresAt) ||
+      payload.expiresAt <= Date.now() ||
       !(
         (['profile', 'post'].includes(payload.purpose) &&
           ALLOWED_TYPES.has(payload.contentType)) ||
@@ -133,6 +146,14 @@ function matchesImageSignature(bytes, contentType) {
   return false;
 }
 
+function decodePathKey(pathname, prefixLength) {
+  try {
+    return decodeURIComponent(pathname.slice(prefixLength));
+  } catch {
+    return null;
+  }
+}
+
 function validObjectKey(key, userId) {
   const match = /^([1-9][0-9]*)\/([0-9a-f-]{36})\.(jpg|png|webp)$/.exec(key);
   return Boolean(match && Number(match[1]) === userId);
@@ -140,7 +161,11 @@ function validObjectKey(key, userId) {
 
 async function handleUpload(request, env, url) {
   const cors = corsHeaders(request, env);
-  const key = decodeURIComponent(url.pathname.slice('/upload/'.length));
+  const key = decodePathKey(url.pathname, '/upload/'.length);
+  if (!key) {
+    return json({ message: 'Invalid upload object key.' }, 400, cors);
+  }
+
   const token = (request.headers.get('Authorization') || '')
     .replace(/^Bearer\s+/i, '');
 
@@ -232,7 +257,11 @@ async function handleUpload(request, env, url) {
 
 async function handleDelete(request, env, url) {
   const cors = corsHeaders(request, env);
-  const key = decodeURIComponent(url.pathname.slice('/delete/'.length));
+  const key = decodePathKey(url.pathname, '/delete/'.length);
+  if (!key) {
+    return json({ message: 'Invalid delete object key.' }, 400, cors);
+  }
+
   const token = (request.headers.get('Authorization') || '')
     .replace(/^Bearer\s+/i, '');
   const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
@@ -261,9 +290,9 @@ async function handleDelete(request, env, url) {
 }
 
 async function handleImage(request, env, url, ctx) {
-  const key = decodeURIComponent(url.pathname.slice(1));
+  const key = decodePathKey(url.pathname, 1);
 
-  if (!/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
+  if (!key || !/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
     return new Response('Not found', { status: 404 });
   }
 
