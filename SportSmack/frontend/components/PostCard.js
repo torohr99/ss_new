@@ -420,7 +420,7 @@ export default function PostCard({ post }) {
       <div className="post-content">{post.content.replace(/^\[FORUM:[^\]]+\]\s*/, '')}</div>
 
       {post.image_url && (
-        <img src={post.image_url} alt="Post attachment" className="post-image" loading="lazy" />
+        <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/media/post/${post.id}`} alt="Post attachment" className="post-image" loading="lazy" crossOrigin="use-credentials" />
       )}
 
       <div className="post-actions">
