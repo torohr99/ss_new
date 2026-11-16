@@ -433,6 +433,17 @@ test('post image read authorization must match action, purpose, owner, and exact
     options: { customMetadata: { ownerId: '42', purpose: 'post' } }
   });
 
+  const validRead = await worker.fetch(
+    new Request('https://media.test/' + KEY, {
+      headers: {
+        Authorization: 'Bearer ' + signedToken({ action: 'read' })
+      }
+    }),
+    makeEnv(bucket),
+    {}
+  );
+  assert.equal(validRead.status, 415);
+
   const wrongPurpose = await worker.fetch(
     new Request('https://media.test/' + KEY, {
       headers: {
