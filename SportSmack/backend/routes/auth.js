@@ -920,6 +920,7 @@ router.get('/me', authMiddleware, async (req, res) => {
           email: true,
           created_at: true,
           profile_pic: true,
+          postPrivacy: true,
           isVerified: true
         }
       });
