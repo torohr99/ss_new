@@ -65,9 +65,6 @@ app.use(express.urlencoded({
   limit: '1mb'
 }));
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
-const isProduction =
-  process.env.NODE_ENV === 'production';
-
 const { isAllowedOrigin } = require('./lib/originPolicy');
 
 const verifyOrigin = (origin, callback) => {
