@@ -10,7 +10,8 @@ const redisOptions = require('./lib/redisOptions');
 const helmet = require('helmet');
 const {
   standardLimiter,
-  authLimiter
+  authLimiter,
+  emailActionLimiter
 } = require('./middleware/rateLimits');
 const xss = require('xss-clean');
 require('dotenv').config();
@@ -251,6 +252,8 @@ app.use('/api', (req, res, next) => {
 
 app.use('/api', standardLimiter);
 app.use('/api/auth', authLimiter);
+app.use('/api/auth/forgot-password', emailActionLimiter);
+app.use('/api/auth/resend-verification', emailActionLimiter);
 
 // Routes
 const indexRoutes = require('./routes/index');
