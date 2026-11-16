@@ -182,6 +182,10 @@ export const AuthProvider = ({
   // LOGOUT
   // ----------------------------------------------------------
 
+  const updateUser = updates => {
+    setUser(current => current ? { ...current, ...updates } : current);
+  };
+
   const logout = async () => {
   try {
     const baseUrl =
@@ -213,7 +217,8 @@ export const AuthProvider = ({
         loading,
         login,
         register,
-        logout
+        logout,
+        updateUser
       }}
     >
       {!loading && children}
