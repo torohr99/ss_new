@@ -6,6 +6,9 @@ const { Emitter } =
 const Redis =
   require('ioredis');
 
+const redisOptions =
+  require('./lib/redisOptions');
+
 const {
   acquireWorkerLock,
   renewWorkerLock,
@@ -31,7 +34,7 @@ const redis =
   require('./lib/redis');
 
 const emitterRedis =
-  new Redis(process.env.REDIS_URL);
+  new Redis(process.env.REDIS_URL, redisOptions());
 
 const io =
   new Emitter(emitterRedis);
@@ -289,11 +292,20 @@ process.on(
   () => shutdown('SIGINT')
 );
 
-startWorker().catch(error => {
+startWorker().catch(async error => {
   console.error(
     'SportSmack worker failed to start:',
     error
   );
 
-  process.exit(1);
+  // Reuse the normal cleanup path so a startup failure cannot
+  // leave Redis/Prisma connections or an acquired worker lock behind.
+  await shutdown(
+    'STARTUP_FAILURE',
+    {
+      drain: false,
+      releaseLock: true,
+      exitCode: 1
+    }
+  );
 });

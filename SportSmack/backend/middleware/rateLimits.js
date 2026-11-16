@@ -4,6 +4,9 @@ const { ipKeyGenerator } =
 const { RedisStore } =
   require('rate-limit-redis');
 const redis = require('../lib/redis');
+const {
+  shouldSkipStandardRateLimit
+} = require('../lib/rateLimitPolicy');
 
 function userOrIpKeyGenerator(req) {
   if (req.user?.id) {
@@ -26,19 +29,10 @@ const standardLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 
-  // Controlled k6 load tests use a dedicated secret
-  // so the test measures API capacity rather than
-  // the normal per-IP production rate limit.
-  skip: req => {
-    const loadTestSecret =
-      process.env.LOAD_TEST_SECRET;
-
-    return (
-      loadTestSecret &&
-      req.headers['x-load-test-secret'] ===
-        loadTestSecret
-    );
-  },
+  // The dependency-status endpoint remains observable during Redis outages.
+  // Load-test bypasses are restricted to local development and test environments.
+  skip: req =>
+    shouldSkipStandardRateLimit(req),
 
   store: redisStore('rl:standard:'),
   message: {

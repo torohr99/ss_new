@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+      - phase-21-10-3-api-worker-deployment-recovery
+      - phase-21-10-4-production-security-audit
+      - phase-21-10-5-monitoring-alerting-runbooks
   pull_request:
     branches:
       - main
@@ -34,6 +37,12 @@ jobs:
       - name: Check server syntax
         run: node --check server.js
 
+      - name: Check process supervisor syntax and lifecycle tests
+        run: |
+          node --check start.js
+          node --check lib/processSupervisor.js
+          npm run test:supervisor
+
       - name: Check authentication middleware
         run: node --check middleware/auth.js
 
@@ -46,8 +55,19 @@ jobs:
       - name: Check rate-limit middleware
         run: node --check middleware/rateLimits.js
 
-      - name: Check CSRF middleware
-        run: node --check middleware/csrf.js
+      - name: Check Redis client and retry policy
+        run: |
+          node --check lib/redis.js
+          node --check lib/redisOptions.js
+
+      - name: Check background worker
+        run: node --check worker.js
+
+      - name: Check CSRF and origin policy
+        run: |
+          node --check middleware/csrf.js
+          node --check lib/originPolicy.js
+          npm run test:security
 
       - name: Check concurrency middleware
         run: node --check middleware/concurrency.js

@@ -104,7 +104,7 @@ async function main() {
   );
 
   await runTest(
-    'Health endpoint reports instance information',
+    'Public dependency status omits internal instance and process metrics',
     async () => {
       const result = await request('/api/status');
 
@@ -112,8 +112,10 @@ async function main() {
         throw new Error(`Expected 200, received ${result.status}`);
       }
 
-      if (!result.body.instance) {
-        throw new Error('Health endpoint did not report an instance.');
+      for (const field of ['instance', 'region', 'metrics']) {
+        if (Object.prototype.hasOwnProperty.call(result.body || {}, field)) {
+          throw new Error(`Public status unexpectedly exposes ${field}.`);
+        }
       }
     }
   );
@@ -159,6 +161,17 @@ async function main() {
 
       if (result.status !== 401) {
         throw new Error(`Expected 401, received ${result.status}`);
+      }
+    }
+  );
+
+  await runTest(
+    'Legacy public metrics endpoint is not available',
+    async () => {
+      const result = await request('/api/metrics');
+
+      if (result.status !== 404) {
+        throw new Error(`Expected 404, received ${result.status}`);
       }
     }
   );

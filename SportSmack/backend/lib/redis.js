@@ -8,12 +8,9 @@ if (!redisUrl) {
   );
 }
 
-const redis = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: true,
-  lazyConnect: false,
-  family: 0
-});
+const redisOptions = require('./redisOptions');
+
+const redis = new Redis(redisUrl, redisOptions());
 
 redis.on('connect', () => {
   console.log('Redis connection established.');

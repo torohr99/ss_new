@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const logger = require('../lib/logger');
 const {
   sendMail
 } = require('../lib/mailer');
@@ -11,8 +12,8 @@ const authMiddleware = require('../middleware/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET is not configured');
+if (!JWT_SECRET || Buffer.byteLength(JWT_SECRET, 'utf8') < 32) {
+  throw new Error('JWT_SECRET must be configured with at least 32 bytes of secret material');
 }
 
 // ------------------------------------------------------------
@@ -105,7 +106,7 @@ const sendVerificationEmail = async (email, verificationToken) => {
   });
 
   console.log(
-    `Verification email sent successfully to ${email}. Message ID: ${info.messageId}`
+    `Verification email sent successfully. Message ID: ${info.messageId}`
   );
 
   return info;
@@ -202,7 +203,7 @@ const sendPasswordResetEmail = async (
     });
 
   console.log(
-    `Password reset email sent to ${email}.`
+    'Password reset email sent successfully.'
   );
 
   return info;
@@ -714,10 +715,10 @@ router.post(
         });
       }
 
-      if (password.length < 8) {
+      if (password.length < 8 || password.length > 128) {
         return res.status(400).json({
           message:
-            'Password must be at least 8 characters long.'
+            'Password must be between 8 and 128 characters long.'
         });
       }
 

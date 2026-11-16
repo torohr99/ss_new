@@ -5,6 +5,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
+const redisOptions = require('./lib/redisOptions');
 
 const helmet = require('helmet');
 const {
@@ -42,10 +43,7 @@ if (!redisUrl) {
   throw new Error('REDIS_URL environment variable is required.');
 }
 
-const pubClient = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
-  family: 0
-});
+const pubClient = new Redis(redisUrl, redisOptions());
 
 const subClient = pubClient.duplicate();
 
@@ -57,7 +55,8 @@ subClient.on('error', (error) => {
   console.error('Socket.IO Redis subscriber error:', error.message);
 });
 
-// FIX 1: Tell Express to trust Render's proxy headers so express-rate-limit stops crashing
+// Trust one hosting proxy hop. Confirm this value against the active
+// ingress topology before changing it (see the Phase 21.10.4 audit).
 app.set('trust proxy', 1);
 
 // Parse request bodies with strict production limits.
@@ -67,31 +66,16 @@ app.use(express.urlencoded({
   limit: '1mb'
 }));
 // Allow connections from localhost (dev) and the deployed Vercel frontend (prod)
-const isProduction =
-  process.env.NODE_ENV === 'production';
-
-const FRONTEND_URL = (process.env.FRONTEND_URL || '')
-  .trim()
-  .replace(/\/+$/, '');
-
-const ALLOWED_ORIGINS = new Set(
-  [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    FRONTEND_URL
-  ].filter(Boolean)
-);
+const { isAllowedOrigin } = require('./lib/originPolicy');
 
 const verifyOrigin = (origin, callback) => {
+  // Requests without an Origin header are not browser CORS requests.
+  // State-changing API requests are independently protected by CSRF middleware.
   if (!origin) {
     return callback(null, true);
   }
 
-  const normalizedOrigin = origin
-    .trim()
-    .replace(/\/+$/, '');
-
-  if (ALLOWED_ORIGINS.has(normalizedOrigin)) {
+  if (isAllowedOrigin(origin)) {
     return callback(null, true);
   }
 
@@ -320,62 +304,49 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.get('/api/metrics', (req, res) => {
-  return res.status(200).json(
-    metrics.snapshot()
-  );
-});
+const DEPENDENCY_HEALTH_TIMEOUT_MS = 5000;
+
+function withHealthTimeout(promise, dependency) {
+  let timeout;
+
+  const timeoutPromise = new Promise((resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error(
+        `${dependency} health check timed out after ${DEPENDENCY_HEALTH_TIMEOUT_MS}ms`
+      ));
+    }, DEPENDENCY_HEALTH_TIMEOUT_MS);
+  });
+
+  return Promise.race([promise, timeoutPromise])
+    .finally(() => clearTimeout(timeout));
+}
 
 app.get('/api/status', async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
+  const checks = await Promise.allSettled([
+    withHealthTimeout(prisma.$queryRaw`SELECT 1`, 'PostgreSQL'),
+    withHealthTimeout(redis.ping(), 'Redis')
+  ]);
 
-    await redis.ping();
+  const databaseOk = checks[0].status === 'fulfilled';
+  const redisOk = checks[1].status === 'fulfilled';
+  const healthy = databaseOk && redisOk;
 
-    return res.status(200).json({
-      status: 'OK',
-    
-      database: 'OK',
-    
-      redis: 'OK',
-    
-      instance:
-        process.env.RAILWAY_REPLICA_ID ||
-        process.env.RENDER_INSTANCE_ID ||
-        'local',
-    
-      region:
-        process.env.RAILWAY_REPLICA_REGION ||
-        'local',
-    
-      timestamp:
-        new Date().toISOString(),
-    
-      uptime:
-        Math.round(process.uptime()),
-    
-      metrics:
-        metrics.snapshot()
-    });
-  } catch (error) {
-    logger.error(
-      'Health check failed',
-      {
-        error
-      }
-    );
-
-    return res.status(503).json({
-      status: 'ERROR',
-      database: 'ERROR',
-      redis: 'ERROR',
-      instance:
-        process.env.RENDER_INSTANCE_ID ||
-        'local',
-      timestamp:
-        new Date().toISOString()
+  if (!healthy) {
+    logger.error('Dependency health check failed', {
+      database: databaseOk ? 'OK' : 'ERROR',
+      redis: redisOk ? 'OK' : 'ERROR',
+      databaseError: databaseOk ? undefined : checks[0].reason,
+      redisError: redisOk ? undefined : checks[1].reason
     });
   }
+
+  return res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'OK' : 'ERROR',
+    database: databaseOk ? 'OK' : 'ERROR',
+    redis: redisOk ? 'OK' : 'ERROR',
+    timestamp: new Date().toISOString(),
+    uptime: Math.round(process.uptime())
+  });
 });
 
 // 404 handler — MUST come after all routes
@@ -452,49 +423,65 @@ async function gracefulShutdown(signal) {
     }
   );
 
-  io.close(() => {
-    logger.info(
-      'Socket.IO connections closed.'
-    );
-  });
-
-  server.close(async () => {
-    try {
-      await prisma.$disconnect();
-    } catch (error) {
-      logger.error(
-        'Prisma shutdown error',
-        {
-          error
-        }
-      );
-    }
-
-    try {
-      await redis.quit();
-    } catch (error) {
-      logger.error(
-        'Redis shutdown error',
-        {
-          error
-        }
-      );
-    }
-
-    logger.info(
-      'SportSmack backend shutdown complete.'
-    );
-
-    process.exit(0);
-  });
-
-  setTimeout(() => {
+  // io.close() also closes the underlying HTTP server. Calling
+  // server.close() separately creates a competing close operation.
+  const shutdownTimeout = setTimeout(() => {
     logger.error(
       'Graceful shutdown timed out.'
     );
 
     process.exit(1);
-  }, 25000).unref();
+  }, 25000);
+
+  try {
+    await new Promise(resolve => {
+      io.close(() => {
+        logger.info(
+          'Socket.IO connections and HTTP server closed.'
+        );
+
+        resolve();
+      });
+    });
+
+    const cleanupResults = await Promise.allSettled([
+      prisma.$disconnect(),
+      redis.quit()
+    ]);
+
+    for (const result of cleanupResults) {
+      if (result.status === 'rejected') {
+        logger.error(
+          'Backend dependency shutdown error',
+          {
+            error: result.reason
+          }
+        );
+      }
+    }
+
+    // Socket.IO's Redis adapter owns these dedicated clients.
+    // Disconnect explicitly after Socket.IO has closed.
+    pubClient.disconnect();
+    subClient.disconnect();
+
+    logger.info(
+      'SportSmack backend shutdown complete.'
+    );
+
+    clearTimeout(shutdownTimeout);
+    process.exit(0);
+  } catch (error) {
+    logger.error(
+      'SportSmack backend graceful shutdown failed.',
+      {
+        error
+      }
+    );
+
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
 }
 
 process.on(
