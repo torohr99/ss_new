@@ -78,6 +78,8 @@ router.post('/upload-token', writeLimiter, async (req, res) => {
 // @route GET /api/media/post/:postId
 // Streams a post image only after checking the viewer's current access.
 router.get('/post/:postId', async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   try {
     const postId = Number.parseInt(req.params.postId, 10);
     if (!Number.isSafeInteger(postId) || postId < 1) {
@@ -138,8 +140,6 @@ router.get('/post/:postId', async (req, res) => {
       }
     );
 
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
 
     if (!imageResponse.ok) {
       return res.status(imageResponse.status === 404 ? 404 : 502).end();
