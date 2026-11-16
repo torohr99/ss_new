@@ -4,6 +4,8 @@ const http = require('node:http');
 const express = require('express');
 
 process.env.JWT_SECRET = 'test-only-jwt-secret-with-at-least-thirty-two-bytes';
+process.env.RESEND_API_KEY = 'test-only-resend-key';
+process.env.FRONTEND_URL = 'https://frontend.example.test';
 
 const users = [];
 let nextId = 1;
@@ -149,6 +151,45 @@ async function post(path, body) {
     body: JSON.stringify(body)
   });
 }
+
+test('resend verification uses a generic response and issues a fresh expiring token', async () => {
+  const user = addUser({
+    email: 'resend@example.com',
+    verificationToken: 'b'.repeat(64)
+  });
+
+  const response = await post('/api/auth/resend-verification', {
+    email: ' RESEND@example.com '
+  });
+
+  assert.equal(response.status, 200);
+  assert.match((await response.json()).message, /If an unverified account exists/);
+  assert.equal(user.verificationToken.length, 64);
+  assert.match(user.verificationTokenHash, /^[a-f0-9]{64}$/);
+  assert.notEqual(user.verificationTokenHash, user.verificationToken);
+  assert.ok(user.verificationTokenExpires instanceof Date);
+  assert.ok(user.verificationTokenExpires > new Date());
+});
+
+test('resend verification does not reveal whether an email is registered or verified', async () => {
+  const missing = await post('/api/auth/resend-verification', {
+    email: 'missing@example.com'
+  });
+  const missingBody = await missing.json();
+
+  addUser({
+    email: 'verified@example.com',
+    isVerified: true
+  });
+  const verified = await post('/api/auth/resend-verification', {
+    email: 'verified@example.com'
+  });
+  const verifiedBody = await verified.json();
+
+  assert.equal(missing.status, 200);
+  assert.equal(verified.status, 200);
+  assert.deepEqual(missingBody, verifiedBody);
+});
 
 test('verification accepts a valid hash-only token and clears all verification token fields', async () => {
   const token = generateAuthToken();
