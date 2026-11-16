@@ -65,7 +65,7 @@ const sendMail = async ({
   }
 
   console.log(
-    `Email sent successfully to ${to}. Resend ID: ${data?.id}`
+    `Email sent successfully. Resend ID: ${data?.id}`
   );
 
   return {
