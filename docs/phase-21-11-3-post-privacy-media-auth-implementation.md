@@ -35,11 +35,12 @@ Implement an account-level post visibility preference that applies to all posts,
 - Every protected image request rechecks the post's current privacy and block state, so privacy changes and blocks take effect on the next request.
 - The Worker still exposes profile-purpose images as before; profile image privacy is not controlled by `postPrivacy`.
 - Existing post images must have R2 custom metadata identifying `ownerId` and `purpose=post`. Objects without correct metadata fail closed. Validate existing object metadata in a non-production environment before rollout.
+- Profile images retain the existing direct Worker URL behavior and are therefore publicly retrievable by URL, not restricted to authenticated members. Confirm this audience is acceptable; if profile images must be limited to signed-in accounts, implement the profile-image API proxy before production rollout.
 - Third-party image URLs are not proxied by the new post-image endpoint. The current upload UI stores Worker-managed image URLs; any legacy external post-image URLs require an explicit compatibility decision before release.
 - The migration is additive but has not been run against production. Do not deploy the Worker or API, run production migrations, or change production secrets without explicit approval.
 
 ## Validation status
 
-- Automated tests and GitHub Actions are pending final completion of this branch.
+- GitHub Actions completed successfully at commit `818fd6815621ccfc2a593471a9bebddcbc590d96`: backend syntax/security checks, the post-privacy unit tests, all PostgreSQL migrations on disposable PostgreSQL 17, Prisma Client generation, Worker adversarial tests and production bundle validation, frontend lint, and frontend build. Local developer-machine test execution remains to be repeated after syncing the branch.
 - Real R2/Worker integration, Photon WASM runtime validation, cache behavior, and deployed end-to-end privacy checks remain required before release.
 - This document records implementation progress; it is not a production deployment approval.
