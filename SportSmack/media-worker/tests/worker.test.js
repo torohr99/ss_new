@@ -107,6 +107,25 @@ test('upload rejects missing or malformed authorization', async () => {
   assert.equal(response.status, 401);
 });
 
+test('upload rejects oversized authorization headers', async () => {
+  const response = await upload({ token: 'x'.repeat(4097) });
+  assert.equal(response.status, 401);
+});
+
+test('malformed percent-encoding in an upload path returns a client error', async () => {
+  const request = new Request('https://media.test/upload/%E0%A4%A', {
+    method: 'PUT',
+    headers: {
+      Authorization: 'Bearer ' + signedToken(),
+      'Content-Type': 'image/png'
+    },
+    body: PNG_SIGNATURE
+  });
+
+  const response = await worker.fetch(request, makeEnv(), {});
+  assert.equal(response.status, 400);
+});
+
 test('upload rejects expired authorization', async () => {
   const response = await upload({
     token: signedToken({ expiresAt: Date.now() - 1 })
