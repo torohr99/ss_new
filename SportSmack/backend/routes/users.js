@@ -608,8 +608,17 @@ router.get('/feed/news', async (req, res) => {
 // @desc    Update user profile (profile picture, password)
 router.put('/me', async (req, res) => {
   try {
-    const { profile_pic, password } = req.body;
+    const { profile_pic, password, postPrivacy } = req.body;
     let updateData = {};
+
+    if (postPrivacy !== undefined) {
+      if (!['FRIENDS_ONLY', 'PUBLIC'].includes(postPrivacy)) {
+        return res.status(400).json({
+          message: 'postPrivacy must be FRIENDS_ONLY or PUBLIC.'
+        });
+      }
+      updateData.postPrivacy = postPrivacy;
+    }
 
     if (profile_pic !== undefined) {
       const validation = validateMediaUrlForUser(
@@ -634,7 +643,7 @@ router.put('/me', async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
       data: updateData,
-      select: { id: true, username: true, email: true, profile_pic: true }
+      select: { id: true, username: true, email: true, profile_pic: true, postPrivacy: true }
     });
 
     res.json(updatedUser);
