@@ -38,6 +38,12 @@ New registration and password-reset tokens are stored in both the existing plain
 - Email-delivery failure invalidates the newly generated token.
 - A non-enumerating `POST /api/auth/resend-verification` endpoint and verification-page form allow an unverified user to request a fresh link after expiration. The public response does not reveal whether an email is registered or already verified.
 
+
+
+### Email-action abuse protection
+
+The forgot-password and resend-verification endpoints also use a dedicated Redis-backed limit of three requests per normalized email address per hour. The Redis key contains a SHA-256 digest of the normalized email, not the raw email address. This avoids relying solely on the auth limiter, which intentionally skips successful responses and therefore would not constrain the generic-success resend endpoint.
+
 ## 4. Legacy-token backfill utility
 
 `backend/scripts/backfillAuthTokenHashes.js` is an idempotent, batched application-side backfill. It:
