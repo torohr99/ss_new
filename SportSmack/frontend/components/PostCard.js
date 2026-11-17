@@ -28,7 +28,15 @@ function isWorkerManagedMediaUrl(imageUrl, ownerId) {
     }
 
     return new RegExp(
-      '^/' + numericOwnerId + '/[0-9a-f-]{36}\\.(?:jpg|png|webp)export default function PostCard({ post }) {
+      '^/' + numericOwnerId + '/[0-9a-f-]{36}\\.(?:jpg|png|webp)$',
+      'i'
+    ).test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export default function PostCard({ post }) {
   const [isLiked, setIsLiked] = useState(post.hasLiked);
   const [likesCount, setLikesCount] = useState(post._count.likes);
   const [showComments, setShowComments] = useState(false);
