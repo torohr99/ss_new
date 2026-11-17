@@ -36,11 +36,13 @@ Implement an account-level post visibility preference that applies to all posts,
 - The Worker still exposes profile-purpose images as before; profile image privacy is not controlled by `postPrivacy`.
 - Existing post images must have R2 custom metadata identifying `ownerId` and `purpose=post`. Objects without correct metadata fail closed. Validate existing object metadata in a non-production environment before rollout.
 - Profile images retain the existing direct Worker URL behavior and are therefore publicly retrievable by URL, not restricted to authenticated members. Confirm this audience is acceptable; if profile images must be limited to signed-in accounts, implement the profile-image API proxy before production rollout.
-- Third-party image URLs are not proxied by the new post-image endpoint. The current upload UI stores Worker-managed image URLs; any legacy external post-image URLs require an explicit compatibility decision before release.
+- Worker-managed post-image URLs are loaded through the authenticated API proxy, which rechecks current post privacy and block access. Legacy third-party HTTP(S) image URLs continue loading directly in the browser for backward compatibility; they are not privacy-protected by the Worker proxy and remain retrievable by anyone who has the URL. The backend does not fetch arbitrary external URLs, avoiding an SSRF-prone proxy.
 - The migration is additive but has not been run against production. Do not deploy the Worker or API, run production migrations, or change production secrets without explicit approval.
 
 ## Validation status
 
-- GitHub Actions completed successfully at commit `818fd6815621ccfc2a593471a9bebddcbc590d96`: backend syntax/security checks, the post-privacy unit tests, all PostgreSQL migrations on disposable PostgreSQL 17, Prisma Client generation, Worker adversarial tests and production bundle validation, frontend lint, and frontend build. Local developer-machine test execution remains to be repeated after syncing the branch.
-- Real R2/Worker integration, Photon WASM runtime validation, cache behavior, and deployed end-to-end privacy checks remain required before release.
+- GitHub Actions passed on the implementation commit before the final legacy-image compatibility adjustment. The compatibility adjustment is committed separately and requires a fresh CI run before this phase is considered implementation-complete.
+- Local backend tests passed: `test:post-privacy` (8/8) and `test:auth-token` (23/23). Local Worker tests passed (22/22), and `wrangler deploy --dry-run` succeeded.
+- Local Wrangler integration using the local R2 emulator passed profile and post uploads, image transformation to WebP, unauthenticated post-read rejection (401), authorized post reads for all tested variants (200), and the expected public profile versus private/no-store post cache headers.
+- Production migration, deployed Worker/API integration, and end-to-end privacy checks remain release gates. Legacy third-party images retain their previous public-URL behavior and are explicitly outside the protected Worker-media guarantee.
 - This document records implementation progress; it is not a production deployment approval.
