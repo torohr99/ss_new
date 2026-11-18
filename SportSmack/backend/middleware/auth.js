@@ -3,6 +3,8 @@ const jwt =
 
 const logger =
   require('../lib/logger');
+const safeErrorMetadata =
+  require('../lib/safeErrorMetadata');
 
 const authMiddleware = (req, res, next) => {
   // Get token from cookie
@@ -24,7 +26,7 @@ const authMiddleware = (req, res, next) => {
     logger.warn(
       'Token verification failed',
       {
-        error
+        error: safeErrorMetadata(error)
       }
     );
     res.status(401).json({ message: 'Not authorized, token failed' });
