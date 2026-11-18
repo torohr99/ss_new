@@ -51,15 +51,14 @@ const sendMail = async ({
   if (!response.ok) {
     const error =
       new Error(
-        data?.message ||
         'Resend email request failed.'
       );
 
     error.status =
       response.status;
 
-    error.resendData =
-      data;
+    error.code =
+      'RESEND_REQUEST_FAILED';
 
     throw error;
   }
