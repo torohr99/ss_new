@@ -888,13 +888,7 @@ router.post(
   } catch (error) {
     console.error(
       'CREATE COMMENT ERROR:',
-      {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-        stack: error?.stack
-      }
+      safeErrorMetadata(error)
     );
 
     res.status(500).json({
