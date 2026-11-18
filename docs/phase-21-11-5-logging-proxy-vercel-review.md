@@ -1,6 +1,6 @@
 # Phase 21.11.5 — Error Logging, Proxy Topology, and Vercel URL Review
 
-**Status:** Targeted authentication, mailer, central error handling, and AI/media route logging remediation committed. Regression tests cover the shared metadata allowlist and mailer failure handling. Broader route/worker error-call-site review and non-production client-IP header validation remain. No production configuration or rollout was performed.
+**Status:** Targeted authentication, mailer, central error handling, AI/media routes, fantasy/social/moderation/search routes, background worker, process supervisor, and media Worker error logging remediation committed. Existing regression tests cover the shared metadata allowlist and mailer failure handling. Non-production client-IP header validation remains. No production configuration or rollout was performed.
 
 ## 1. Error logging review
 
@@ -16,11 +16,11 @@
 - The mailer no longer attaches the full Resend response body to thrown errors. Provider failures expose only a generic message, HTTP status, and stable error code to callers/logging.
 - The logged path is `req.path`, not the full URL with query string.
 - The error response in production returns a generic message and request ID rather than the underlying exception message.
-- Some auth, mail, and background-worker paths also use `console.error`/logger calls.
+- Fantasy, social-post, moderation, admin-moderation, search, background-worker, process-supervisor, and media Worker error call sites now log only allowlisted error metadata rather than raw error objects/messages. The media Worker uses a small runtime-compatible local allowlist.
 
 ### Assessment
 
-No explicit logging of passwords, JWTs, raw verification/reset tokens, authorization headers, or environment-variable values was found in the reviewed paths. However, the logger has no centralized field-redaction policy. Full third-party/ORM/network error objects may contain implementation details, so the remaining error call sites should be checked before claiming that all sensitive fields are excluded.
+No explicit logging of passwords, JWTs, raw verification/reset tokens, authorization headers, or environment-variable values was found in the reviewed error paths. The shared helper deliberately keeps only `name`, `code`, and `type`; the media Worker applies the same allowlist. This is targeted error-metadata sanitization, not a general centralized redaction policy for arbitrary future log fields.
 
 Do not add broad object serialization or request-body logging. If redaction is introduced, add tests using sentinel values for passwords, cookies, bearer tokens, database URLs, and mail-provider credentials.
 
@@ -88,7 +88,7 @@ The variable names and reported scopes/origins are consistent with the applicati
 
 Phase 21.11.5 remains open until:
 
-1. Review remaining fantasy, posts, moderation, search, worker, process-supervisor, and server process/shutdown error-logging call sites; convert unsafe raw error-object logging to the allowlisted helper and extend regression tests as needed.
+1. Run the backend logging-security, auth-token, and post-privacy suites plus the repository CI checks against the final branch head.
 2. API private-hostname consumers are ruled out by configuration/code review, and the public-edge client-IP behavior is validated in non-production.
 3. Rate-limit behavior is tested against normal and forged public forwarding headers.
 4. Vercel production `NEXT_PUBLIC_API_URL` and API `FRONTEND_URL` are confirmed by the user as described above; no secret values are required.
