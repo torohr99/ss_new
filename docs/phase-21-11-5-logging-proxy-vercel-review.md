@@ -1,6 +1,6 @@
 # Phase 21.11.5 — Error Logging, Proxy Topology, and Vercel URL Review
 
-**Status:** Source review complete; Railway topology and user-reported production URL configuration reviewed. Error call-site audit and non-production client-IP header validation remain. No production configuration or application behavior was changed.
+**Status:** Targeted authentication, mailer, and central error logging remediation committed with regression tests. Broader route/worker error-call-site review and non-production client-IP header validation remain. No production configuration or rollout was performed.
 
 ## 1. Error logging review
 
@@ -8,7 +8,10 @@
 
 - Production Winston output is timestamped JSON and includes stack traces for Error objects.
 - The logger uses `LOG_LEVEL`, defaulting to `info`.
-- The Express final error handler logs the full error object with request ID, method, path, and status.
+- The Express final error handler now logs only allowlisted error metadata (`name`, `code`, and `type`) alongside request ID, method, path, and status. It no longer serializes arbitrary error properties, request-body fragments, provider response payloads, or stack/message text.
+- Dependency health-check failures use the same allowlisted metadata rather than logging raw database/Redis error objects.
+- Authentication route and authentication middleware error logs now use the allowlisted metadata helper.
+- The mailer no longer attaches the full Resend response body to thrown errors. Provider failures expose only a generic message, HTTP status, and stable error code to callers/logging.
 - The logged path is `req.path`, not the full URL with query string.
 - The error response in production returns a generic message and request ID rather than the underlying exception message.
 - Some auth, mail, and background-worker paths also use `console.error`/logger calls.
@@ -83,7 +86,7 @@ The variable names and reported scopes/origins are consistent with the applicati
 
 Phase 21.11.5 remains open until:
 
-1. Remaining error-logging call sites in auth, media, AI, and worker paths have been reviewed for secret-bearing error fields.
+1. Review remaining media, AI, fantasy, moderation, and worker error-logging call sites; convert any unsafe raw error-object logging to the allowlisted helper and extend regression tests as needed.
 2. API private-hostname consumers are ruled out by configuration/code review, and the public-edge client-IP behavior is validated in non-production.
 3. Rate-limit behavior is tested against normal and forged public forwarding headers.
 4. Vercel production `NEXT_PUBLIC_API_URL` and API `FRONTEND_URL` are confirmed by the user as described above; no secret values are required.
