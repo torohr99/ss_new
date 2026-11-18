@@ -1,6 +1,6 @@
 # Phase 21.11.5 — Error Logging, Proxy Topology, and Vercel URL Review
 
-**Status:** Targeted authentication, mailer, central error handling, AI/media routes, fantasy/social/moderation/search routes, background worker, process supervisor, and media Worker error logging remediation committed. Existing regression tests cover the shared metadata allowlist and mailer failure handling. Non-production client-IP header validation remains. No production configuration or rollout was performed.
+**Status:** Code remediation and local validation are complete on branch `phase-21-11-3-post-privacy-media-auth` at commit `01c528e11623a05319504c7d98bc2bf7d762ccda`. The latest PR #11 checks passed. Backend logging-security (3/3), auth-token (23/23), post-privacy (8/8), process-supervisor, and Media Worker (22/22) tests passed; syntax checks passed for all nine changed JavaScript files; Wrangler production-bundle dry run passed. Non-production client-IP/header validation and final platform URL confirmation remain release gates. No production configuration or rollout was performed.
 
 ## 1. Error logging review
 
@@ -84,14 +84,18 @@ Do not change `trust proxy` to `true`, increase the hop count, or trust a guesse
 
 The variable names and reported scopes/origins are consistent with the application configuration. Treat the actual URL values as user-confirmed belief rather than independently verified platform evidence. No value needs to be pasted into chat or committed.
 
-## 4. Completion criteria
+## 4. Completion criteria and remaining release gates
 
-Phase 21.11.5 remains open until:
+**Completed:**
 
-1. Run the backend logging-security, auth-token, and post-privacy suites plus the repository CI checks against the final branch head.
-2. API private-hostname consumers are ruled out by configuration/code review, and the public-edge client-IP behavior is validated in non-production.
-3. Rate-limit behavior is tested against normal and forged public forwarding headers.
-4. Vercel production `NEXT_PUBLIC_API_URL` and API `FRONTEND_URL` are confirmed by the user as described above; no secret values are required.
-5. Any resulting code/configuration change has tests and a separate approval before production rollout.
+- Targeted error-log sanitization and the local regression suites listed in the status above.
+- Latest PR #11 GitHub checks passed on commit `01c528e11623a05319504c7d98bc2bf7d762ccda`.
+- Review of the supplied Railway service inventory found no identified API private-hostname consumers.
+
+**Still required before production rollout:**
+
+1. Validate public-edge client-IP behavior in a non-production API deployment by comparing the socket peer, `X-Real-IP`, `X-Forwarded-For`, and `req.ip` for normal and deliberately forged forwarding headers. No such non-production API deployment is currently available, so do not experiment against production.
+2. Confirm the actual Vercel production `NEXT_PUBLIC_API_URL` and Railway API `FRONTEND_URL` values/scopes in their respective dashboards. Do not paste secret values into chat.
+3. Obtain separate explicit approval for any production configuration/code change, migration, deployment, credential action, or rollout.
 
 No proxy, rate-limit, logging, or Vercel environment changes were made in this phase.
