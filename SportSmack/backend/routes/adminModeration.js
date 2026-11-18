@@ -1,4 +1,5 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 
 const router =
   express.Router();
@@ -47,7 +48,7 @@ router.get(
     } catch (error) {
       console.error(
         'Moderation reports error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -112,7 +113,7 @@ router.put(
     } catch (error) {
       console.error(
         'Resolve report error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({

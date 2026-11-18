@@ -4,6 +4,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { writeLimiter } = require('../middleware/rateLimits');
 const prisma = require('../lib/prisma');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 
 router.use(authMiddleware);
 
@@ -70,8 +71,101 @@ router.post('/upload-token', writeLimiter, async (req, res) => {
       expiresIn: 300
     });
   } catch (error) {
-    console.error('Media upload authorization failed:', error);
+    console.error('Media upload authorization failed:', safeErrorMetadata(error));
     return res.status(500).json({ message: 'Unable to authorize image upload.' });
+  }
+});
+
+// @route GET /api/media/post/:postId
+// Streams a post image only after checking the viewer's current access.
+router.get('/post/:postId', async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  try {
+    const postId = Number.parseInt(req.params.postId, 10);
+    if (!Number.isSafeInteger(postId) || postId < 1) {
+      return res.status(400).json({ message: 'Invalid post ID.' });
+    }
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, user_id: true, image_url: true }
+    });
+
+    if (!post || !post.image_url) {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+
+    const { canViewPost } = require('../services/postPrivacy');
+    if (!(await canViewPost(req.user.id, post))) {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+
+    const workerUrl = (process.env.MEDIA_WORKER_URL || '').replace(/[/]+$/, '');
+    const secret = process.env.MEDIA_UPLOAD_SECRET;
+    if (!workerUrl || !secret || secret.length < 32) {
+      return res.status(503).json({ message: 'Media delivery is not configured.' });
+    }
+
+    let storedUrl;
+    try {
+      storedUrl = new URL(post.image_url);
+    } catch {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+
+    if (storedUrl.origin !== new URL(workerUrl).origin) {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+
+    const match = /^[/]([1-9][0-9]*)[/]([0-9a-f-]{36}[.](?:jpg|png|webp))$/.exec(storedUrl.pathname);
+    if (!match || Number(match[1]) !== Number(post.user_id)) {
+      return res.status(404).json({ message: 'Image not found.' });
+    }
+
+    const key = match[1] + '/' + match[2];
+    const token = signPayload({
+      userId: Number(post.user_id),
+      key,
+      purpose: 'post',
+      action: 'read',
+      expiresAt: Date.now() + 30 * 1000
+    }, secret);
+
+    const imageResponse = await fetch(
+      workerUrl + '/' + key + '?variant=post',
+      {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + token },
+        signal: AbortSignal.timeout(10000)
+      }
+    );
+
+
+    if (!imageResponse.ok) {
+      return res.status(imageResponse.status === 404 ? 404 : 502).end();
+    }
+
+    const contentType = imageResponse.headers.get('content-type');
+    if (contentType !== 'image/webp') {
+      return res.status(502).end();
+    }
+
+    res.setHeader('Content-Type', 'image/webp');
+    const bytes = Buffer.from(await imageResponse.arrayBuffer());
+    if (!bytes.length || bytes.length > 5 * 1024 * 1024) {
+      return res.status(502).end();
+    }
+
+    return res.status(200).send(bytes);
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      return res.status(504).end();
+    }
+    console.error('Protected post image delivery failed:', {
+      error: safeErrorMetadata(error)
+    });
+    return res.status(500).end();
   }
 });
 
@@ -144,7 +238,7 @@ router.delete('/image', writeLimiter, async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('Media deletion failed:', error);
+    console.error('Media deletion failed:', safeErrorMetadata(error));
     return res.status(500).json({ message: 'Unable to delete image.' });
   }
 });

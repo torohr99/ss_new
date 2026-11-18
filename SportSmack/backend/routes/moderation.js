@@ -1,4 +1,5 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const router = express.Router();
 
 const authMiddleware =
@@ -99,7 +100,7 @@ router.post(
     } catch (error) {
       console.error(
         'Block user error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -148,7 +149,7 @@ router.delete(
     } catch (error) {
       console.error(
         'Unblock user error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -191,7 +192,7 @@ router.get(
     } catch (error) {
       console.error(
         'Get blocks error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -312,7 +313,7 @@ router.post(
     } catch (error) {
       console.error(
         'Report error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({

@@ -1,6 +1,6 @@
 # Phase 21.11.5 — Error Logging, Proxy Topology, and Vercel URL Review
 
-**Status:** Source review complete; production topology and Vercel environment verification pending. No production configuration or application behavior was changed.
+**Status:** Code remediation and local validation are complete on branch `phase-21-11-3-post-privacy-media-auth` at commit `01c528e11623a05319504c7d98bc2bf7d762ccda`. The latest PR #11 checks passed. Backend logging-security (3/3), auth-token (23/23), post-privacy (8/8), process-supervisor, and Media Worker (22/22) tests passed; syntax checks passed for all nine changed JavaScript files; Wrangler production-bundle dry run passed. Non-production client-IP/header validation and final platform URL confirmation remain release gates. No production configuration or rollout was performed.
 
 ## 1. Error logging review
 
@@ -8,18 +8,35 @@
 
 - Production Winston output is timestamped JSON and includes stack traces for Error objects.
 - The logger uses `LOG_LEVEL`, defaulting to `info`.
-- The Express final error handler logs the full error object with request ID, method, path, and status.
+- The Express final error handler now logs only allowlisted error metadata (`name`, `code`, and `type`) alongside request ID, method, path, and status. It no longer serializes arbitrary error properties, request-body fragments, provider response payloads, or stack/message text.
+- Dependency health-check failures use the same allowlisted metadata rather than logging raw database/Redis error objects.
+- Authentication route and authentication middleware error logs now use the allowlisted metadata helper.
+- AI route failures no longer log provider response bodies or raw error messages; they log allowlisted metadata.
+- Media upload, protected image delivery, and deletion failure logs now use allowlisted metadata.
+- The mailer no longer attaches the full Resend response body to thrown errors. Provider failures expose only a generic message, HTTP status, and stable error code to callers/logging.
 - The logged path is `req.path`, not the full URL with query string.
 - The error response in production returns a generic message and request ID rather than the underlying exception message.
-- Some auth, mail, and background-worker paths also use `console.error`/logger calls.
+- Fantasy, social-post, moderation, admin-moderation, search, background-worker, process-supervisor, and media Worker error call sites now log only allowlisted error metadata rather than raw error objects/messages. The media Worker uses a small runtime-compatible local allowlist.
 
 ### Assessment
 
-No explicit logging of passwords, JWTs, raw verification/reset tokens, authorization headers, or environment-variable values was found in the reviewed paths. However, the logger has no centralized field-redaction policy. Full third-party/ORM/network error objects may contain implementation details, so the remaining error call sites should be checked before claiming that all sensitive fields are excluded.
+No explicit logging of passwords, JWTs, raw verification/reset tokens, authorization headers, or environment-variable values was found in the reviewed error paths. The shared helper deliberately keeps only `name`, `code`, and `type`; the media Worker applies the same allowlist. This is targeted error-metadata sanitization, not a general centralized redaction policy for arbitrary future log fields.
 
 Do not add broad object serialization or request-body logging. If redaction is introduced, add tests using sentinel values for passwords, cookies, bearer tokens, database URLs, and mail-provider credentials.
 
 ## 2. Proxy topology and rate-limit identity
+
+### User-confirmed Railway topology
+
+- The API service has a public HTTP domain and Railway private networking/private hostname.
+- The API service has no TCP Proxy.
+- The Railway Worker service has `DATABASE_URL` and `REDIS_URL` connections to the Postgres and Redis services; these are database/cache connections, not API calls.
+- The database-backup service uses `DATABASE_URL` to connect to Postgres.
+- The Redis service's `REDIS_URL` is the Redis connection endpoint.
+- The Postgres service's `DATABASE_URL` and `PGHOST` refer to the Postgres service itself.
+- No service-to-API call through the API's private hostname has been identified in the supplied inventory.
+
+Important distinction: `DATABASE_URL`, `REDIS_URL`, and `PGHOST` identify database/cache endpoints. Their presence does not establish that those services call the API over private networking.
 
 ### Source finding
 
@@ -34,46 +51,51 @@ The standard and auth limiters use Express's `req.ip` by default. The user-or-IP
 Express documents that numeric `trust proxy` settings assume a known hop count and warns that paths with different hop counts can allow client-supplied forwarding values to influence the result:
 https://expressjs.com/en/guide/behind-proxies/
 
-Current Railway staff responses in public support discussions recommend `X-Real-IP` for public-edge client IP identity, state that the public edge overwrites it, and warn that `X-Forwarded-For` has no fixed hop count. The same responses warn that private-network requests bypass the public edge and can supply their own forwarding headers. They also state that the immediate proxy peer addresses are not a stable allowlist:
-https://station.railway.com/questions/need-authoritative-client-ip-proxy-tru-090eac86
-https://station.railway.com/questions/supported-client-ip-trust-boundary-for-f-0e4c52d9
+Railway's current public-networking specifications document `X-Real-IP` as the header for identifying the client's remote IP. Railway documents private networking as direct service-to-service communication that bypasses the public edge. TCP Proxy is a separate feature for exposing raw TCP services; the API has no TCP Proxy enabled.
+Sources:
+- https://docs.railway.com/networking/public-networking/specs-and-limits
+- https://docs.railway.com/networking
+- https://docs.railway.com/networking/tcp-proxy
 
 ### Assessment
 
-The current one-hop `req.ip` assumption is not sufficiently evidenced for the deployed topology. Depending on the actual header chain, it may key limits on an infrastructure hop rather than the end user. It may also be unsafe for requests arriving over private networking if those callers can reach the API listener and supply forwarding headers.
+The topology evidence now indicates that ordinary external API requests arrive through Railway's public HTTP edge, while the listed internal connections are to Postgres and Redis—not to the API. This removes the previously unresolved possibility of known private service callers to the API, based on the inventories supplied.
 
-Do not change `trust proxy` to `true`, increase the hop count, or trust a guessed Railway CIDR. A safe fix requires confirming all paths to the API listener and choosing a client-IP source only within a verified trust boundary. The source review alone cannot establish whether the API is reachable by other services over `*.railway.internal` or through a TCP proxy.
+However, it does not by itself prove the exact forwarding-header chain observed by the API process or prove that `trust proxy = 1` produces the desired client IP. Railway documents `X-Real-IP`; Express's numeric trust setting derives `req.ip` from the proxy chain. These are distinct mechanisms.
 
-### Required evidence
+Do not change `trust proxy` to `true`, increase the hop count, or trust a guessed Railway CIDR. Before changing rate-limit identity, validate the public edge's behavior in a non-production deployment. The test should record only the socket peer, `X-Real-IP`, `X-Forwarded-For`, and resulting `req.ip`; compare normal requests with deliberately forged forwarding headers. Never log cookies, authorization headers, or request bodies.
 
-- Confirm whether any other service in the same Railway environment calls the API through its private hostname.
-- Confirm whether a TCP proxy is enabled.
-- Capture a non-production request at the API that records only the socket peer, `X-Real-IP`, `X-Forwarded-For`, and resulting `req.ip`; do not log cookies, authorization headers, or request bodies.
-- Compare normal and deliberately forged forwarding headers sent through the public edge.
-- Test the chosen key generator against both public and private ingress paths before changing production.
+### Remaining evidence
+
+- Confirm by code/configuration review that no API private hostname is consumed by another service, scheduled job, or external integration.
+- In a non-production deployment, compare the socket peer, `X-Real-IP`, `X-Forwarded-For`, and `req.ip` for normal and deliberately forged public-edge requests.
+- Confirm the chosen rate-limit client identity is stable and cannot be spoofed before changing the production implementation.
 
 ## 3. Vercel/API URL configuration
 
 - Frontend source repeatedly reads `NEXT_PUBLIC_API_URL`, with a local `http://localhost:5000` fallback.
 - Backend `FRONTEND_URL` is used by CORS/origin policy and email-link generation.
 - The backend production startup requires `FRONTEND_URL`.
+- User confirms Vercel's production-only variable is named `NEXT_PUBLIC_API_URL` and believes it points to the intended production Railway API.
+- User reports that Railway API `FRONTEND_URL` points to the Vercel frontend origin and does not include preview deployment origins. These values were not independently inspected or copied into this audit.
 - The repository has no committed `vercel.json`, frontend `.env.example`, or `next.config.js` at the inspected paths.
-- A prior environment review recorded a production URL-valued Vercel variable but did not establish its exact name/scope.
 
-### Required evidence
+### Assessment
 
-Confirm in Vercel project settings, by name and scope only, that `NEXT_PUBLIC_API_URL` is set for Production and points to the intended Railway API base URL. Check Preview and Development scopes separately if those deployments are used. Do not paste the variable value into chat; a redacted host or simple “correct / incorrect” confirmation is sufficient.
+The variable names and reported scopes/origins are consistent with the application configuration. Treat the actual URL values as user-confirmed belief rather than independently verified platform evidence. No value needs to be pasted into chat or committed.
 
-Confirm that the Railway API's `FRONTEND_URL` is the canonical production frontend origin and that preview origins are not accidentally allowed in production.
+## 4. Completion criteria and remaining release gates
 
-## 4. Completion criteria
+**Completed:**
 
-Phase 21.11.5 remains open until:
+- Targeted error-log sanitization and the local regression suites listed in the status above.
+- Latest PR #11 GitHub checks passed on commit `01c528e11623a05319504c7d98bc2bf7d762ccda`.
+- Review of the supplied Railway service inventory found no identified API private-hostname consumers.
 
-1. All error-logging call sites in auth, media, AI, and worker paths have been reviewed for secret-bearing error fields.
-2. Railway ingress paths and client-IP trust assumptions are verified.
-3. Rate-limit behavior is tested with public-edge and any private service traffic.
-4. Vercel production `NEXT_PUBLIC_API_URL` name/scope and backend `FRONTEND_URL` are confirmed without disclosing values.
-5. Any resulting code/configuration change has tests and a separate approval before production rollout.
+**Still required before production rollout:**
+
+1. Validate public-edge client-IP behavior in a non-production API deployment by comparing the socket peer, `X-Real-IP`, `X-Forwarded-For`, and `req.ip` for normal and deliberately forged forwarding headers. No such non-production API deployment is currently available, so do not experiment against production.
+2. Confirm the actual Vercel production `NEXT_PUBLIC_API_URL` and Railway API `FRONTEND_URL` values/scopes in their respective dashboards. Do not paste secret values into chat.
+3. Obtain separate explicit approval for any production configuration/code change, migration, deployment, credential action, or rollout.
 
 No proxy, rate-limit, logging, or Vercel environment changes were made in this phase.

@@ -1,6 +1,6 @@
 # Phase 21.11.4 — Environment Variable and Credential Consumer Audit
 
-**Status:** Repository-side consumer mapping completed for the known API, media Worker, and backup-service variables. Current deployed variable-name inventory and external-consumer confirmation remain outstanding. No variables or credentials were changed.
+**Status:** Repository-side consumer mapping and user-provided platform variable-name inventories reviewed for the API, database-backup service, Cloudflare media Worker, and Vercel production environment. User reports no known Railway cross-service variable references. No variables or credentials were changed.
 
 ## 1. Audit rules
 
@@ -21,10 +21,10 @@
 | `RESEND_FROM` | Backend mailer and auth email sender; has a code fallback | Optional |
 | `MEDIA_WORKER_URL` | Media upload/delete routes and media URL validation | Required for Worker-backed media |
 | `MEDIA_UPLOAD_SECRET` | Backend media route signs short-lived upload/delete authorizations | Required; must match Worker secret |
-| `R2_ACCESS_KEY_ID` | No consumer found in repository source search | Likely unused on API; external-consumer check required before removal |
-| `R2_SECRET_ACCESS_KEY` | No consumer found in repository source search | Likely unused on API; external-consumer check required before removal |
-| `SPORTSMACK_DATABASE_BACKUPS_ACCESS_KEY_ID` | No consumer found in repository source search | Likely unused on API; backup service uses a different variable name; external-consumer check required |
-| `SPORTSMACK_DATABASE_BACKUPS_SECRET_ACCESS_KEY` | No consumer found in repository source search | Likely unused on API; backup service uses a different variable name; external-consumer check required |
+| `R2_ACCESS_KEY_ID` | No consumer found in repository source search | Likely unused on API; candidate for separately approved cleanup |
+| `R2_SECRET_ACCESS_KEY` | No consumer found in repository source search | Likely unused on API; candidate for separately approved cleanup |
+| `SPORTSMACK_DATABASE_BACKUPS_ACCESS_KEY_ID` | No consumer found in repository source search | Likely unused on API; backup service uses a different variable name |
+| `SPORTSMACK_DATABASE_BACKUPS_SECRET_ACCESS_KEY` | No consumer found in repository source search | Likely unused on API; backup service uses a different variable name |
 
 Other code-consumed or optional API variables found during source review include:
 
@@ -69,14 +69,13 @@ The Worker uses the R2 bucket binding. The repository README explicitly says the
 ## 5. Frontend / Vercel
 
 - `NEXT_PUBLIC_API_URL` is referenced throughout the frontend and should point to the intended API base URL.
+- Confirmed Vercel production-only variable: `NEXT_PUBLIC_API_URL`.
+- Its value was not copied into this audit; it should point to the intended production API base URL.
 - The repository source search did not find a direct `VERCEL_URL` consumer.
-- A prior environment review recorded that a production URL-valued variable existed in Vercel, but its exact name and scope were not established in the source inventory.
 
-The actual Vercel variable names and scopes must be checked in the Vercel project settings without copying values.
+## 6. API-side variables that are likely unnecessary
 
-## 6. Variables that must not be removed yet
-
-The four API-side variables below are strong candidates for removal, but remain unchanged pending confirmation that no Railway variable references, deployment templates, external scripts, or operational processes consume them:
+The four API-side variables below have no repository consumers identified. The user reports no known Railway cross-service variable references. They are likely unnecessary on the API, but remain unchanged pending a separate explicit approval and confirmation that no external scripts or operational processes consume them:
 
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
@@ -85,16 +84,16 @@ The four API-side variables below are strong candidates for removal, but remain 
 
 Do not remove the backup service's separate `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY`; the backup script requires them.
 
-## 7. Remaining completion evidence
+## 7. Additional platform observations
 
-To complete the platform-side part of this audit, capture **variable names only** (never values) for:
+- `SPORTSMACK_BACKEND_URL` is present but has no value in either the Railway API or Worker service. It is currently inert; do not populate it without identifying a concrete consumer and requirement.
+- The Railway database-backup service inventory is `AGE_RECIPIENT`, `AWS_ACCESS_KEY_ID`, `AWS_DEFAULT_REGION`, `AWS_SECRET_ACCESS_KEY`, `DATABASE_URL`, `R2_BUCKET`, and `R2_ENDPOINT`. These match the backup script's expected inputs; retain the backup service's separate AWS credentials.
+- The Cloudflare `sportsmack-media` Worker has plain variable `ALLOWED_ORIGINS`, secret `MEDIA_UPLOAD_SECRET`, and R2 binding `MEDIA_BUCKET`. This matches the Worker implementation.
+- The Vercel production-only variable is confirmed as `NEXT_PUBLIC_API_URL`.
+- The user does not believe there are Railway cross-service variable references; this was not independently inspected through a Railway connector.
 
-1. Railway SportSmack API service.
-2. Railway database-backup service.
-3. Railway Worker service, if it has its own variables.
-4. Vercel production project and relevant deployment scopes.
-5. Cloudflare Worker secrets and plain vars (names only), plus the R2 binding name.
+## 8. Audit conclusion
 
-Then confirm whether any of the four candidate API-side R2/backup variables are referenced by Railway variable references or any external process. Only after that evidence is reviewed should a separate, explicitly approved removal be considered.
+The repository-side consumer mapping and user-provided platform inventories have been reconciled. The API-side R2/backup credential names are likely unused by the API; they are documented as candidates for a separately approved cleanup, not deleted in this phase. The database-backup service's `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, Cloudflare Worker `MEDIA_UPLOAD_SECRET`, and `MEDIA_BUCKET` binding must be retained for their documented consumers.
 
-**No production environment variables were changed in Phase 21.11.4.**
+No secret values were collected. No production environment variables, credentials, service settings, or deployments were changed in Phase 21.11.4.

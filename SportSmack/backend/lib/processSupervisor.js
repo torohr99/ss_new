@@ -1,3 +1,4 @@
+const safeErrorMetadata = require('./safeErrorMetadata');
 /**
  * Coordinates shutdown of the API and worker child processes.
  * The parent remains alive until every child closes, escalating to SIGKILL
@@ -82,7 +83,7 @@ function superviseChildren({
             } catch (error) {
               logger.error('Failed to force-stop child process.', {
                 service: state.name,
-                error
+                error: safeErrorMetadata(error)
               });
             }
           }
@@ -100,7 +101,7 @@ function superviseChildren({
           } catch (error) {
             logger.error('Failed to request child shutdown.', {
               service: state.name,
-              error
+              error: safeErrorMetadata(error)
             });
           }
         }
@@ -127,7 +128,7 @@ function superviseChildren({
     state.child.on('error', error => {
       logger.error('Supervised child process error.', {
         service: state.name,
-        error
+        error: safeErrorMetadata(error)
       });
       shutdown(`${state.name} failed`, 1);
     });

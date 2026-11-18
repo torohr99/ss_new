@@ -11,6 +11,17 @@ const VARIANTS = {
   post: 1200
 };
 
+function safeErrorMetadata(error) {
+  const metadata = {};
+  for (const key of ['name', 'code', 'type']) {
+    if (typeof error?.[key] === 'string' && error[key].length <= 100) {
+      metadata[key] = error[key];
+    }
+  }
+  if (Object.keys(metadata).length === 0) metadata.name = 'Error';
+  return metadata;
+}
+
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
   const allowed = (env.ALLOWED_ORIGINS || '')
@@ -99,7 +110,13 @@ async function verifyUploadToken(token, secret) {
       !(
         (['profile', 'post'].includes(payload.purpose) &&
           ALLOWED_TYPES.has(payload.contentType)) ||
-        payload.action === 'delete'
+        payload.action === 'delete' ||
+        (
+          payload.action === 'read' &&
+          ['profile', 'post'].includes(payload.purpose) &&
+          typeof payload.key === 'string' &&
+          validObjectKey(payload.key, payload.userId)
+        )
       )
     ) {
       return null;
@@ -286,32 +303,57 @@ async function handleDelete(request, env, url) {
 async function handleImage(request, env, url, ctx) {
   const key = decodePathKey(url.pathname, 1);
 
-  if (!key || !/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
+  if (!key || !/^([1-9][0-9]*)[/][0-9a-f-]{36}[.](jpg|png|webp)$/.test(key)) {
     return new Response('Not found', { status: 404 });
   }
 
   const variant = url.searchParams.get('variant') || 'post';
   const maxDimension = VARIANTS[variant];
-
   if (!maxDimension) {
     return new Response('Unsupported image variant', { status: 400 });
   }
-
-  const cacheKey = new Request(
-    url.origin + '/' + key + '?variant=' + variant,
-    { method: 'GET' }
-  );
-
-  const cache = caches.default;
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
 
   const object = await env.MEDIA_BUCKET.get(key);
   if (!object) return new Response('Not found', { status: 404 });
 
   const ownerId = key.split('/')[0];
-  if (!object.customMetadata || object.customMetadata.ownerId !== ownerId) {
+  const metadata = object.customMetadata || {};
+  if (metadata.ownerId !== ownerId) {
     return new Response('Not found', { status: 404 });
+  }
+
+  const purpose = metadata.purpose;
+  if (purpose === 'post') {
+    const token = (request.headers.get('Authorization') || '')
+      .replace(/^Bearer[ ]+/i, '');
+    const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
+
+    if (
+      !payload ||
+      payload.action !== 'read' ||
+      payload.purpose !== 'post' ||
+      payload.key !== key ||
+      String(payload.userId) !== ownerId
+    ) {
+      return new Response('Unauthorized', {
+        status: 401,
+        headers: { 'Cache-Control': 'no-store' }
+      });
+    }
+  } else if (purpose !== 'profile') {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const isPublicProfileImage = purpose === 'profile';
+  const cacheKey = new Request(
+    url.origin + '/' + key + '?variant=' + variant,
+    { method: 'GET' }
+  );
+  const cache = caches.default;
+
+  if (isPublicProfileImage) {
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
   }
 
   const etag = object.httpEtag || object.etag || key;
@@ -328,7 +370,6 @@ async function handleImage(request, env, url, ctx) {
       await import('@cf-wasm/photon/workerd');
 
     inputImage = PhotonImage.new_from_byteslice(inputBytes);
-
     const originalWidth = inputImage.get_width();
     const originalHeight = inputImage.get_height();
 
@@ -341,7 +382,6 @@ async function handleImage(request, env, url, ctx) {
       maxDimension / originalWidth,
       maxDimension / originalHeight
     );
-
     const targetWidth = Math.max(1, Math.round(originalWidth * scale));
     const targetHeight = Math.max(1, Math.round(originalHeight * scale));
 
@@ -356,17 +396,21 @@ async function handleImage(request, env, url, ctx) {
     const response = new Response(outputBytes, {
       headers: {
         'Content-Type': 'image/webp',
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': isPublicProfileImage
+          ? 'public, max-age=86400'
+          : 'private, no-store',
         'ETag': '"' + etag + '-' + variant + '-webp"',
         'X-Content-Type-Options': 'nosniff',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': isPublicProfileImage ? '*' : 'null'
       }
     });
 
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    if (isPublicProfileImage) {
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    }
     return response;
   } catch (error) {
-    console.error('Image transformation failed:', error);
+    console.error('Image transformation failed:', safeErrorMetadata(error));
     return new Response('Unable to process image', { status: 415 });
   } finally {
     if (outputImage) outputImage.free();

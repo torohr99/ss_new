@@ -19,6 +19,7 @@ const compression = require('compression');
 const csrfProtection =
   require('./middleware/csrf');
 const logger = require('./lib/logger');
+const safeErrorMetadata = require('./lib/safeErrorMetadata');
 const metrics = require('./services/metrics');
 const redis = require('./lib/redis');
 
@@ -49,11 +50,11 @@ const pubClient = new Redis(redisUrl, redisOptions());
 const subClient = pubClient.duplicate();
 
 pubClient.on('error', (error) => {
-  console.error('Socket.IO Redis publisher error:', error.message);
+  console.error('Socket.IO Redis publisher error:', safeErrorMetadata(error));
 });
 
 subClient.on('error', (error) => {
-  console.error('Socket.IO Redis subscriber error:', error.message);
+  console.error('Socket.IO Redis subscriber error:', safeErrorMetadata(error));
 });
 
 // Trust one hosting proxy hop. Confirm this value against the active
@@ -338,8 +339,12 @@ app.get('/api/status', async (req, res) => {
     logger.error('Dependency health check failed', {
       database: databaseOk ? 'OK' : 'ERROR',
       redis: redisOk ? 'OK' : 'ERROR',
-      databaseError: databaseOk ? undefined : checks[0].reason,
-      redisError: redisOk ? undefined : checks[1].reason
+      databaseError: databaseOk
+        ? undefined
+        : safeErrorMetadata(checks[0].reason),
+      redisError: redisOk
+        ? undefined
+        : safeErrorMetadata(checks[1].reason)
     });
   }
 
@@ -373,7 +378,7 @@ app.use(
           req.path,
         statusCode:
           err.status || 500,
-        error: err
+        error: safeErrorMetadata(err)
       }
     );
 
@@ -457,7 +462,7 @@ async function gracefulShutdown(signal) {
         logger.error(
           'Backend dependency shutdown error',
           {
-            error: result.reason
+            error: safeErrorMetadata(result.reason)
           }
         );
       }
@@ -478,7 +483,7 @@ async function gracefulShutdown(signal) {
     logger.error(
       'SportSmack backend graceful shutdown failed.',
       {
-        error
+        error: safeErrorMetadata(error)
       }
     );
 
@@ -503,12 +508,7 @@ process.on(
     logger.error(
       'Unhandled promise rejection',
       {
-        error:
-          reason instanceof Error
-            ? reason
-            : new Error(
-                String(reason)
-              )
+        error: safeErrorMetadata(reason)
       }
     );
   }
@@ -520,7 +520,7 @@ process.on(
     logger.error(
       'Uncaught exception',
       {
-        error
+        error: safeErrorMetadata(error)
       }
     );
 

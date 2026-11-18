@@ -1,8 +1,10 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const logger = require('../lib/logger');
 const { validateMediaUrlForUser } = require('../services/mediaUrls');
+const { canViewPost } = require('../services/postPrivacy');
 
 const prisma = require('../lib/prisma');
 const {
@@ -16,8 +18,7 @@ const {
   MAX_COMMENT_LENGTH,
   validateContent,
   hasRecentDuplicatePost,
-  hasRecentDuplicateComment,
-  isBlocked
+  hasRecentDuplicateComment
 } = require('../middleware/moderation');
 // Protect all post routes
 router.use(authMiddleware);
@@ -153,10 +154,24 @@ router.get('/', async (req, res) => {
       }
     }
     
+    const excludedUserIds = Array.from(new Set(
+      blockedUsers.map(block =>
+        block.blockerId === req.user.id
+          ? block.blockedId
+          : block.blockerId
+      )
+    ));
+
     let whereClause = {
-      user_id: {
-        in: Array.from(allowedUserIds)
-      }
+      AND: [
+        { user_id: { notIn: excludedUserIds } },
+        {
+          OR: [
+            { user_id: { in: Array.from(allowedUserIds) } },
+            { user: { is: { postPrivacy: 'PUBLIC' } } }
+          ]
+        }
+      ]
     };
     if (forum) {
       // Fetch posts specific to this forum category
@@ -223,7 +238,7 @@ router.get('/', async (req, res) => {
       nextCursor
     });
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error fetching posts' });
   }
 });
@@ -420,7 +435,7 @@ router.get('/social', async (req, res) => {
   } catch (error) {
     console.error(
       'SOCIAL FEED ERROR:',
-      error
+      safeErrorMetadata(error)
     );
 
     return res.status(500).json({
@@ -496,7 +511,7 @@ router.post(
 
     res.status(201).json({ ...newPost, hasLiked: false });
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error creating post' });
   }
 });
@@ -565,7 +580,7 @@ router.delete(
     } catch (error) {
       console.error(
         'DELETE POST ERROR:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -589,12 +604,7 @@ router.post(
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    if (
-      await isBlocked(
-        req.user.id,
-        post.user_id
-      )
-    ) {
+    if (!(await canViewPost(req.user.id, post))) {
       return res.status(403).json({
         message:
           'You cannot interact with this post.'
@@ -628,7 +638,7 @@ router.post(
       res.json({ liked: true });
     }
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error toggling like' });
   }
 });
@@ -643,6 +653,19 @@ router.get('/:id/comments', async (req, res) => {
       return res.status(400).json({
         message: 'Invalid ID'
       });
+    }
+
+    const parentPost = await prisma.post.findUnique({
+      where: { id: postId },
+      select: { id: true, user_id: true }
+    });
+
+    if (!parentPost) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    if (!(await canViewPost(req.user.id, parentPost))) {
+      return res.status(403).json({ message: 'You cannot view comments on this post.' });
     }
 
     const cursor = req.query.cursor
@@ -705,7 +728,7 @@ router.get('/:id/comments', async (req, res) => {
   } catch (error) {
     console.error(
       'Error fetching comments:',
-      error
+      safeErrorMetadata(error)
     );
 
     res.status(500).json({
@@ -768,6 +791,17 @@ router.delete(
         });
       }
 
+      const parentPost = await prisma.post.findUnique({
+        where: { id: postId },
+        select: { id: true, user_id: true }
+      });
+
+      if (!parentPost || !(await canViewPost(req.user.id, parentPost))) {
+        return res.status(403).json({
+          message: 'You cannot access comments on this post.'
+        });
+      }
+
       await prisma.comment.delete({
         where: {
           id: commentId
@@ -781,7 +815,7 @@ router.delete(
     } catch (error) {
       console.error(
         'DELETE COMMENT ERROR:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -832,12 +866,7 @@ router.post(
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ message: 'Post not found' });
     
-    if (
-      await isBlocked(
-        req.user.id,
-        post.user_id
-      )
-    ) {
+    if (!(await canViewPost(req.user.id, post))) {
       return res.status(403).json({
         message:
           'You cannot comment on this post.'
@@ -859,13 +888,7 @@ router.post(
   } catch (error) {
     console.error(
       'CREATE COMMENT ERROR:',
-      {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-        stack: error?.stack
-      }
+      safeErrorMetadata(error)
     );
 
     res.status(500).json({

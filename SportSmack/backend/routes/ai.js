@@ -11,6 +11,7 @@ const {
 } = require('../middleware/concurrency');
 const entityDb = require('../services/entityDb');
 const sportsApi = require('../services/sportsApi');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 
 // Build a highly constrained sports meme prompt.
 function buildMemePrompt(
@@ -227,7 +228,7 @@ router.post(
       } catch (contextError) {
         console.error(
           'Could not enrich meme game context:',
-          contextError.message
+          safeErrorMetadata(contextError)
         );
       }
     }
@@ -397,8 +398,7 @@ router.post(
     } catch (imageError) {
       console.error(
         'OpenAI image generation failed:',
-        imageError.response?.data ||
-        imageError.message
+        safeErrorMetadata(imageError)
       );
     
       return res.status(502).json({
@@ -410,7 +410,7 @@ router.post(
   } catch (error) {
     console.error(
       'Error generating AI meme:',
-      error.message
+      safeErrorMetadata(error)
     );
 
     res.status(500).json({

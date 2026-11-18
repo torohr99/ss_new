@@ -1,4 +1,5 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const {
@@ -161,7 +162,7 @@ router.post('/seed', authenticateToken, async (req, res) => {
       total
     });
   } catch (err) {
-    console.error('Fantasy seed error:', err);
+    console.error('Fantasy seed error:', safeErrorMetadata(err));
     res.status(500).json({
       error: 'Failed to seed players'
     });
@@ -265,7 +266,7 @@ router.get('/players', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(
       'Fantasy players fetch error:',
-      err
+      safeErrorMetadata(err)
     );
 
     res.status(500).json({
@@ -339,7 +340,7 @@ router.get(
     } catch (err) {
       console.error(
         'Player search error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -386,7 +387,7 @@ router.post('/league', authenticateToken, async (req, res) => {
 
     res.json(league);
   } catch (err) {
-    console.error('Create league error:', err);
+    console.error('Create league error:', safeErrorMetadata(err));
     res.status(500).json({
       error: 'Failed to create league'
     });
@@ -490,7 +491,7 @@ router.post('/league/test-bots', authenticateToken, async (req, res) => {
 
     res.json(league);
   } catch (err) {
-    console.error('test-bots error:', err);
+    console.error('test-bots error:', safeErrorMetadata(err));
 
     res.status(500).json({
       error: 'Failed to create test league'
@@ -534,7 +535,7 @@ router.get('/leagues', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(
       'Fetch fantasy leagues error:',
-      err
+      safeErrorMetadata(err)
     );
 
     res.status(500).json({
@@ -665,7 +666,7 @@ router.delete(
     } catch (err) {
       console.error(
         'Delete fantasy league error:',
-        err
+        safeErrorMetadata(err)
       );
 
       if (err?.code === 'P2002') {
@@ -738,7 +739,7 @@ router.post(
 
       res.json(team);
     } catch (err) {
-      console.error(err);
+      console.error(safeErrorMetadata(err));
 
       res.status(500).json({
         error: 'Failed to join league'
@@ -967,7 +968,7 @@ router.get(
         currentFantasyWeek: currentWeek
       });
     } catch (err) {
-      console.error('League details error:', err);
+      console.error('League details error:', safeErrorMetadata(err));
 
       res.status(500).json({
         error: 'Failed to fetch league'
@@ -1126,7 +1127,7 @@ router.patch(
     } catch (err) {
       console.error(
         'Fantasy team name update error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -1301,7 +1302,7 @@ router.post(
     } catch (err) {
       console.error(
         'Roster update error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -1379,7 +1380,7 @@ router.get(
 
       res.json(players);
     } catch (err) {
-      console.error('Free agent error:', err);
+      console.error('Free agent error:', safeErrorMetadata(err));
 
       res.status(500).json({
         error: 'Failed to fetch free agents'
@@ -1477,7 +1478,7 @@ router.get(
     } catch (err) {
       console.error(
         'Fantasy week error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -1656,7 +1657,7 @@ router.post(
     } catch (err) {
       console.error(
         'Fantasy drop error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -1795,7 +1796,7 @@ router.post(
         remainingFaab: team.faab - bidAmount
       });
     } catch (err) {
-      console.error('Waiver claim error:', err);
+      console.error('Waiver claim error:', safeErrorMetadata(err));
 
       res.status(500).json({
         error: 'Failed to submit waiver claim'
@@ -1868,7 +1869,7 @@ router.get(
     } catch (err) {
       console.error(
         'Fetch waivers error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -1920,7 +1921,7 @@ router.post(
     } catch (err) {
       console.error(
         'Process waivers error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -2149,7 +2150,7 @@ router.post(
     } catch (err) {
       console.error(
         'Add player error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -2320,7 +2321,7 @@ router.post(
     } catch (err) {
       console.error(
         'Drop player error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -2567,7 +2568,7 @@ router.get(
     } catch (err) {
       console.error(
         'Fantasy standings error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -2701,7 +2702,7 @@ router.post(
     } catch (err) {
       console.error(
         'Score week error:',
-        err
+        safeErrorMetadata(err)
       );
 
       res.status(500).json({
@@ -2783,7 +2784,7 @@ router.post(
 
       res.json(matchups);
     } catch (err) {
-      console.error(err);
+      console.error(safeErrorMetadata(err));
 
       res.status(500).json({
         error:
@@ -2903,7 +2904,7 @@ router.post(
         trade
       });
     } catch (err) {
-      console.error('Create trade error:', err);
+      console.error('Create trade error:', safeErrorMetadata(err));
 
       res.status(400).json({
         error: err.message || 'Failed to create trade.'
@@ -3007,7 +3008,7 @@ router.get(
 
       res.json(trades);
     } catch (err) {
-      console.error('Get trades error:', err);
+      console.error('Get trades error:', safeErrorMetadata(err));
 
       res.status(500).json({
         error: 'Failed to fetch trades.'
@@ -3032,7 +3033,7 @@ router.post(
         trade
       });
     } catch (err) {
-      console.error('Accept trade error:', err);
+      console.error('Accept trade error:', safeErrorMetadata(err));
 
       res.status(400).json({
         error: err.message || 'Failed to accept trade.'
@@ -3057,7 +3058,7 @@ router.post(
         trade
       });
     } catch (err) {
-      console.error('Reject trade error:', err);
+      console.error('Reject trade error:', safeErrorMetadata(err));
 
       res.status(400).json({
         error: err.message || 'Failed to reject trade.'
@@ -3082,7 +3083,7 @@ router.post(
         trade
       });
     } catch (err) {
-      console.error('Cancel trade error:', err);
+      console.error('Cancel trade error:', safeErrorMetadata(err));
 
       res.status(400).json({
         error: err.message || 'Failed to cancel trade.'

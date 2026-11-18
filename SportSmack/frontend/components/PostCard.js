@@ -3,6 +3,20 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+// Worker-managed images use owner-scoped object keys. Older third-party
+// image URLs retain direct browser loading for backward compatibility.
+function isWorkerManagedMediaUrl(imageUrl, ownerId) {
+  const id = Number(ownerId);
+  if (typeof imageUrl !== 'string' || !imageUrl || !Number.isSafeInteger(id) || id < 1) return false;
+  try {
+    const parsed = new URL(imageUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.hash) return false;
+    return new RegExp('^/' + id + '/[0-9a-f-]{36}\\.(?:jpg|png|webp)$', 'i').test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export default function PostCard({ post }) {
   const [isLiked, setIsLiked] = useState(post.hasLiked);
   const [likesCount, setLikesCount] = useState(post._count.likes);
@@ -154,6 +168,10 @@ export default function PostCard({ post }) {
   };
 
   const authorInitials = post.user.username.substring(0, 2).toUpperCase();
+  const workerManagedImage = isWorkerManagedMediaUrl(post.image_url, post.user.id);
+  const postImageSrc = workerManagedImage
+    ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/media/post/${post.id}`
+    : post.image_url;
 
   const deletePost = async () => {
     const confirmed = window.confirm(
@@ -420,9 +438,14 @@ export default function PostCard({ post }) {
       <div className="post-content">{post.content.replace(/^\[FORUM:[^\]]+\]\s*/, '')}</div>
 
       {post.image_url && (
-        <img src={post.image_url} alt="Post attachment" className="post-image" loading="lazy" />
+        <img
+          src={postImageSrc}
+          alt="Post attachment"
+          className="post-image"
+          loading="lazy"
+          crossOrigin={workerManagedImage ? 'use-credentials' : undefined}
+        />
       )}
-
       <div className="post-actions">
         <button 
           className={`action-btn ${isLiked ? 'liked' : ''}`} 

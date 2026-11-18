@@ -43,10 +43,11 @@ async function uploadProfileImage(file) {
 }
 
 export default function SettingsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, updateUser } = useAuth();
   const router = useRouter();
 
   const [profilePic, setProfilePic] = useState('');
+  const [postPrivacy, setPostPrivacy] = useState('FRIENDS_ONLY');
   const [profileFile, setProfileFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [password, setPassword] = useState('');
@@ -58,7 +59,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
-    if (user) setProfilePic(user.profile_pic || '');
+    if (user) {
+      setProfilePic(user.profile_pic || '');
+      setPostPrivacy(user.postPrivacy || 'FRIENDS_ONLY');
+    }
   }, [user, authLoading, router]);
 
   useEffect(() => {
@@ -114,6 +118,10 @@ export default function SettingsPage() {
     try {
       const payload = {};
 
+      if (postPrivacy !== (user.postPrivacy || 'FRIENDS_ONLY')) {
+        payload.postPrivacy = postPrivacy;
+      }
+
       if (profileFile) {
         payload.profile_pic = await uploadProfileImage(profileFile);
       }
@@ -136,6 +144,11 @@ export default function SettingsPage() {
       if (!response.ok) {
         throw new Error(data.message || 'Failed to update profile.');
       }
+
+      updateUser({
+        postPrivacy: data.postPrivacy || postPrivacy,
+        profile_pic: data.profile_pic || user.profile_pic
+      });
 
       const previousProfilePic = user.profile_pic || '';
       const nextProfilePic = data.profile_pic || profilePic;
@@ -224,6 +237,24 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          <div style={{ margin: '1rem 0', borderBottom: '1px solid var(--border-color)' }}></div>
+
+          <div className="form-group">
+            <label htmlFor="post-privacy">Who can see your posts?</label>
+            <select
+              id="post-privacy"
+              value={postPrivacy}
+              onChange={event => setPostPrivacy(event.target.value)}
+              disabled={saving}
+            >
+              <option value="FRIENDS_ONLY">Friends only</option>
+              <option value="PUBLIC">All signed-in users</option>
+            </select>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.4rem' }}>
+              This setting applies to all of your posts, including posts you have already shared. People you block cannot view your posts.
+            </p>
           </div>
 
           <div style={{ margin: '1rem 0', borderBottom: '1px solid var(--border-color)' }}></div>
