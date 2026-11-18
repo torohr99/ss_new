@@ -4,6 +4,7 @@ const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const { writeLimiter } = require('../middleware/rateLimits');
 const prisma = require('../lib/prisma');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 
 router.use(authMiddleware);
 
@@ -70,7 +71,7 @@ router.post('/upload-token', writeLimiter, async (req, res) => {
       expiresIn: 300
     });
   } catch (error) {
-    console.error('Media upload authorization failed:', error);
+    console.error('Media upload authorization failed:', safeErrorMetadata(error));
     return res.status(500).json({ message: 'Unable to authorize image upload.' });
   }
 });
@@ -162,8 +163,7 @@ router.get('/post/:postId', async (req, res) => {
       return res.status(504).end();
     }
     console.error('Protected post image delivery failed:', {
-      name: error?.name,
-      message: error?.message
+      error: safeErrorMetadata(error)
     });
     return res.status(500).end();
   }
@@ -238,7 +238,7 @@ router.delete('/image', writeLimiter, async (req, res) => {
 
     return res.json({ success: true });
   } catch (error) {
-    console.error('Media deletion failed:', error);
+    console.error('Media deletion failed:', safeErrorMetadata(error));
     return res.status(500).json({ message: 'Unable to delete image.' });
   }
 });
