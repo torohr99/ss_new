@@ -50,11 +50,11 @@ const pubClient = new Redis(redisUrl, redisOptions());
 const subClient = pubClient.duplicate();
 
 pubClient.on('error', (error) => {
-  console.error('Socket.IO Redis publisher error:', error.message);
+  console.error('Socket.IO Redis publisher error:', safeErrorMetadata(error));
 });
 
 subClient.on('error', (error) => {
-  console.error('Socket.IO Redis subscriber error:', error.message);
+  console.error('Socket.IO Redis subscriber error:', safeErrorMetadata(error));
 });
 
 // Trust one hosting proxy hop. Confirm this value against the active
@@ -462,7 +462,7 @@ async function gracefulShutdown(signal) {
         logger.error(
           'Backend dependency shutdown error',
           {
-            error: result.reason
+            error: safeErrorMetadata(result.reason)
           }
         );
       }
@@ -483,7 +483,7 @@ async function gracefulShutdown(signal) {
     logger.error(
       'SportSmack backend graceful shutdown failed.',
       {
-        error
+        error: safeErrorMetadata(error)
       }
     );
 
@@ -508,12 +508,7 @@ process.on(
     logger.error(
       'Unhandled promise rejection',
       {
-        error:
-          reason instanceof Error
-            ? reason
-            : new Error(
-                String(reason)
-              )
+        error: safeErrorMetadata(reason)
       }
     );
   }
@@ -525,7 +520,7 @@ process.on(
     logger.error(
       'Uncaught exception',
       {
-        error
+        error: safeErrorMetadata(error)
       }
     );
 
