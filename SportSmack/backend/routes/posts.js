@@ -1,4 +1,5 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const logger = require('../lib/logger');
@@ -237,7 +238,7 @@ router.get('/', async (req, res) => {
       nextCursor
     });
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error fetching posts' });
   }
 });
@@ -434,7 +435,7 @@ router.get('/social', async (req, res) => {
   } catch (error) {
     console.error(
       'SOCIAL FEED ERROR:',
-      error
+      safeErrorMetadata(error)
     );
 
     return res.status(500).json({
@@ -510,7 +511,7 @@ router.post(
 
     res.status(201).json({ ...newPost, hasLiked: false });
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error creating post' });
   }
 });
@@ -579,7 +580,7 @@ router.delete(
     } catch (error) {
       console.error(
         'DELETE POST ERROR:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -637,7 +638,7 @@ router.post(
       res.json({ liked: true });
     }
   } catch (error) {
-    console.error(error);
+    console.error(safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error toggling like' });
   }
 });
@@ -727,7 +728,7 @@ router.get('/:id/comments', async (req, res) => {
   } catch (error) {
     console.error(
       'Error fetching comments:',
-      error
+      safeErrorMetadata(error)
     );
 
     res.status(500).json({
@@ -814,7 +815,7 @@ router.delete(
     } catch (error) {
       console.error(
         'DELETE COMMENT ERROR:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
