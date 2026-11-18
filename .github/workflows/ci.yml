@@ -1,5 +1,9 @@
 name: SportSmack CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -7,6 +11,7 @@ on:
       - phase-21-10-3-api-worker-deployment-recovery
       - phase-21-10-4-production-security-audit
       - phase-21-10-5-monitoring-alerting-runbooks
+      - phase-21-11-2-token-hardening
   pull_request:
     branches:
       - main
@@ -15,6 +20,24 @@ jobs:
   backend:
     name: Backend checks
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://sportsmack:sportsmack-ci-password@localhost:5432/sportsmack_ci?schema=public
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: sportsmack
+          POSTGRES_PASSWORD: sportsmack-ci-password
+          POSTGRES_DB: sportsmack_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sportsmack -d sportsmack_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     defaults:
       run:
@@ -78,14 +101,52 @@ jobs:
       - name: Check authentication routes
         run: node --check routes/auth.js
 
+      - name: Test auth token security helpers
+        run: npm run test:auth-token
+
       - name: Check gamecast routes
         run: node --check routes/gamecast.js
 
       - name: Check chat socket handler
         run: node --check sockets/chatHandler.js
 
+      - name: Apply all migrations to disposable PostgreSQL
+        run: npx prisma migrate deploy --schema prisma/schema.postgres.prisma
+
       - name: Generate Prisma client
         run: npx prisma generate --schema prisma/schema.postgres.prisma
+
+      - name: Test auth token backfill against PostgreSQL
+        run: npm run test:auth-token-db
+
+
+  media-worker:
+    name: Cloudflare media Worker tests and bundle check
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: SportSmack/media-worker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: SportSmack/media-worker/package-lock.json
+
+      - name: Install Worker dependencies
+        run: npm ci
+
+      - name: Run adversarial Worker tests
+        run: npm test
+
+      - name: Validate Worker production bundle
+        run: npm run check
 
   frontend:
     name: Frontend checks

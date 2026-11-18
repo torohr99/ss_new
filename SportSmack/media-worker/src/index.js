@@ -1,9 +1,3 @@
-import {
-  PhotonImage,
-  SamplingFilter,
-  resize
-} from '@cf-wasm/photon/workerd';
-
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   'image/jpeg',
@@ -57,10 +51,22 @@ function decodeBase64Url(value) {
 }
 
 async function verifyUploadToken(token, secret) {
-  if (!token || !secret) return null;
+  if (
+    typeof token !== 'string' ||
+    token.length > 4096 ||
+    !secret
+  ) {
+    return null;
+  }
 
   const parts = token.split('.');
-  if (parts.length !== 2) return null;
+  if (
+    parts.length !== 2 ||
+    !parts[0] ||
+    !parts[1]
+  ) {
+    return null;
+  }
 
   try {
     const key = await crypto.subtle.importKey(
@@ -86,9 +92,10 @@ async function verifyUploadToken(token, secret) {
 
     if (
       !payload ||
-      !Number.isInteger(payload.userId) ||
-      !Number.isFinite(payload.expiresAt) ||
-      payload.expiresAt < Date.now() ||
+      !Number.isSafeInteger(payload.userId) ||
+      payload.userId < 1 ||
+      !Number.isSafeInteger(payload.expiresAt) ||
+      payload.expiresAt <= Date.now() ||
       !(
         (['profile', 'post'].includes(payload.purpose) &&
           ALLOWED_TYPES.has(payload.contentType)) ||
@@ -133,6 +140,14 @@ function matchesImageSignature(bytes, contentType) {
   return false;
 }
 
+function decodePathKey(pathname, prefixLength) {
+  try {
+    return decodeURIComponent(pathname.slice(prefixLength));
+  } catch {
+    return null;
+  }
+}
+
 function validObjectKey(key, userId) {
   const match = /^([1-9][0-9]*)\/([0-9a-f-]{36})\.(jpg|png|webp)$/.exec(key);
   return Boolean(match && Number(match[1]) === userId);
@@ -140,7 +155,11 @@ function validObjectKey(key, userId) {
 
 async function handleUpload(request, env, url) {
   const cors = corsHeaders(request, env);
-  const key = decodeURIComponent(url.pathname.slice('/upload/'.length));
+  const key = decodePathKey(url.pathname, '/upload/'.length);
+  if (!key) {
+    return json({ message: 'Invalid upload object key.' }, 400, cors);
+  }
+
   const token = (request.headers.get('Authorization') || '')
     .replace(/^Bearer\s+/i, '');
 
@@ -161,10 +180,6 @@ async function handleUpload(request, env, url) {
   const declaredLength = Number(request.headers.get('Content-Length') || 0);
   if (declaredLength > MAX_UPLOAD_BYTES) {
     return json({ message: 'Images must be 5 MB or smaller.' }, 413, cors);
-  }
-
-  if (await env.MEDIA_BUCKET.head(key)) {
-    return json({ message: 'This upload authorization has already been used.' }, 409, cors);
   }
 
   const reader = request.body?.getReader();
@@ -207,7 +222,12 @@ async function handleUpload(request, env, url) {
     return json({ message: 'The uploaded file does not match an allowed image format.' }, 415, cors);
   }
 
-  await env.MEDIA_BUCKET.put(key, bytes, {
+  // R2 evaluates this condition atomically with the write. A separate
+  // head() check would allow two concurrent replays to overwrite the object.
+  const storedObject = await env.MEDIA_BUCKET.put(key, bytes, {
+    onlyIf: {
+      etagDoesNotMatch: '*'
+    },
     httpMetadata: {
       contentType: payload.contentType,
       cacheControl: 'public, max-age=31536000, immutable'
@@ -218,6 +238,10 @@ async function handleUpload(request, env, url) {
     }
   });
 
+  if (!storedObject) {
+    return json({ message: 'This upload authorization has already been used.' }, 409, cors);
+  }
+
   return json({
     success: true,
     imageUrl: url.origin + '/' + key,
@@ -227,7 +251,11 @@ async function handleUpload(request, env, url) {
 
 async function handleDelete(request, env, url) {
   const cors = corsHeaders(request, env);
-  const key = decodeURIComponent(url.pathname.slice('/delete/'.length));
+  const key = decodePathKey(url.pathname, '/delete/'.length);
+  if (!key) {
+    return json({ message: 'Invalid delete object key.' }, 400, cors);
+  }
+
   const token = (request.headers.get('Authorization') || '')
     .replace(/^Bearer\s+/i, '');
   const payload = await verifyUploadToken(token, env.MEDIA_UPLOAD_SECRET);
@@ -256,9 +284,9 @@ async function handleDelete(request, env, url) {
 }
 
 async function handleImage(request, env, url, ctx) {
-  const key = decodeURIComponent(url.pathname.slice(1));
+  const key = decodePathKey(url.pathname, 1);
 
-  if (!/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
+  if (!key || !/^([1-9][0-9]*)\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(key)) {
     return new Response('Not found', { status: 404 });
   }
 
@@ -296,6 +324,9 @@ async function handleImage(request, env, url, ctx) {
   let outputImage;
 
   try {
+    const { PhotonImage, SamplingFilter, resize } =
+      await import('@cf-wasm/photon/workerd');
+
     inputImage = PhotonImage.new_from_byteslice(inputBytes);
 
     const originalWidth = inputImage.get_width();

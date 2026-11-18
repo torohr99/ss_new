@@ -16,6 +16,8 @@ model User {
   profile_pic       String?
   isVerified        Boolean  @default(false) // Required for new signups
   verificationToken String? // Token used to verify the email
+  verificationTokenHash String? @unique
+  verificationTokenExpires DateTime?
   otpCode           String?
   created_at        DateTime @default(now())
 
@@ -47,6 +49,7 @@ model User {
   predictions_won   Int @default(0)
 
   resetPasswordToken   String?
+  resetPasswordTokenHash String? @unique
   resetPasswordExpires DateTime?
 }
 

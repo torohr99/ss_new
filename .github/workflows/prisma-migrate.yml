@@ -1,17 +1,28 @@
 name: Prisma Production Migration
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "SportSmack/backend/prisma/migrations/**"
-
   workflow_dispatch:
+    inputs:
+      confirm_production_migration:
+        description: "Set to yes only after explicitly approving the production database migration."
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+        default: "no"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sportsmack-production-prisma-migration
+  cancel-in-progress: false
 
 jobs:
   migrate:
     name: Apply production migrations
+    if: github.event_name == 'workflow_dispatch' && inputs.confirm_production_migration == 'yes'
     runs-on: ubuntu-latest
 
     steps:
