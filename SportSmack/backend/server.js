@@ -19,6 +19,7 @@ const compression = require('compression');
 const csrfProtection =
   require('./middleware/csrf');
 const logger = require('./lib/logger');
+const safeErrorMetadata = require('./lib/safeErrorMetadata');
 const metrics = require('./services/metrics');
 const redis = require('./lib/redis');
 
@@ -338,8 +339,12 @@ app.get('/api/status', async (req, res) => {
     logger.error('Dependency health check failed', {
       database: databaseOk ? 'OK' : 'ERROR',
       redis: redisOk ? 'OK' : 'ERROR',
-      databaseError: databaseOk ? undefined : checks[0].reason,
-      redisError: redisOk ? undefined : checks[1].reason
+      databaseError: databaseOk
+        ? undefined
+        : safeErrorMetadata(checks[0].reason),
+      redisError: redisOk
+        ? undefined
+        : safeErrorMetadata(checks[1].reason)
     });
   }
 
@@ -373,7 +378,7 @@ app.use(
           req.path,
         statusCode:
           err.status || 500,
-        error: err
+        error: safeErrorMetadata(err)
       }
     );
 
