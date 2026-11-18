@@ -11,6 +11,17 @@ const VARIANTS = {
   post: 1200
 };
 
+function safeErrorMetadata(error) {
+  const metadata = {};
+  for (const key of ['name', 'code', 'type']) {
+    if (typeof error?.[key] === 'string' && error[key].length <= 100) {
+      metadata[key] = error[key];
+    }
+  }
+  if (Object.keys(metadata).length === 0) metadata.name = 'Error';
+  return metadata;
+}
+
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin');
   const allowed = (env.ALLOWED_ORIGINS || '')
@@ -399,7 +410,7 @@ async function handleImage(request, env, url, ctx) {
     }
     return response;
   } catch (error) {
-    console.error('Image transformation failed:', error);
+    console.error('Image transformation failed:', safeErrorMetadata(error));
     return new Response('Unable to process image', { status: 415 });
   } finally {
     if (outputImage) outputImage.free();
