@@ -1,6 +1,6 @@
 # Phase 21.11.5 — Error Logging, Proxy Topology, and Vercel URL Review
 
-**Status:** Source review complete; production topology and Vercel environment verification pending. No production configuration or application behavior was changed.
+**Status:** Source review complete; Railway topology and user-reported production URL configuration reviewed. Error call-site audit and non-production client-IP header validation remain. No production configuration or application behavior was changed.
 
 ## 1. Error logging review
 
@@ -21,6 +21,18 @@ Do not add broad object serialization or request-body logging. If redaction is i
 
 ## 2. Proxy topology and rate-limit identity
 
+### User-confirmed Railway topology
+
+- The API service has a public HTTP domain and Railway private networking/private hostname.
+- The API service has no TCP Proxy.
+- The Railway Worker service has `DATABASE_URL` and `REDIS_URL` connections to the Postgres and Redis services; these are database/cache connections, not API calls.
+- The database-backup service uses `DATABASE_URL` to connect to Postgres.
+- The Redis service's `REDIS_URL` is the Redis connection endpoint.
+- The Postgres service's `DATABASE_URL` and `PGHOST` refer to the Postgres service itself.
+- No service-to-API call through the API's private hostname has been identified in the supplied inventory.
+
+Important distinction: `DATABASE_URL`, `REDIS_URL`, and `PGHOST` identify database/cache endpoints. Their presence does not establish that those services call the API over private networking.
+
 ### Source finding
 
 The API currently sets:
@@ -34,46 +46,47 @@ The standard and auth limiters use Express's `req.ip` by default. The user-or-IP
 Express documents that numeric `trust proxy` settings assume a known hop count and warns that paths with different hop counts can allow client-supplied forwarding values to influence the result:
 https://expressjs.com/en/guide/behind-proxies/
 
-Current Railway staff responses in public support discussions recommend `X-Real-IP` for public-edge client IP identity, state that the public edge overwrites it, and warn that `X-Forwarded-For` has no fixed hop count. The same responses warn that private-network requests bypass the public edge and can supply their own forwarding headers. They also state that the immediate proxy peer addresses are not a stable allowlist:
-https://station.railway.com/questions/need-authoritative-client-ip-proxy-tru-090eac86
-https://station.railway.com/questions/supported-client-ip-trust-boundary-for-f-0e4c52d9
+Railway's current public-networking specifications document `X-Real-IP` as the header for identifying the client's remote IP. Railway documents private networking as direct service-to-service communication that bypasses the public edge. TCP Proxy is a separate feature for exposing raw TCP services; the API has no TCP Proxy enabled.
+Sources:
+- https://docs.railway.com/networking/public-networking/specs-and-limits
+- https://docs.railway.com/networking
+- https://docs.railway.com/networking/tcp-proxy
 
 ### Assessment
 
-The current one-hop `req.ip` assumption is not sufficiently evidenced for the deployed topology. Depending on the actual header chain, it may key limits on an infrastructure hop rather than the end user. It may also be unsafe for requests arriving over private networking if those callers can reach the API listener and supply forwarding headers.
+The topology evidence now indicates that ordinary external API requests arrive through Railway's public HTTP edge, while the listed internal connections are to Postgres and Redis—not to the API. This removes the previously unresolved possibility of known private service callers to the API, based on the inventories supplied.
 
-Do not change `trust proxy` to `true`, increase the hop count, or trust a guessed Railway CIDR. A safe fix requires confirming all paths to the API listener and choosing a client-IP source only within a verified trust boundary. The source review alone cannot establish whether the API is reachable by other services over `*.railway.internal` or through a TCP proxy.
+However, it does not by itself prove the exact forwarding-header chain observed by the API process or prove that `trust proxy = 1` produces the desired client IP. Railway documents `X-Real-IP`; Express's numeric trust setting derives `req.ip` from the proxy chain. These are distinct mechanisms.
 
-### Required evidence
+Do not change `trust proxy` to `true`, increase the hop count, or trust a guessed Railway CIDR. Before changing rate-limit identity, validate the public edge's behavior in a non-production deployment. The test should record only the socket peer, `X-Real-IP`, `X-Forwarded-For`, and resulting `req.ip`; compare normal requests with deliberately forged forwarding headers. Never log cookies, authorization headers, or request bodies.
 
-- Confirm whether any other service in the same Railway environment calls the API through its private hostname.
-- Confirm whether a TCP proxy is enabled.
-- Capture a non-production request at the API that records only the socket peer, `X-Real-IP`, `X-Forwarded-For`, and resulting `req.ip`; do not log cookies, authorization headers, or request bodies.
-- Compare normal and deliberately forged forwarding headers sent through the public edge.
-- Test the chosen key generator against both public and private ingress paths before changing production.
+### Remaining evidence
+
+- Confirm by code/configuration review that no API private hostname is consumed by another service, scheduled job, or external integration.
+- In a non-production deployment, compare the socket peer, `X-Real-IP`, `X-Forwarded-For`, and `req.ip` for normal and deliberately forged public-edge requests.
+- Confirm the chosen rate-limit client identity is stable and cannot be spoofed before changing the production implementation.
 
 ## 3. Vercel/API URL configuration
 
 - Frontend source repeatedly reads `NEXT_PUBLIC_API_URL`, with a local `http://localhost:5000` fallback.
 - Backend `FRONTEND_URL` is used by CORS/origin policy and email-link generation.
 - The backend production startup requires `FRONTEND_URL`.
+- User confirms Vercel's production-only variable is named `NEXT_PUBLIC_API_URL` and believes it points to the intended production Railway API.
+- User reports that Railway API `FRONTEND_URL` points to the Vercel frontend origin and does not include preview deployment origins. These values were not independently inspected or copied into this audit.
 - The repository has no committed `vercel.json`, frontend `.env.example`, or `next.config.js` at the inspected paths.
-- A prior environment review recorded a production URL-valued Vercel variable but did not establish its exact name/scope.
 
-### Required evidence
+### Assessment
 
-Confirm in Vercel project settings, by name and scope only, that `NEXT_PUBLIC_API_URL` is set for Production and points to the intended Railway API base URL. Check Preview and Development scopes separately if those deployments are used. Do not paste the variable value into chat; a redacted host or simple “correct / incorrect” confirmation is sufficient.
-
-Confirm that the Railway API's `FRONTEND_URL` is the canonical production frontend origin and that preview origins are not accidentally allowed in production.
+The variable names and reported scopes/origins are consistent with the application configuration. Treat the actual URL values as user-confirmed belief rather than independently verified platform evidence. No value needs to be pasted into chat or committed.
 
 ## 4. Completion criteria
 
 Phase 21.11.5 remains open until:
 
-1. All error-logging call sites in auth, media, AI, and worker paths have been reviewed for secret-bearing error fields.
-2. Railway ingress paths and client-IP trust assumptions are verified.
-3. Rate-limit behavior is tested with public-edge and any private service traffic.
-4. Vercel production `NEXT_PUBLIC_API_URL` name/scope and backend `FRONTEND_URL` are confirmed without disclosing values.
+1. Remaining error-logging call sites in auth, media, AI, and worker paths have been reviewed for secret-bearing error fields.
+2. API private-hostname consumers are ruled out by configuration/code review, and the public-edge client-IP behavior is validated in non-production.
+3. Rate-limit behavior is tested against normal and forged public forwarding headers.
+4. Vercel production `NEXT_PUBLIC_API_URL` and API `FRONTEND_URL` are confirmed by the user as described above; no secret values are required.
 5. Any resulting code/configuration change has tests and a separate approval before production rollout.
 
 No proxy, rate-limit, logging, or Vercel environment changes were made in this phase.
