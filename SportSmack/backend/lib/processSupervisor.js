@@ -1,3 +1,4 @@
+const safeErrorMetadata = require('./safeErrorMetadata');
 /**
  * Coordinates shutdown of the API and worker child processes.
  * The parent remains alive until every child closes, escalating to SIGKILL
