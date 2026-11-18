@@ -1,3 +1,4 @@
+const safeErrorMetadata = require('./lib/safeErrorMetadata');
 require('dotenv').config();
 
 const { Emitter } =
