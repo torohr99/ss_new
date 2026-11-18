@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const logger = require('../lib/logger');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const {
   sendMail
 } = require('../lib/mailer');
@@ -335,7 +336,7 @@ router.post('/register', async (req, res) => {
     } catch (emailError) {
       console.error(
         'EMAIL VERIFICATION ERROR:',
-        emailError
+        safeErrorMetadata(emailError)
       );
 
       // Remove the account if the verification email could
@@ -350,7 +351,7 @@ router.post('/register', async (req, res) => {
       } catch (deleteError) {
         console.error(
           'Failed to delete user after email failure:',
-          deleteError
+          safeErrorMetadata(deleteError)
         );
       }
 
@@ -369,7 +370,7 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     console.error(
       'Registration error:',
-      error
+      safeErrorMetadata(error)
     );
 
     // Protect against simultaneous duplicate registrations
@@ -444,13 +445,13 @@ router.post('/resend-verification', async (req, res) => {
         }
       });
 
-      logger.error({ error: emailError }, 'Resend verification email failed');
+      logger.error({ error: safeErrorMetadata(emailError) }, 'Resend verification email failed');
       // Keep the public response identical to avoid account enumeration.
     }
 
     return res.json(genericResponse);
   } catch (error) {
-    logger.error({ error }, 'Resend verification request failed');
+    logger.error({ error: safeErrorMetadata(error) }, 'Resend verification request failed');
 
     return res.status(500).json({
       success: false,
@@ -546,7 +547,7 @@ router.post('/verify/:token', async (req, res) => {
       message: 'Your email has been verified successfully. You may now log in.'
     });
   } catch (error) {
-    logger.error({ error }, 'Email verification error');
+    logger.error({ error: safeErrorMetadata(error) }, 'Email verification error');
 
     return res.status(500).json({
       message: 'Server error during email verification.'
@@ -668,7 +669,7 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     logger.error(
       {
-        error
+        error: safeErrorMetadata(error)
       },
       'Login error'
     );
@@ -745,7 +746,7 @@ router.post(
       } catch (emailError) {
         console.error(
           'PASSWORD RESET EMAIL ERROR:',
-          emailError
+          safeErrorMetadata(emailError)
         );
 
         /*
@@ -778,7 +779,7 @@ router.post(
     } catch (error) {
       console.error(
         'Forgot password error:',
-        error
+        safeErrorMetadata(error)
       );
 
       return res.status(500).json({
@@ -872,7 +873,7 @@ router.post(
         message: 'Your password has been reset successfully.'
       });
     } catch (error) {
-      logger.error({ error }, 'Reset password error');
+      logger.error({ error: safeErrorMetadata(error) }, 'Reset password error');
 
       return res.status(500).json({
         message: 'Unable to reset password.'
@@ -938,7 +939,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error(
       'Current-user error:',
-      error
+      safeErrorMetadata(error)
     );
 
     return res.status(500).json({
