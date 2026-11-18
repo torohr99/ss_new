@@ -106,7 +106,7 @@ async function startWorker() {
       } catch (error) {
         console.error(
           'Background-worker lock renewal failed:',
-          error.message
+          safeErrorMetadata(error)
         );
 
         // If lock ownership cannot be verified, stop processing
@@ -149,7 +149,7 @@ async function startWorker() {
           .catch(error => {
             console.error(
               'Chat moderation worker error:',
-              error.message
+              safeErrorMetadata(error)
             );
           })
           .finally(() => {
@@ -212,7 +212,7 @@ async function shutdown(signal, options = {}) {
       if (result.status === 'rejected') {
         console.error(
           'Background job drain failed:',
-          result.reason?.message || result.reason
+          safeErrorMetadata(result.reason)
         );
       }
     }
@@ -220,14 +220,14 @@ async function shutdown(signal, options = {}) {
     liveGameEngine.stop().catch(error => {
       console.error(
         'Live-game stop error after lock loss:',
-        error.message
+        safeErrorMetadata(error)
       );
     });
 
     stopFantasyScheduler().catch(error => {
       console.error(
         'Fantasy scheduler stop error after lock loss:',
-        error.message
+        safeErrorMetadata(error)
       );
     });
   }
@@ -242,7 +242,7 @@ async function shutdown(signal, options = {}) {
   } catch (error) {
     console.error(
       'Prisma shutdown error:',
-      error.message
+      safeErrorMetadata(error)
     );
   }
 
@@ -251,7 +251,7 @@ async function shutdown(signal, options = {}) {
   } catch (error) {
     console.error(
       'Socket.IO Redis emitter shutdown error:',
-      error.message
+      safeErrorMetadata(error)
     );
   }
 
@@ -261,7 +261,7 @@ async function shutdown(signal, options = {}) {
     } catch (error) {
       console.error(
         'Worker lock release error:',
-        error.message
+        safeErrorMetadata(error)
       );
     }
   }
@@ -271,7 +271,7 @@ async function shutdown(signal, options = {}) {
   } catch (error) {
     console.error(
       'Redis shutdown error:',
-      error.message
+      safeErrorMetadata(error)
     );
   }
 
@@ -295,7 +295,7 @@ process.on(
 startWorker().catch(async error => {
   console.error(
     'SportSmack worker failed to start:',
-    error
+    safeErrorMetadata(error)
   );
 
   // Reuse the normal cleanup path so a startup failure cannot
