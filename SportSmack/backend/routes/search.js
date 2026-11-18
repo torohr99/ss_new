@@ -1,4 +1,5 @@
 const express = require('express');
+const safeErrorMetadata = require('../lib/safeErrorMetadata');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const prisma = require('../lib/prisma');
@@ -55,7 +56,7 @@ router.get('/', authMiddleware, async (req, res) => {
     const combinedResults = [...formattedUsers, ...formattedTeams];
     res.json(combinedResults);
   } catch (error) {
-    console.error("Global search crash:", error);
+    console.error("Global search crash:", safeErrorMetadata(error));
     res.status(500).json({ message: 'Server error during global search' });
   }
 });
