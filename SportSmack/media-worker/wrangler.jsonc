@@ -14,5 +14,19 @@
   ],
   "vars": {
     "ALLOWED_ORIGINS": "https://ss-new-backendfromr.vercel.app,http://localhost:3000"
+  },
+  "env": {
+    "staging": {
+      "workers_dev": true,
+      "r2_buckets": [
+        {
+          "binding": "MEDIA_BUCKET",
+          "bucket_name": "sportsmack-media-staging"
+        }
+      ],
+      "vars": {
+        "ALLOWED_ORIGINS": "https://ss-new-backendfromr-git-staging-sport-smack.vercel.app"
+      }
+    }
   }
 }
